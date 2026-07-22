@@ -137,7 +137,15 @@ export const useStore = create<State>()(
       },
 
       symbol: DEFAULT_SYMBOL,
-      resolution: 5,
+      // 1 minute by default.
+      //
+      // Measured against the live feed: a 1m bar carries a wick 91% of the time
+      // with a body/range of 0.69 — a real candle. At 5s the same instrument is
+      // flat 62% of the time, because BTC's mid changes roughly 45 times a
+      // minute in bursts, so most 5-second windows contain no price change at
+      // all. 5s and 15s remain available for volatile periods; they are just a
+      // poor thing to open onto.
+      resolution: 60,
       chartStyle: "candles",
 
       stakeMinor: "10000", // KES 100.00
@@ -414,7 +422,7 @@ export const useStore = create<State>()(
       // longer offers and the segmented control would show nothing selected.
       // v4: the catalogue is crypto-only now, so a persisted "VOL50" would
       // restore a symbol that no longer exists and `instrument()` would throw.
-      name: "meridian.session.v4",
+      name: "meridian.session.v5",
       storage: createJSONStorage(() => localStorage),
     },
   ),

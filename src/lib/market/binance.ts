@@ -146,8 +146,19 @@ export class BinanceFeed {
   private readonly controller = new AbortController();
   private readonly toOurSymbol = new Map<string, string>();
 
-  /** Newest quote per symbol, awaiting the next flush. */
-  private readonly pending = new Map<string, number>();
+  /**
+   * Quotes observed since the last flush, reduced to what a candle needs.
+   *
+   * Keeping only the newest price here was wrong and it showed: every
+   * intermediate quote between flushes was discarded, so a 5-second bar was
+   * built from twenty near-identical samples and drew as a flat body with no
+   * wicks. Tracking the extremes as well means the bar's high and low reflect
+   * every quote actually seen, which is what a candle is supposed to say.
+   */
+  private readonly pending = new Map<
+    string,
+    { min: number; max: number; last: number }
+  >();
 
   /**
    * `serverTime - Date.now()`.
@@ -234,9 +245,23 @@ export class BinanceFeed {
       if (this.pending.size === 0) return;
 
       const ts = Date.now() + this.clockOffset;
-      for (const [symbol, price] of this.pending) {
-        this.engine.ingest(symbol, price, ts);
+
+      for (const [symbol, agg] of this.pending) {
+        // Replay the window as extremes then close, a millisecond apart, so the
+        // candle picks up its true high and low rather than just the last
+        // sample. The extreme further from the close is emitted first — that is
+        // the ordering a real path is most likely to have taken, and it puts
+        // the nearer extreme adjacent to the close.
+        if (agg.min !== agg.max) {
+          const farFirst =
+            Math.abs(agg.max - agg.last) >= Math.abs(agg.min - agg.last);
+          this.engine.ingest(symbol, farFirst ? agg.max : agg.min, ts, false);
+          this.engine.ingest(symbol, farFirst ? agg.min : agg.max, ts + 1, false);
+        }
+        // Only the close notifies subscribers — one render per symbol per beat.
+        this.engine.ingest(symbol, agg.last, ts + 2);
       }
+
       this.pending.clear();
     }, INGEST_INTERVAL_MS);
   }
@@ -272,7 +297,11 @@ export class BinanceFeed {
         try {
           const [minutes, seconds] = await Promise.all([
             fetchKlines(binanceSymbol, "1m", 720, this.controller.signal),
-            fetchKlines(binanceSymbol, "1s", 600, this.controller.signal),
+            // 1000 is Binance's per-request cap: ~16 minutes of 1s bars, which
+            // covers well past what the 5s chart shows on screen. Below that
+            // the visible window runs off the end of the fine data and into
+            // flat carry bars.
+            fetchKlines(binanceSymbol, "1s", 1000, this.controller.signal),
           ]);
 
           // Hand over per symbol rather than all up front. `goLive` wipes the
@@ -358,10 +387,18 @@ export class BinanceFeed {
         if (!Number.isFinite(bid) || !Number.isFinite(ask)) return;
         if (bid <= 0 || ask <= 0 || ask < bid) return;
 
-        // Coalesced, not ingested — the flush timer samples this at 250ms.
+        // Coalesced, not ingested — the flush timer drains this at 250ms.
         // `bookTicker` carries no event time, hence the clock-offset stamp
         // applied at flush.
-        this.pending.set(ours, (bid + ask) / 2);
+        const mid = (bid + ask) / 2;
+        const agg = this.pending.get(ours);
+        if (agg) {
+          if (mid < agg.min) agg.min = mid;
+          if (mid > agg.max) agg.max = mid;
+          agg.last = mid;
+        } else {
+          this.pending.set(ours, { min: mid, max: mid, last: mid });
+        }
       } catch {
         // A malformed frame is not worth tearing the connection down for.
       }

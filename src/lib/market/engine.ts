@@ -474,7 +474,16 @@ export class MarketEngine {
     const last = state.ticks[state.ticks.length - 1];
     if (last && ts < last.ts) return;
 
-    const mid = round(price, state.spec.precision);
+    // Store one decimal finer than the instrument quotes.
+    //
+    // The mid of a one-tick-wide book sits on a *half* tick — BTC bid 65969.96
+    // / ask 65969.97 gives 65969.965. Rounding that to the instrument's own
+    // 2dp precision quantises every half-tick move to either zero or a full
+    // cent, which erases most of the genuine variation inside a short bar and
+    // is a large part of why 5s candles were drawing as flat bodies. The extra
+    // digit is real observed price, not invented resolution; display still
+    // formats at the instrument's precision.
+    const mid = round(price, state.spec.precision + 1);
     const tick: Tick = {
       symbol,
       ts,

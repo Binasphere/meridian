@@ -134,10 +134,13 @@ export function PriceChart({
       },
     });
 
+    // One decimal finer than the instrument quotes, matching how the engine
+    // stores mid prices. With `minMove` at the instrument's own tick size the
+    // renderer snaps half-tick wicks away and short bars flatten out.
     const priceFormat = {
       type: "price" as const,
-      precision,
-      minMove: 1 / 10 ** precision,
+      precision: precision + 1,
+      minMove: 1 / 10 ** (precision + 1),
     };
 
     const handle: SeriesHandle =
