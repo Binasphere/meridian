@@ -101,15 +101,17 @@ export function PriceChart({
       timeScale: {
         borderColor: "rgba(255,255,255,0.07)",
         timeVisible: true,
-        // Every interval is now >= 5 minutes, so the seconds field on an axis
-        // label would always read ":00".
-        secondsVisible: false,
+        // Sub-minute intervals need the seconds field; at 1m and above every
+        // label would just read ":00".
+        secondsVisible: resolution < 60,
         rightOffset: 8,
-        // Wide bars. At 8px the bodies were hairlines and the wicks were
-        // indistinguishable from the grid; 14px gives a candle an actual body
-        // to read an open/close off, which is the entire point of the form.
+        // Wide bars, held wide regardless of interval. At 8px the bodies were
+        // hairlines and the wicks were indistinguishable from the grid; 14px
+        // gives a candle an actual body to read an open/close off, which is the
+        // entire point of the form. Shortening the interval must not quietly
+        // shrink them again — `minBarSpacing` is the floor that prevents it.
         barSpacing: 14,
-        minBarSpacing: 6,
+        minBarSpacing: 8,
       },
       crosshair: {
         mode: CrosshairMode.Normal,

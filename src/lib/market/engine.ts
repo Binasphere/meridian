@@ -23,15 +23,26 @@ import { INSTRUMENTS, type Instrument } from "./instruments";
  */
 
 /**
- * Candle intervals, in seconds. 5 minutes is the floor.
+ * Candle intervals, in seconds.
  *
- * Sub-minute candles look busy but carry almost no information at these
- * volatilities — a 1-second candle is mostly a single tick with no body. Five
- * minutes is the shortest interval where the open/high/low/close actually
- * describe a range worth reading.
+ * The ladder is chosen against the *contract durations*, which is the only
+ * thing that makes an interval useful or useless here. Contracts run 30s to
+ * 15m, and you want a contract to span roughly 5–20 candles: fewer and the
+ * chart says nothing about the period you are trading, more and your entry
+ * scrolls off the left before expiry.
+ *
+ *   5s  → a 30s contract spans 6 candles, a 1m spans 12   (the default)
+ *   15s → a 1m spans 4, a 5m spans 20
+ *   1m  → a 5m spans 5, a 15m spans 15
+ *   5m  → context for 15m contracts
+ *   15m → session context
+ *
+ * 5 seconds is the floor rather than 1: at a 250ms tick a 5s candle aggregates
+ * 20 ticks, which is enough for a real body and wicks. A 1s candle is four
+ * ticks — mostly a doji with no information in it.
  */
-export type Resolution = 300 | 900 | 1800 | 3600;
-export const RESOLUTIONS: Resolution[] = [300, 900, 1800, 3600];
+export type Resolution = 5 | 15 | 60 | 300 | 900;
+export const RESOLUTIONS: Resolution[] = [5, 15, 60, 300, 900];
 
 export interface Tick {
   symbol: string;
@@ -52,20 +63,51 @@ export interface Candle {
 
 const TICK_MS = 250;
 const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
-const MAX_TICKS = 15_000;
+/**
+ * Retained tick history.
+ *
+ * Only two things read raw ticks: settlement (`priceAt`, which needs the last
+ * few minutes) and the 15-minute sparkline/change window. Long history lives in
+ * the aggregated candles, not here, so this can stay small — 8,000 ticks is
+ * ~33 minutes of live 4Hz data, comfortably more than either caller needs.
+ */
+const MAX_TICKS = 8_000;
 const MAX_CANDLES = 900;
 
 /**
  * Backfill, so the chart opens onto real history rather than three candles.
  *
- * Three days at a 30-second step. The step is coarse because the shortest
- * candle is now five minutes — 30s still puts ten samples inside every candle,
- * which is plenty to shape a body and wicks, at a twentieth of the work a 1s
- * warmup would cost. Settlement is unaffected: contracts run 30s to 15m and
- * always settle against live 250ms ticks, never against warmup history.
+ * 24 hours at a 5-second step — the step has to match the shortest candle, or
+ * the backfilled 5s candles would each be a single sample with no body. That is
+ * 17,280 steps per instrument, which measures at ~160ms for the whole
+ * catalogue.
+ *
+ * 24 hours is chosen against the *longest* interval: it gives the 15m chart 96
+ * candles of history. The shorter intervals hit the `MAX_CANDLES` cap long
+ * before that and keep their most recent 900.
+ *
+ * Settlement is unaffected either way — contracts run 30s to 15m and always
+ * settle against live 250ms ticks, never against warmup history.
  */
-const WARMUP_SECONDS = 3 * 24 * 60 * 60;
-const WARMUP_STEP_MS = 30_000;
+const WARMUP_SECONDS = 24 * 60 * 60;
+
+/**
+ * The warmup runs in two phases, because one step size cannot serve both ends
+ * of the interval ladder.
+ *
+ * A step equal to the shortest bucket puts exactly one sample in each of those
+ * candles, and a candle built from one sample has no range — no wicks, no
+ * shape, nothing to read. A step fine enough for 5s candles across the whole
+ * 24 hours would be 86,400 iterations per instrument and cost seconds of
+ * blocked main thread at startup.
+ *
+ * So: a 1-second step over the recent window (enough to fill the 900-candle cap
+ * at 5s with five samples each), and a coarse 30-second step before that, which
+ * only the 5m and 15m series still care about by then.
+ */
+const WARMUP_FINE_SECONDS = 90 * 60;
+const WARMUP_FINE_STEP_MS = 1_000;
+const WARMUP_COARSE_STEP_MS = 30_000;
 
 /**
  * Target spread of log-price around an instrument's base, as a standard
@@ -156,12 +198,20 @@ export class MarketEngine {
 
   private warmup(state: SymbolState): void {
     const now = Date.now();
+    const fineFrom = now - WARMUP_FINE_SECONDS * 1000;
+
+    // Distant past: coarse. Only the 5m/15m series still hold these.
     for (
       let ts = now - WARMUP_SECONDS * 1000;
-      ts <= now;
-      ts += WARMUP_STEP_MS
+      ts < fineFrom;
+      ts += WARMUP_COARSE_STEP_MS
     ) {
-      this.record(state, this.advance(state, WARMUP_STEP_MS, ts));
+      this.record(state, this.advance(state, WARMUP_COARSE_STEP_MS, ts));
+    }
+
+    // Recent past: fine, so the short intervals get real bodies and wicks.
+    for (let ts = fineFrom; ts <= now; ts += WARMUP_FINE_STEP_MS) {
+      this.record(state, this.advance(state, WARMUP_FINE_STEP_MS, ts));
     }
   }
 
@@ -225,14 +275,18 @@ export class MarketEngine {
         last.low = Math.min(last.low, tick.mid);
         last.close = tick.mid;
       } else {
+        // Open at the previous close — a gap between one candle's close and the
+        // next one's open is an artifact readers correctly read as missing data.
+        const open = last ? last.close : tick.mid;
         series.push({
           time: bucket,
-          // Open at the previous close — a gap between one candle's close and
-          // the next one's open is an artifact readers correctly read as
-          // missing data.
-          open: last ? last.close : tick.mid,
-          high: tick.mid,
-          low: tick.mid,
+          open,
+          // High and low must bracket BOTH open and close. Seeding them from
+          // the tick alone produces a malformed candle whenever a bucket
+          // receives only one sample: the open sits outside the high–low range,
+          // which is not a candle any renderer can draw honestly.
+          high: Math.max(open, tick.mid),
+          low: Math.min(open, tick.mid),
           close: tick.mid,
         });
         if (series.length > MAX_CANDLES) {

@@ -137,7 +137,7 @@ export const useStore = create<State>()(
       },
 
       symbol: "VOL50",
-      resolution: 300,
+      resolution: 5,
       chartStyle: "candles",
 
       stakeMinor: "10000", // KES 100.00
@@ -409,7 +409,10 @@ export const useStore = create<State>()(
       // Bumped from v1: the persisted shape lost two preference keys and the
       // default candle interval changed, so a stale v1 blob would restore a
       // resolution the chart no longer offers.
-      name: "meridian.session.v2",
+      // Bumped again: the candle-interval ladder changed, so a persisted v2
+      // resolution (300/900/1800/3600) would restore a value the chart no
+      // longer offers and the segmented control would show nothing selected.
+      name: "meridian.session.v3",
       storage: createJSONStorage(() => localStorage),
     },
   ),

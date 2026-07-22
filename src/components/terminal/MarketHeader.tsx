@@ -7,10 +7,11 @@ import type { Resolution } from "@/lib/market/engine";
 import { Segmented } from "@/components/ui/primitives";
 
 const RESOLUTION_OPTIONS: ReadonlyArray<{ value: Resolution; label: string }> = [
+  { value: 5, label: "5s" },
+  { value: 15, label: "15s" },
+  { value: 60, label: "1m" },
   { value: 300, label: "5m" },
   { value: 900, label: "15m" },
-  { value: 1800, label: "30m" },
-  { value: 3600, label: "1H" },
 ];
 
 /**
