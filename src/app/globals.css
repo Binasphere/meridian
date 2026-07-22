@@ -243,6 +243,14 @@
     animation: panel-slide-in 240ms var(--ease-out-quint);
   }
 
+  @keyframes dialog-pop-in {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  .dialog-pop[data-state="open"] {
+    animation: dialog-pop-in 180ms var(--ease-out-quint);
+  }
+
   .grid-noise {
     background-image:
       linear-gradient(var(--color-line) 1px, transparent 1px),

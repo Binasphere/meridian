@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, RotateCcw, Undo2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,13 @@ import { formatMoney, formatRelative } from "@/lib/format";
 import { useNow } from "@/lib/hooks";
 import { maskPhone, useCurrentAccount } from "@/lib/auth";
 import { useStore } from "@/lib/store";
+import {
+  DEMO_COMMUNITY_ACTIVITY,
+  buildDemoActivity,
+  makeDemoActivity,
+  nextDemoInterval,
+  type DemoActivity,
+} from "@/lib/demo";
 import type { Trade } from "@/lib/trading";
 import { LiveDot } from "@/components/ui/primitives";
 
@@ -97,14 +104,47 @@ export function ActivityFeed() {
 
   const selfLabel = account ? maskPhone(account.phone) : "You";
 
-  const events = useMemo(
-    () =>
-      eventsFromTrades(
-        trades.filter((t) => t.accountKind === accountKind),
-        selfLabel,
-      ),
-    [trades, accountKind, selfLabel],
+  // Sample community events, seeded once and dripped in on a timer so the feed
+  // demonstrates its live behaviour. See `demo.ts` — this is off in production.
+  const [demo, setDemo] = useState<DemoActivity[]>(() =>
+    DEMO_COMMUNITY_ACTIVITY ? buildDemoActivity() : [],
   );
+
+  useEffect(() => {
+    if (!DEMO_COMMUNITY_ACTIVITY) return;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const schedule = () => {
+      timer = setTimeout(() => {
+        setDemo((current) =>
+          [makeDemoActivity(Date.now()), ...current].slice(0, 40),
+        );
+        schedule();
+      }, nextDemoInterval());
+    };
+
+    schedule();
+    return () => clearTimeout(timer);
+  }, []);
+
+  const events = useMemo(() => {
+    const mine = eventsFromTrades(
+      trades.filter((t) => t.accountKind === accountKind),
+      selfLabel,
+    );
+
+    const sample: ActivityEvent[] = demo.map((d) => ({
+      id: d.id,
+      at: d.at,
+      actor: { id: d.id, label: d.actorLabel, isSelf: false },
+      kind: d.kind,
+      symbol: d.symbol,
+      amountMinor: d.amountMinor,
+      direction: d.direction,
+    }));
+
+    return [...mine, ...sample].sort((a, b) => b.at - a.at).slice(0, 50);
+  }, [trades, accountKind, selfLabel, demo]);
 
   return (
     <section className="border border-line bg-surface-1">
@@ -113,7 +153,14 @@ export function ActivityFeed() {
         <h2 className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
           Activity
         </h2>
-        {events.length > 0 ? (
+        {DEMO_COMMUNITY_ACTIVITY ? (
+          // Visible, not buried in a tooltip. Anyone looking at the screen can
+          // tell this is sample data, which is what keeps it a demo aid rather
+          // than manufactured social proof.
+          <span className="ml-auto border border-warning/25 bg-warning/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-warning">
+            sample
+          </span>
+        ) : events.length > 0 ? (
           <span className="tnum ml-auto font-mono text-[10.5px] text-ink-faint">
             {events.length}
           </span>
@@ -125,10 +172,6 @@ export function ActivityFeed() {
           <div className="px-3 py-5 text-center">
             <p className="text-[11.5px] leading-relaxed text-ink-muted">
               Your contracts appear here as they settle.
-            </p>
-            <p className="mt-1.5 text-[10.5px] leading-relaxed text-ink-faint">
-              Community activity switches on with live accounts — real trades by
-              real people, never generated.
             </p>
           </div>
         ) : (

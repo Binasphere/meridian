@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { ArrowDownToLine } from "lucide-react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { useCurrentAccount } from "@/lib/auth";
@@ -11,6 +10,7 @@ import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
 import { LiveDot } from "@/components/ui/primitives";
 import { Wordmark } from "@/components/Wordmark";
 import { AccountPanel } from "./AccountPanel";
+import { CashDialog } from "./CashDialog";
 
 /**
  * The terminal's top bar.
@@ -20,6 +20,7 @@ import { AccountPanel } from "./AccountPanel";
  */
 export function TopBar() {
   const [panelOpen, setPanelOpen] = useState(false);
+  const [depositOpen, setDepositOpen] = useState(false);
 
   const accountKind = useStore((s) => s.accountKind);
   const balance = useStore(selectBalance);
@@ -48,7 +49,7 @@ export function TopBar() {
             </div>
           </div>
 
-          <DepositButton />
+          <DepositButton onClick={() => setDepositOpen(true)} />
 
           <button
             onClick={() => setPanelOpen(true)}
@@ -64,6 +65,11 @@ export function TopBar() {
       </header>
 
       <AccountPanel open={panelOpen} onOpenChange={setPanelOpen} />
+      <CashDialog
+        mode="deposit"
+        open={depositOpen}
+        onOpenChange={setDepositOpen}
+      />
     </>
   );
 }
@@ -136,15 +142,10 @@ function AccountSwitcher() {
  * it sits in the header, well away from the trading panel, so it cannot be
  * confused with the "up" direction on a contract.
  */
-function DepositButton() {
+function DepositButton({ onClick }: { onClick: () => void }) {
   return (
     <button
-      onClick={() =>
-        toast("Deposits are not enabled in this build", {
-          description:
-            "M-Pesa STK push connects in the next phase. The demo account is already funded.",
-        })
-      }
+      onClick={onClick}
       className={cn(
         "inline-flex h-9 shrink-0 items-center gap-1.5 px-3 sm:px-3.5",
         "bg-cash text-[13px] font-semibold text-white hover:bg-cash-hover",
