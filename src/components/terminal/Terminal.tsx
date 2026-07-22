@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { instrument } from "@/lib/market/instruments";
+import { instrumentOrDefault } from "@/lib/market/instruments";
 import { market } from "@/lib/market/engine";
 import { useAuth, useAuthHydrated } from "@/lib/auth";
 import { useOpenTrades, useStore } from "@/lib/store";
@@ -53,7 +53,7 @@ export function Terminal() {
   if (!mounted || !authHydrated) return <Boot />;
   if (!currentPhone) return <AuthScreen />;
 
-  const spec = instrument(symbol);
+  const spec = instrumentOrDefault(symbol);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-base">

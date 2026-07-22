@@ -243,12 +243,20 @@
     animation: panel-slide-in 240ms var(--ease-out-quint);
   }
 
+  /* Animate `scale` and `opacity` only — never `transform`.
+     Tailwind v4 centres this dialog with the standalone `translate` property
+     (`translate: -50% -50%`), and `transform` composes *on top of* it rather
+     than replacing it. A keyframe that re-states the translate inside a
+     `transform` therefore doubles it: the dialog opens shifted a full width and
+     height up-left, then snaps to centre when the animation ends and the
+     transform is dropped. Using the standalone `scale` property composes
+     correctly with `translate` and leaves the centring untouched. */
   @keyframes dialog-pop-in {
-    from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
-    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    from { opacity: 0; scale: 0.97; }
+    to { opacity: 1; scale: 1; }
   }
   .dialog-pop[data-state="open"] {
-    animation: dialog-pop-in 180ms var(--ease-out-quint);
+    animation: dialog-pop-in 160ms var(--ease-out-quint);
   }
 
   .grid-noise {

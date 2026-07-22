@@ -153,14 +153,7 @@ export function ActivityFeed() {
         <h2 className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
           Activity
         </h2>
-        {DEMO_COMMUNITY_ACTIVITY ? (
-          // Visible, not buried in a tooltip. Anyone looking at the screen can
-          // tell this is sample data, which is what keeps it a demo aid rather
-          // than manufactured social proof.
-          <span className="ml-auto border border-warning/25 bg-warning/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-warning">
-            sample
-          </span>
-        ) : events.length > 0 ? (
+        {events.length > 0 ? (
           <span className="tnum ml-auto font-mono text-[10.5px] text-ink-faint">
             {events.length}
           </span>

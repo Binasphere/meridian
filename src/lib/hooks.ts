@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { market, type Tick } from "./market/engine";
+import { market, onFeedStatus, type Tick } from "./market/engine";
 
 /**
  * React bindings for the market engine.
@@ -118,6 +118,28 @@ export function useMounted(): boolean {
     () => true,
     () => false,
   );
+}
+
+/**
+ * Which symbols are on a real exchange feed.
+ *
+ * Re-derived whenever the feed's connection status changes, so a symbol's badge
+ * flips from "sim" to "live" the moment real prices start arriving — and back
+ * again if the connection is lost for good.
+ */
+export function useLiveSymbols(): Set<string> {
+  const [live, setLive] = useState<Set<string>>(() => new Set());
+
+  useEffect(() => {
+    const engine = market();
+    const refresh = () =>
+      setLive(new Set(engine.symbols().filter((s) => engine.isLive(s))));
+
+    refresh();
+    return onFeedStatus(refresh);
+  }, []);
+
+  return live;
 }
 
 /** Previous value of something, for comparing across renders. */

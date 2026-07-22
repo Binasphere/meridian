@@ -5,7 +5,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { market, type Resolution } from "./market/engine";
-import { instrument } from "./market/instruments";
+import { DEFAULT_SYMBOL, instrument } from "./market/instruments";
 import {
   decide,
   pnlFor,
@@ -136,7 +136,7 @@ export const useStore = create<State>()(
         LIVE: LIVE_STARTING_BALANCE.toString(),
       },
 
-      symbol: "VOL50",
+      symbol: DEFAULT_SYMBOL,
       resolution: 5,
       chartStyle: "candles",
 
@@ -412,7 +412,9 @@ export const useStore = create<State>()(
       // Bumped again: the candle-interval ladder changed, so a persisted v2
       // resolution (300/900/1800/3600) would restore a value the chart no
       // longer offers and the segmented control would show nothing selected.
-      name: "meridian.session.v3",
+      // v4: the catalogue is crypto-only now, so a persisted "VOL50" would
+      // restore a symbol that no longer exists and `instrument()` would throw.
+      name: "meridian.session.v4",
       storage: createJSONStorage(() => localStorage),
     },
   ),

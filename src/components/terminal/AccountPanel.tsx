@@ -10,17 +10,14 @@ import {
   ChartNoAxesColumn,
   ChevronRight,
   CircleHelp,
-  History,
-  LineChart,
   LogOut,
-  Settings,
   Wallet,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { formatPhone, useAuth, useCurrentAccount } from "@/lib/auth";
-import { instrument } from "@/lib/market/instruments";
+import { instrumentOrDefault } from "@/lib/market/instruments";
 import { useHistory, useStore } from "@/lib/store";
 import { CashDialog } from "./CashDialog";
 
@@ -53,7 +50,7 @@ export function AccountPanel({
   const accountKind = useStore((s) => s.accountKind);
   const symbol = useStore((s) => s.symbol);
   const history = useHistory();
-  const spec = instrument(symbol);
+  const spec = instrumentOrDefault(symbol);
 
   const close = () => onOpenChange(false);
 
@@ -119,12 +116,17 @@ export function AccountPanel({
                 </button>
               </div>
 
-              {/* --- Routes -------------------------------------------------- */}
+              {/* --- Routes --------------------------------------------------
+                  Four destinations, not eight. Balances, moving money and the
+                  statement are one task and now live on one page; splitting
+                  them made each page a thin card and every answer an extra
+                  navigation away. */}
               <nav className="divide-y divide-line">
                 <PanelLink
-                  href="/balances"
+                  href="/wallet"
                   icon={Wallet}
-                  label="Balances"
+                  label="Wallet"
+                  hint="Balances · deposits · statement"
                   value={formatMoney(BigInt(balances[accountKind]), {
                     currency: "KSh",
                   })}
@@ -133,42 +135,21 @@ export function AccountPanel({
                 <PanelLink
                   href="/performance"
                   icon={ChartNoAxesColumn}
-                  label="Session performance"
+                  label="Performance"
+                  hint="Strike rate · selected market"
                   value={
-                    history.length > 0 ? `${history.length} settled` : "None yet"
+                    history.length > 0
+                      ? `${history.length} settled`
+                      : spec.symbol
                   }
                   onNavigate={close}
                 />
                 <PanelLink
-                  href="/market"
-                  icon={LineChart}
-                  label="Selected market"
-                  value={spec.symbol}
-                  onNavigate={close}
-                />
-                <PanelLink
-                  href="/wallet"
-                  icon={ArrowDownToLine}
-                  label="Deposits & withdrawals"
-                  onNavigate={close}
-                />
-                <PanelLink
-                  href="/statement"
-                  icon={History}
-                  label="Transaction statement"
-                  onNavigate={close}
-                />
-                <PanelLink
-                  href="/verification"
+                  href="/account"
                   icon={BadgeCheck}
-                  label="Verification & limits"
+                  label="Account"
+                  hint="Profile · verification · settings"
                   value="Tier 1"
-                  onNavigate={close}
-                />
-                <PanelLink
-                  href="/settings"
-                  icon={Settings}
-                  label="Settings"
                   onNavigate={close}
                 />
                 <PanelLink
@@ -215,24 +196,34 @@ function PanelLink({
   href,
   icon: Icon,
   label,
+  hint,
   value,
   onNavigate,
 }: {
   href: string;
   icon: React.ElementType;
   label: string;
+  hint?: string;
   value?: string;
   onNavigate: () => void;
 }) {
   return (
     <Link
       href={href}
+      // Next prefetches links in the viewport, so the page is already compiled
+      // and its chunk downloaded by the time the row is clicked.
+      prefetch
       onClick={onNavigate}
-      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 transition-colors hover:bg-surface-2"
+      className="flex w-full items-center gap-2.5 px-3.5 py-3 transition-colors hover:bg-surface-2"
     >
-      <Icon className="h-[15px] w-[15px] shrink-0 text-ink-muted" aria-hidden />
-      <span className="flex-1 truncate text-[13px] text-ink-secondary">
-        {label}
+      <Icon className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] text-ink">{label}</span>
+        {hint ? (
+          <span className="block truncate text-[10.5px] text-ink-faint">
+            {hint}
+          </span>
+        ) : null}
       </span>
       {value ? (
         <span className="tnum shrink-0 font-mono text-[11px] text-ink-faint">

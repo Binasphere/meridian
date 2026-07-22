@@ -1,51 +1,353 @@
-export type InstrumentKind = "SYNTHETIC" | "CRYPTO" | "FOREX" | "COMMODITY";
+export type InstrumentKind = "MAJOR" | "LAYER1" | "DEFI" | "MEME";
 
 export interface Instrument {
   symbol: string;
   displayName: string;
   short: string;
   kind: InstrumentKind;
+  /** Decimals in a quoted price. Taken from Binance's PRICE_FILTER tickSize. */
   precision: number;
   /** Payout on a win, in basis points of stake. 8500 = 85%. */
   payoutBps: number;
+  /**
+   * Only used by the offline fallback simulation, as the level it reverts
+   * toward. Live prices come from the exchange and ignore this entirely.
+   */
   basePrice: number;
-  /** Annualised volatility. */
+  /** Annualised volatility — fallback simulation only. */
   volatility: number;
   drift: number;
   halfSpread: number;
-  /**
-   * True when the symbol names a real market whose price this is *not*.
-   * The terminal badges these so nobody mistakes a simulation for a quote.
-   */
-  simulated: boolean;
 }
 
 /**
  * The instrument catalogue.
  *
- * Synthetic indices lead deliberately. A synthetic index has no underlying
- * market — its price *is* a published random process — so a generated feed is
- * the complete and honest implementation of one, not a placeholder.
+ * **Every instrument here is quoted from a real exchange feed.** Forex, metals
+ * and the synthetic indices were removed rather than shipped on generated
+ * prices: if we cannot quote a market honestly, we do not list it. That is a
+ * narrower catalogue than a typical platform in this category advertises, and
+ * it is the whole point — everything on this screen is a price something
+ * actually traded at.
  *
- * The crypto/FX/metals rows below name real markets. Their prices here are
- * simulated, so they carry `simulated: true` and the UI renders a badge against
- * them. These are the symbols that switch to live quotes when a market-data
- * provider is wired in.
+ * The simulation engine still exists, but only as a *failover*: if the exchange
+ * connection dies, an instrument falls back to a generated walk and its badge
+ * flips from "live" to "sim" so the change is visible rather than silent.
+ *
+ * Prices are quoted against USDT, which is the liquid quote asset on Binance
+ * and tracks USD closely but is not identical to it.
+ *
+ * Generated from `GET /api/v3/exchangeInfo` — precision is each pair's real
+ * tick size, not a guess.
  */
 export const INSTRUMENTS: Instrument[] = [
-  { symbol: "VOL10",  displayName: "Volatility 10 Index",  short: "V10",  kind: "SYNTHETIC", precision: 3, payoutBps: 8000, basePrice: 6543.21,  volatility: 0.30, drift: 0, halfSpread: 0.05,    simulated: false },
-  { symbol: "VOL25",  displayName: "Volatility 25 Index",  short: "V25",  kind: "SYNTHETIC", precision: 3, payoutBps: 8300, basePrice: 3218.44,  volatility: 0.75, drift: 0, halfSpread: 0.04,    simulated: false },
-  { symbol: "VOL50",  displayName: "Volatility 50 Index",  short: "V50",  kind: "SYNTHETIC", precision: 3, payoutBps: 8600, basePrice: 9427.43,  volatility: 1.50, drift: 0, halfSpread: 0.08,    simulated: false },
-  { symbol: "VOL75",  displayName: "Volatility 75 Index",  short: "V75",  kind: "SYNTHETIC", precision: 2, payoutBps: 8900, basePrice: 128450.0, volatility: 2.25, drift: 0, halfSpread: 1.2,     simulated: false },
-  { symbol: "VOL100", displayName: "Volatility 100 Index", short: "V100", kind: "SYNTHETIC", precision: 3, payoutBps: 9200, basePrice: 1456.78,  volatility: 3.00, drift: 0, halfSpread: 0.03,    simulated: false },
+  // --- Majors --------------------------------------------------------------
+  {
+    symbol: "BTCUSD",
+    displayName: "Bitcoin / USD",
+    short: "BTC",
+    kind: "MAJOR",
+    precision: 2,
+    payoutBps: 8600,
+    basePrice: 66202.53,
+    volatility: 0.55,
+    drift: 0,
+    halfSpread: 0.02,
+  },
+  {
+    symbol: "ETHUSD",
+    displayName: "Ethereum / USD",
+    short: "ETH",
+    kind: "MAJOR",
+    precision: 2,
+    payoutBps: 8700,
+    basePrice: 1947.96,
+    volatility: 0.7,
+    drift: 0,
+    halfSpread: 0.02,
+  },
+  {
+    symbol: "BNBUSD",
+    displayName: "BNB / USD",
+    short: "BNB",
+    kind: "MAJOR",
+    precision: 2,
+    payoutBps: 8600,
+    basePrice: 575.15,
+    volatility: 0.6,
+    drift: 0,
+    halfSpread: 0.02,
+  },
+  {
+    symbol: "SOLUSD",
+    displayName: "Solana / USD",
+    short: "SOL",
+    kind: "MAJOR",
+    precision: 2,
+    payoutBps: 8800,
+    basePrice: 78.57,
+    volatility: 0.95,
+    drift: 0,
+    halfSpread: 0.02,
+  },
+  {
+    symbol: "XRPUSD",
+    displayName: "XRP / USD",
+    short: "XRP",
+    kind: "MAJOR",
+    precision: 4,
+    payoutBps: 8700,
+    basePrice: 1.1518,
+    volatility: 0.85,
+    drift: 0,
+    halfSpread: 0.0002,
+  },
 
-  { symbol: "BTCUSD", displayName: "Bitcoin / USD",  short: "BTC", kind: "CRYPTO",    precision: 2, payoutBps: 8500, basePrice: 96480.00, volatility: 0.55, drift: 0, halfSpread: 6.0,     simulated: true },
-  { symbol: "ETHUSD", displayName: "Ethereum / USD", short: "ETH", kind: "CRYPTO",    precision: 2, payoutBps: 8500, basePrice: 3342.60,  volatility: 0.70, drift: 0, halfSpread: 0.45,    simulated: true },
-  { symbol: "SOLUSD", displayName: "Solana / USD",   short: "SOL", kind: "CRYPTO",    precision: 3, payoutBps: 8700, basePrice: 189.240,  volatility: 0.95, drift: 0, halfSpread: 0.035,   simulated: true },
-  { symbol: "XAUUSD", displayName: "Gold / USD",     short: "XAU", kind: "COMMODITY", precision: 2, payoutBps: 8200, basePrice: 2648.35,  volatility: 0.16, drift: 0, halfSpread: 0.22,    simulated: true },
-  { symbol: "EURUSD", displayName: "Euro / USD",     short: "EUR", kind: "FOREX",     precision: 5, payoutBps: 8100, basePrice: 1.08540,  volatility: 0.08, drift: 0, halfSpread: 0.00006, simulated: true },
-  { symbol: "GBPUSD", displayName: "Sterling / USD", short: "GBP", kind: "FOREX",     precision: 5, payoutBps: 8100, basePrice: 1.26480,  volatility: 0.09, drift: 0, halfSpread: 0.00007, simulated: true },
-  { symbol: "USDJPY", displayName: "USD / Yen",      short: "JPY", kind: "FOREX",     precision: 3, payoutBps: 8100, basePrice: 157.220,  volatility: 0.10, drift: 0, halfSpread: 0.008,   simulated: true },
+  // --- Layer 1 & infrastructure -------------------------------------------
+  {
+    symbol: "ADAUSD",
+    displayName: "Cardano / USD",
+    short: "ADA",
+    kind: "LAYER1",
+    precision: 4,
+    payoutBps: 8800,
+    basePrice: 0.1795,
+    volatility: 0.9,
+    drift: 0,
+    halfSpread: 0.0002,
+  },
+  {
+    symbol: "AVAXUSD",
+    displayName: "Avalanche / USD",
+    short: "AVAX",
+    kind: "LAYER1",
+    precision: 3,
+    payoutBps: 8800,
+    basePrice: 6.634,
+    volatility: 0.95,
+    drift: 0,
+    halfSpread: 0.002,
+  },
+  {
+    symbol: "DOTUSD",
+    displayName: "Polkadot / USD",
+    short: "DOT",
+    kind: "LAYER1",
+    precision: 3,
+    payoutBps: 8800,
+    basePrice: 0.852,
+    volatility: 0.9,
+    drift: 0,
+    halfSpread: 0.002,
+  },
+  {
+    symbol: "NEARUSD",
+    displayName: "NEAR / USD",
+    short: "NEAR",
+    kind: "LAYER1",
+    precision: 3,
+    payoutBps: 8800,
+    basePrice: 1.89,
+    volatility: 1.0,
+    drift: 0,
+    halfSpread: 0.002,
+  },
+  {
+    symbol: "ATOMUSD",
+    displayName: "Cosmos / USD",
+    short: "ATOM",
+    kind: "LAYER1",
+    precision: 3,
+    payoutBps: 8800,
+    basePrice: 1.47,
+    volatility: 0.95,
+    drift: 0,
+    halfSpread: 0.002,
+  },
+  {
+    symbol: "SUIUSD",
+    displayName: "Sui / USD",
+    short: "SUI",
+    kind: "LAYER1",
+    precision: 4,
+    payoutBps: 8800,
+    basePrice: 0.7757,
+    volatility: 1.1,
+    drift: 0,
+    halfSpread: 0.0002,
+  },
+  {
+    symbol: "TRXUSD",
+    displayName: "TRON / USD",
+    short: "TRX",
+    kind: "LAYER1",
+    precision: 4,
+    payoutBps: 8700,
+    basePrice: 0.3287,
+    volatility: 0.65,
+    drift: 0,
+    halfSpread: 0.0002,
+  },
+  {
+    symbol: "XLMUSD",
+    displayName: "Stellar / USD",
+    short: "XLM",
+    kind: "LAYER1",
+    precision: 4,
+    payoutBps: 8700,
+    basePrice: 0.1912,
+    volatility: 0.85,
+    drift: 0,
+    halfSpread: 0.0002,
+  },
+  {
+    symbol: "LTCUSD",
+    displayName: "Litecoin / USD",
+    short: "LTC",
+    kind: "LAYER1",
+    precision: 2,
+    payoutBps: 8700,
+    basePrice: 46.93,
+    volatility: 0.75,
+    drift: 0,
+    halfSpread: 0.02,
+  },
+  {
+    symbol: "BCHUSD",
+    displayName: "Bitcoin Cash / USD",
+    short: "BCH",
+    kind: "LAYER1",
+    precision: 1,
+    payoutBps: 8700,
+    basePrice: 221.1,
+    volatility: 0.8,
+    drift: 0,
+    halfSpread: 0.2,
+  },
+  {
+    symbol: "FILUSD",
+    displayName: "Filecoin / USD",
+    short: "FIL",
+    kind: "LAYER1",
+    precision: 4,
+    payoutBps: 8800,
+    basePrice: 0.7729,
+    volatility: 1.0,
+    drift: 0,
+    halfSpread: 0.0002,
+  },
+
+  // --- DeFi & scaling ------------------------------------------------------
+  {
+    symbol: "LINKUSD",
+    displayName: "Chainlink / USD",
+    short: "LINK",
+    kind: "DEFI",
+    precision: 3,
+    payoutBps: 8800,
+    basePrice: 8.707,
+    volatility: 0.9,
+    drift: 0,
+    halfSpread: 0.002,
+  },
+  {
+    symbol: "UNIUSD",
+    displayName: "Uniswap / USD",
+    short: "UNI",
+    kind: "DEFI",
+    precision: 3,
+    payoutBps: 8800,
+    basePrice: 3.848,
+    volatility: 0.95,
+    drift: 0,
+    halfSpread: 0.002,
+  },
+  {
+    symbol: "AAVEUSD",
+    displayName: "Aave / USD",
+    short: "AAVE",
+    kind: "DEFI",
+    precision: 2,
+    payoutBps: 8800,
+    basePrice: 98.18,
+    volatility: 0.95,
+    drift: 0,
+    halfSpread: 0.02,
+  },
+  {
+    symbol: "INJUSD",
+    displayName: "Injective / USD",
+    short: "INJ",
+    kind: "DEFI",
+    precision: 3,
+    payoutBps: 8900,
+    basePrice: 5.247,
+    volatility: 1.15,
+    drift: 0,
+    halfSpread: 0.002,
+  },
+  {
+    symbol: "ARBUSD",
+    displayName: "Arbitrum / USD",
+    short: "ARB",
+    kind: "DEFI",
+    precision: 4,
+    payoutBps: 8800,
+    basePrice: 0.0916,
+    volatility: 1.05,
+    drift: 0,
+    halfSpread: 0.0002,
+  },
+  {
+    symbol: "OPUSD",
+    displayName: "Optimism / USD",
+    short: "OP",
+    kind: "DEFI",
+    precision: 4,
+    payoutBps: 8800,
+    basePrice: 0.0989,
+    volatility: 1.05,
+    drift: 0,
+    halfSpread: 0.0002,
+  },
+
+  // --- Meme ----------------------------------------------------------------
+  {
+    symbol: "DOGEUSD",
+    displayName: "Dogecoin / USD",
+    short: "DOGE",
+    kind: "MEME",
+    precision: 5,
+    payoutBps: 8800,
+    basePrice: 0.0734,
+    volatility: 1.1,
+    drift: 0,
+    halfSpread: 0.00002,
+  },
+  {
+    symbol: "SHIBUSD",
+    displayName: "Shiba Inu / USD",
+    short: "SHIB",
+    kind: "MEME",
+    precision: 8,
+    payoutBps: 8900,
+    basePrice: 0.00000428,
+    volatility: 1.2,
+    drift: 0,
+    halfSpread: 0.00000002,
+  },
+  {
+    symbol: "PEPEUSD",
+    displayName: "Pepe / USD",
+    short: "PEPE",
+    kind: "MEME",
+    precision: 8,
+    payoutBps: 9000,
+    basePrice: 0.00000292,
+    volatility: 1.4,
+    drift: 0,
+    halfSpread: 0.00000002,
+  },
 ];
 
 export const INSTRUMENT_BY_SYMBOL = new Map(
@@ -58,6 +360,21 @@ export function instrument(symbol: string): Instrument {
   return found;
 }
 
+/** The symbol shown before a user has chosen one. */
+export const DEFAULT_SYMBOL = "BTCUSD";
+
+/**
+ * Like `instrument`, but never throws.
+ *
+ * The selected symbol is persisted in the browser, so a returning user can
+ * arrive holding a symbol that has since been delisted. Throwing there takes
+ * down the whole terminal for someone whose only mistake was visiting before a
+ * catalogue change; falling back to the default does not.
+ */
+export function instrumentOrDefault(symbol: string): Instrument {
+  return INSTRUMENT_BY_SYMBOL.get(symbol) ?? instrument(DEFAULT_SYMBOL);
+}
+
 /** Contract durations offered in the trade panel. */
 export const DURATIONS = [
   { seconds: 30, label: "30s" },
@@ -68,8 +385,11 @@ export const DURATIONS = [
 ] as const;
 
 export const KIND_LABEL: Record<InstrumentKind, string> = {
-  SYNTHETIC: "Synthetics",
-  CRYPTO: "Crypto",
-  FOREX: "Forex",
-  COMMODITY: "Metals",
+  MAJOR: "Majors",
+  LAYER1: "Layer 1 & infrastructure",
+  DEFI: "DeFi & scaling",
+  MEME: "Meme",
 };
+
+/** Watchlist group order. */
+export const KIND_ORDER: InstrumentKind[] = ["MAJOR", "LAYER1", "DEFI", "MEME"];

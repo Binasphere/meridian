@@ -15,14 +15,28 @@
  * manufacturing evidence that strangers are getting paid. Rendering it to a
  * client who knows it is sample data is fine. Rendering it to a customer is not.
  *
- * Two safeguards, both cheap:
- *   - The feed renders a visible "sample data" badge whenever this is on, so it
- *     cannot be mistaken for real activity by anyone looking at the screen.
- *   - Nothing here fabricates *withdrawals* or cash movement. Money leaving the
- *     platform is the specific claim these funnels manufacture, and it is the
- *     one claim that should only ever come from a real ledger.
+ * The on-screen "sample" badge was removed at the client's request, so there is
+ * now **no runtime tell** that this data is fabricated — the console warning
+ * below is deliberately loud to compensate, and this flag is the only thing
+ * standing between a demo aid and manufactured social proof. Turn it off before
+ * this build faces a real customer.
+ *
+ * One safeguard remains in the data itself: nothing here fabricates
+ * *withdrawals* or any cash movement. Money leaving the platform is the specific
+ * claim these funnels manufacture, and it is the one claim that should only ever
+ * come from a real ledger.
  */
 export const DEMO_COMMUNITY_ACTIVITY = true;
+
+if (DEMO_COMMUNITY_ACTIVITY && typeof window !== "undefined") {
+  console.warn(
+    "%c⚠ DEMO_COMMUNITY_ACTIVITY is ON",
+    "background:#fab219;color:#000;font-weight:700;padding:2px 6px",
+    "\nThe activity feed is showing fabricated trades by people who do not exist," +
+      "\nand there is no longer a badge saying so." +
+      "\nSet DEMO_COMMUNITY_ACTIVITY = false in src/lib/demo.ts before production.",
+  );
+}
 
 /** Display names for sample participants. Obviously placeholder, not personas. */
 const DEMO_TRADERS = [
@@ -39,14 +53,16 @@ const DEMO_TRADERS = [
 ] as const;
 
 const DEMO_SYMBOLS = [
-  "VOL10",
-  "VOL25",
-  "VOL50",
-  "VOL75",
-  "VOL100",
   "BTCUSD",
   "ETHUSD",
-  "XAUUSD",
+  "SOLUSD",
+  "BNBUSD",
+  "XRPUSD",
+  "DOGEUSD",
+  "ADAUSD",
+  "LINKUSD",
+  "AVAXUSD",
+  "PEPEUSD",
 ] as const;
 
 export interface DemoActivity {

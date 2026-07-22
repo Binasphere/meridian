@@ -3,15 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAllTicks } from "@/lib/hooks";
+import { useAllTicks, useLiveSymbols } from "@/lib/hooks";
 import { market } from "@/lib/market/engine";
 import {
   INSTRUMENTS,
   KIND_LABEL,
+  KIND_ORDER,
   type InstrumentKind,
 } from "@/lib/market/instruments";
 import { Sparkline } from "./Sparkline";
-import { Badge, Empty } from "@/components/ui/primitives";
+import { Empty } from "@/components/ui/primitives";
 
 /**
  * The instrument list.
@@ -27,6 +28,7 @@ export function Watchlist({
   onSelect: (symbol: string) => void;
 }) {
   const ticks = useAllTicks();
+  const liveSymbols = useLiveSymbols();
   const [query, setQuery] = useState("");
   const [sparks, setSparks] = useState<Record<string, number[]>>({});
   const [changes, setChanges] = useState<Record<string, number>>({});
@@ -61,13 +63,16 @@ export function Watchlist({
         i.displayName.toLowerCase().includes(needle),
     );
 
+    // Fixed group order, so the list does not reshuffle as the filter narrows.
     const byKind = new Map<InstrumentKind, typeof INSTRUMENTS>();
     for (const spec of matched) {
       const list = byKind.get(spec.kind) ?? [];
       list.push(spec);
       byKind.set(spec.kind, list);
     }
-    return [...byKind.entries()];
+    return KIND_ORDER.filter((k) => byKind.has(k)).map(
+      (k) => [k, byKind.get(k)!] as const,
+    );
   }, [query]);
 
   return (
@@ -116,9 +121,7 @@ export function Watchlist({
                     className={cn(
                       "group relative flex w-full items-center gap-2.5 px-3 py-2 text-left",
                       "transition-colors duration-100",
-                      isActive
-                        ? "bg-surface-3"
-                        : "hover:bg-surface-2/70",
+                      isActive ? "bg-surface-3" : "hover:bg-surface-2/70",
                     )}
                   >
                     {/* Active marker in the gutter — position, not colour, so
@@ -141,14 +144,25 @@ export function Watchlist({
                         >
                           {spec.short}
                         </span>
-                        {spec.simulated ? (
+                        {/* Every instrument is quoted live, so "sim" appears
+                            only when the exchange connection has dropped and
+                            this symbol has fallen back to the failover walk.
+                            Silent degradation is the thing to avoid. */}
+                        {liveSymbols.has(spec.symbol) ? (
                           <span
-                            title="Simulated price — not a live market quote"
-                            className="rounded-none border border-warning/25 bg-warning/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-warning"
+                            title="Live price from Binance"
+                            className="border border-up/25 bg-up/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-up"
+                          >
+                            live
+                          </span>
+                        ) : (
+                          <span
+                            title="Exchange feed unavailable — showing a simulated fallback"
+                            className="border border-warning/25 bg-warning/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-warning"
                           >
                             sim
                           </span>
-                        ) : null}
+                        )}
                       </div>
                       <div className="truncate text-[10.5px] text-ink-faint">
                         {spec.payoutBps / 100}% payout
@@ -189,14 +203,6 @@ export function Watchlist({
             </div>
           ))
         )}
-      </div>
-
-      <div className="shrink-0 border-t border-line px-3 py-2">
-        <Badge tone="warning">
-          <span className="normal-case tracking-normal">
-            Simulated feed · demo build
-          </span>
-        </Badge>
       </div>
     </div>
   );

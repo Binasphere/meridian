@@ -180,6 +180,15 @@ export class MarketEngine {
   private readonly listeners = new Map<string, Set<TickListener>>();
   private timer: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * Symbols whose prices arrive from a real feed rather than the simulation.
+   *
+   * The simulation loop skips these entirely — a live symbol must never have a
+   * generated tick mixed into its history, or `priceAt` would settle a contract
+   * against a price that never traded.
+   */
+  private readonly live = new Set<string>();
+
   constructor(specs: Instrument[] = INSTRUMENTS, seed = Date.now() & 0xffffffff) {
     specs.forEach((spec, i) => {
       // Independent PRNG stream per symbol, so adding or removing an instrument
@@ -309,19 +318,13 @@ export class MarketEngine {
       previous = now;
 
       for (const state of this.states.values()) {
+        // Live symbols are driven by `ingest`; generating a tick for one here
+        // would interleave invented prices with real trades.
+        if (this.live.has(state.spec.symbol)) continue;
+
         const tick = this.advance(state, elapsed, now);
         this.record(state, tick);
-
-        const subscribers = this.listeners.get(state.spec.symbol);
-        if (subscribers) {
-          for (const listener of subscribers) {
-            try {
-              listener(tick);
-            } catch {
-              // A throwing subscriber must never stall the market.
-            }
-          }
-        }
+        this.emit(state.spec.symbol, tick);
       }
     }, TICK_MS);
   }
@@ -331,8 +334,83 @@ export class MarketEngine {
     this.timer = null;
   }
 
+  private emit(symbol: string, tick: Tick): void {
+    const subscribers = this.listeners.get(symbol);
+    if (!subscribers) return;
+    for (const listener of subscribers) {
+      try {
+        listener(tick);
+      } catch {
+        // A throwing subscriber must never stall the market.
+      }
+    }
+  }
+
   symbols(): string[] {
     return [...this.states.keys()];
+  }
+
+  /** True when this symbol's prices come from a real exchange feed. */
+  isLive(symbol: string): boolean {
+    return this.live.has(symbol);
+  }
+
+  /**
+   * Hands a symbol over to an external feed.
+   *
+   * Clears the simulated history first: the generated series and the real one
+   * are different price paths, and splicing them would leave a visible
+   * discontinuity in the chart and — far worse — leave `priceAt` able to return
+   * an invented price for a timestamp inside a live contract's window.
+   */
+  goLive(symbol: string): void {
+    const state = this.states.get(symbol);
+    if (!state) return;
+
+    this.live.add(symbol);
+    state.ticks.length = 0;
+    for (const series of state.candles.values()) series.length = 0;
+  }
+
+  /** Returns a symbol to the simulation, e.g. when a feed drops for good. */
+  goSimulated(symbol: string): void {
+    const state = this.states.get(symbol);
+    if (!state) return;
+
+    this.live.delete(symbol);
+    // Resume the walk from the last real price rather than snapping back to
+    // base, so the handover is continuous on the chart.
+    const last = state.ticks[state.ticks.length - 1];
+    if (last) state.price = last.mid;
+  }
+
+  /**
+   * Records a real observed price.
+   *
+   * Ticks must arrive in non-decreasing time order per symbol — out-of-order
+   * ticks are dropped rather than inserted, because `priceAt` binary-searches
+   * the array and an unsorted array would silently return wrong settlement
+   * prices. Exchange feeds do occasionally deliver out of order.
+   */
+  ingest(symbol: string, price: number, ts: number, emit = true): void {
+    const state = this.states.get(symbol);
+    if (!state) return;
+
+    const last = state.ticks[state.ticks.length - 1];
+    if (last && ts < last.ts) return;
+
+    const mid = round(price, state.spec.precision);
+    const tick: Tick = {
+      symbol,
+      ts,
+      mid,
+      bid: round(mid - state.spec.halfSpread, state.spec.precision),
+      ask: round(mid + state.spec.halfSpread, state.spec.precision),
+    };
+
+    state.price = mid;
+    this.record(state, tick);
+    if (emit) this.emit(symbol, tick);
   }
 
   lastTick(symbol: string): Tick | undefined {
@@ -425,7 +503,16 @@ export class MarketEngine {
  */
 const globalForEngine = globalThis as unknown as {
   __meridianMarket?: MarketEngine;
+  __meridianFeed?: { stop(): void };
 };
+
+/**
+ * Connect real crypto prices on boot.
+ *
+ * Set to false to run entirely on the simulation — useful offline, in tests, or
+ * anywhere the exchange is unreachable.
+ */
+export const USE_LIVE_CRYPTO = true;
 
 export function market(): MarketEngine {
   // Guard rather than silently working: constructing the engine during server
@@ -443,6 +530,44 @@ export function market(): MarketEngine {
     const engine = new MarketEngine();
     engine.start();
     globalForEngine.__meridianMarket = engine;
+
+    if (USE_LIVE_CRYPTO) {
+      // Imported lazily so the exchange adapter is not in the bundle's critical
+      // path, and so a failure to load it cannot stop the terminal booting.
+      void import("./binance")
+        .then(({ BinanceFeed }) => {
+          const feed = new BinanceFeed(engine, (status) => {
+            notifyFeedStatus(status);
+          });
+          globalForEngine.__meridianFeed = feed;
+          return feed.start();
+        })
+        .catch((error) => {
+          console.warn("[market] live feed unavailable, staying simulated:", error);
+          notifyFeedStatus("failed");
+        });
+    }
   }
   return globalForEngine.__meridianMarket;
+}
+
+// --- Feed status ----------------------------------------------------------
+
+export type FeedStatus = "connecting" | "live" | "reconnecting" | "failed";
+
+const feedStatusListeners = new Set<(status: FeedStatus) => void>();
+let currentFeedStatus: FeedStatus = USE_LIVE_CRYPTO ? "connecting" : "failed";
+
+function notifyFeedStatus(status: FeedStatus): void {
+  currentFeedStatus = status;
+  for (const listener of feedStatusListeners) listener(status);
+}
+
+export function feedStatus(): FeedStatus {
+  return currentFeedStatus;
+}
+
+export function onFeedStatus(listener: (status: FeedStatus) => void): () => void {
+  feedStatusListeners.add(listener);
+  return () => feedStatusListeners.delete(listener);
 }
