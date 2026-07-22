@@ -217,22 +217,34 @@ export function PriceChart({
     // above exists to avoid.
     chart.timeScale().scrollToRealTime();
 
-    let frame = 0;
-    const unsubscribe = engine.subscribe(symbol, () => {
-      // One redraw per animation frame, not one per tick.
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        const latest = engine.candles(symbol, resolution, 2);
-        const point = latest[latest.length - 1];
-        if (point) push(point);
-      });
-    });
+    /**
+     * Redraw on a steady beat rather than on tick arrival.
+     *
+     * Driving the redraw from the tick subscription couples the chart's sense
+     * of time to how busy the market is: a quiet instrument stops repainting,
+     * so the newest bar sits frozen and then lurches when a quote finally
+     * lands. Polling the latest bar at a fixed cadence means the engine's
+     * carry-forward bars appear on schedule and the chart advances at the same
+     * rate whether the market is frantic or asleep.
+     *
+     * `series.update` with unchanged data is a no-op inside lightweight-charts,
+     * so idle instruments cost nothing.
+     */
+    let previous = "";
+    const timer = setInterval(() => {
+      const latest = engine.candles(symbol, resolution, 2);
+      const point = latest[latest.length - 1];
+      if (!point) return;
 
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      unsubscribe();
-    };
+      // Skip the call entirely when nothing about the bar has changed.
+      const signature = `${point.time}:${point.open}:${point.high}:${point.low}:${point.close}`;
+      if (signature === previous) return;
+      previous = signature;
+
+      push(point);
+    }, 250);
+
+    return () => clearInterval(timer);
   }, [symbol, resolution, style]);
 
   // Entry-price lines for live positions on this instrument. Reconciled against

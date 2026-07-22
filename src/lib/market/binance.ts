@@ -57,6 +57,21 @@ export const BINANCE_SYMBOLS: Record<string, string> = {
   PEPEUSD: "PEPEUSDT",
 };
 
+/**
+ * Ingest cadence.
+ *
+ * `@bookTicker` on BTC alone delivers ~50 updates a second, and 25 symbols
+ * together approach 1,000/s. Feeding every one into the engine would burn CPU
+ * redrawing faster than a screen refreshes and would churn the tick ring buffer
+ * — BTC would evict its own last hour of history in about three minutes.
+ *
+ * So quotes are coalesced: the newest price per symbol is held and flushed on a
+ * fixed 250ms beat, matching the simulator's cadence. Nothing is invented and
+ * nothing about settlement changes; intermediate quotes are simply not recorded,
+ * exactly as a 250ms sampling of any feed would not record them.
+ */
+const INGEST_INTERVAL_MS = 250;
+
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 const MAX_RECONNECT_ATTEMPTS = 6;
@@ -127,8 +142,24 @@ export class BinanceFeed {
   private stopped = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private stallTimer: ReturnType<typeof setTimeout> | null = null;
+  private flushTimer: ReturnType<typeof setInterval> | null = null;
   private readonly controller = new AbortController();
   private readonly toOurSymbol = new Map<string, string>();
+
+  /** Newest quote per symbol, awaiting the next flush. */
+  private readonly pending = new Map<string, number>();
+
+  /**
+   * `serverTime - Date.now()`.
+   *
+   * Historical bars are stamped with exchange time while live quotes are
+   * stamped on arrival here, so a local clock even slightly behind the exchange
+   * would make every live tick look *older* than the seeded history. `ingest`
+   * drops out-of-order ticks to keep `priceAt` binary-searchable, so that would
+   * silently discard the entire live stream — the chart would seed and then
+   * never move.
+   */
+  private clockOffset = 0;
 
   status: FeedStatus = "connecting";
 
@@ -158,9 +189,7 @@ export class BinanceFeed {
 
     this.setStatus("connecting");
 
-    // Hand the symbols over before any history lands, so the simulation loop
-    // stops generating ticks for them immediately.
-    for (const symbol of symbols) this.engine.goLive(symbol);
+    await this.syncClock();
 
     try {
       await this.seedHistory(symbols);
@@ -170,7 +199,46 @@ export class BinanceFeed {
       console.warn("[binance] history seed failed:", error);
     }
 
+    this.startFlushing();
     this.connect(symbols);
+  }
+
+  /** Aligns our clock with the exchange's. See `clockOffset`. */
+  private async syncClock(): Promise<void> {
+    try {
+      const before = Date.now();
+      const response = await fetch(`${REST}/time`, {
+        signal: this.controller.signal,
+      });
+      const after = Date.now();
+      const { serverTime } = (await response.json()) as { serverTime: number };
+
+      // Charge half the round trip to the response leg.
+      this.clockOffset = serverTime - (before + (after - before) / 2);
+
+      if (Math.abs(this.clockOffset) > 2_000) {
+        console.warn(
+          `[binance] local clock is ${(this.clockOffset / 1000).toFixed(1)}s off exchange time; correcting`,
+        );
+      }
+    } catch {
+      this.clockOffset = 0;
+    }
+  }
+
+  /** Flushes the newest quote per symbol on a fixed beat. */
+  private startFlushing(): void {
+    if (this.flushTimer) return;
+
+    this.flushTimer = setInterval(() => {
+      if (this.pending.size === 0) return;
+
+      const ts = Date.now() + this.clockOffset;
+      for (const [symbol, price] of this.pending) {
+        this.engine.ingest(symbol, price, ts);
+      }
+      this.pending.clear();
+    }, INGEST_INTERVAL_MS);
   }
 
   /**
@@ -207,11 +275,20 @@ export class BinanceFeed {
             fetchKlines(binanceSymbol, "1s", 600, this.controller.signal),
           ]);
 
-          // Oldest first, and drop any 1m bar overlapping the 1s window so the
-          // same period is not replayed at two resolutions.
+          // Hand over per symbol rather than all up front. `goLive` wipes the
+          // simulated series, so doing it for all 25 before any data arrives
+          // leaves every chart blank for the whole seeding run; this way each
+          // instrument flips the moment its own history is ready, and the
+          // default symbol — first in the queue — populates almost at once.
+          this.engine.goLive(symbol);
+
+          // Oldest first, and drop any 1m bar that *overlaps* the 1s window.
+          // Comparing open times is not enough: a 1m bar opening just before
+          // the window still replays ticks across it, and those land after the
+          // first 1s tick and get dropped as out-of-order, tearing the seam.
           const firstSecond = seconds[0]?.[0] ?? Infinity;
           for (const kline of minutes) {
-            if (kline[0] >= firstSecond) break;
+            if (kline[0] + 60_000 > firstSecond) break;
             replayKline(this.engine, symbol, kline, 60_000);
           }
           for (const kline of seconds) {
@@ -235,8 +312,16 @@ export class BinanceFeed {
   private connect(symbols: string[]): void {
     if (this.stopped) return;
 
+    // `@bookTicker`, not `@trade`.
+    //
+    // A trade stream only fires when someone trades, so a quiet market produces
+    // a chart that visibly freezes and then jumps. Measured over 20s: BTC 121
+    // trades vs 974 quote updates; ATOM zero trades vs 7 quote updates. The
+    // top-of-book mid is also the more defensible settlement reference — it is
+    // the price you could actually have transacted at, rather than the price
+    // someone else happened to hit.
     const streams = symbols
-      .map((s) => `${BINANCE_SYMBOLS[s]!.toLowerCase()}@trade`)
+      .map((s) => `${BINANCE_SYMBOLS[s]!.toLowerCase()}@bookTicker`)
       .join("/");
 
     let socket: WebSocket;
@@ -260,19 +345,23 @@ export class BinanceFeed {
       this.armStallTimer(symbols);
       try {
         const payload = JSON.parse(event.data as string) as {
-          stream?: string;
-          data?: { s?: string; p?: string; T?: number };
+          data?: { s?: string; b?: string; a?: string };
         };
-        const trade = payload.data;
-        if (!trade?.s || !trade.p || !trade.T) return;
+        const quote = payload.data;
+        if (!quote?.s || !quote.b || !quote.a) return;
 
-        const ours = this.toOurSymbol.get(trade.s.toLowerCase());
+        const ours = this.toOurSymbol.get(quote.s.toLowerCase());
         if (!ours) return;
 
-        const price = Number(trade.p);
-        if (!Number.isFinite(price) || price <= 0) return;
+        const bid = Number(quote.b);
+        const ask = Number(quote.a);
+        if (!Number.isFinite(bid) || !Number.isFinite(ask)) return;
+        if (bid <= 0 || ask <= 0 || ask < bid) return;
 
-        this.engine.ingest(ours, price, trade.T);
+        // Coalesced, not ingested — the flush timer samples this at 250ms.
+        // `bookTicker` carries no event time, hence the clock-offset stamp
+        // applied at flush.
+        this.pending.set(ours, (bid + ask) / 2);
       } catch {
         // A malformed frame is not worth tearing the connection down for.
       }
@@ -335,6 +424,7 @@ export class BinanceFeed {
     this.controller.abort();
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     if (this.stallTimer) clearTimeout(this.stallTimer);
+    if (this.flushTimer) clearInterval(this.flushTimer);
     this.socket?.close();
     this.socket = null;
   }

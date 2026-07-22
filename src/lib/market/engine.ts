@@ -73,6 +73,8 @@ const SECONDS_PER_YEAR = 365 * 24 * 60 * 60;
  */
 const MAX_TICKS = 8_000;
 const MAX_CANDLES = 900;
+/** Headroom before trimming, so the splice is amortised rather than per-bar. */
+const TRIM_SLACK = 300;
 
 /**
  * Backfill, so the chart opens onto real history rather than three candles.
@@ -287,6 +289,31 @@ export class MarketEngine {
         // Open at the previous close — a gap between one candle's close and the
         // next one's open is an artifact readers correctly read as missing data.
         const open = last ? last.close : tick.mid;
+
+        // Fill any buckets skipped since the last bar, flat at the last close.
+        //
+        // Necessary for more than long silences: Binance omits 1s klines for
+        // seconds in which nothing traded, so the *backfill itself* arrives
+        // full of holes. Without this the seeded series is non-contiguous and
+        // the chart draws bars bunched at uneven spacing, which reads exactly
+        // like the chart freezing and then jumping.
+        if (last) {
+          let time = last.time + resolution;
+          // Filling further back than the retained window is pure waste — every
+          // one of those bars is trimmed before anyone sees it.
+          let budget = MAX_CANDLES;
+          while (time < bucket && budget-- > 0) {
+            series.push({
+              time,
+              open: last.close,
+              high: last.close,
+              low: last.close,
+              close: last.close,
+            });
+            time += resolution;
+          }
+        }
+
         series.push({
           time: bucket,
           open,
@@ -298,7 +325,11 @@ export class MarketEngine {
           low: Math.min(open, tick.mid),
           close: tick.mid,
         });
-        if (series.length > MAX_CANDLES) {
+
+        // Trim in blocks. Splicing a single element every time the cap is
+        // exceeded is O(n) per bar, which during a gap-filling backfill turns
+        // into millions of element moves per symbol.
+        if (series.length > MAX_CANDLES + TRIM_SLACK) {
           series.splice(0, series.length - MAX_CANDLES);
         }
       }
@@ -319,8 +350,12 @@ export class MarketEngine {
 
       for (const state of this.states.values()) {
         // Live symbols are driven by `ingest`; generating a tick for one here
-        // would interleave invented prices with real trades.
-        if (this.live.has(state.spec.symbol)) continue;
+        // would interleave invented prices with real trades. They still need
+        // their candle buckets rolled forward, though.
+        if (this.live.has(state.spec.symbol)) {
+          this.carryForward(state, now);
+          continue;
+        }
 
         const tick = this.advance(state, elapsed, now);
         this.record(state, tick);
@@ -332,6 +367,46 @@ export class MarketEngine {
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+  }
+
+  /**
+   * Rolls candle buckets forward through periods with no price updates.
+   *
+   * A candle bucket is otherwise only created when a tick arrives, so a market
+   * that goes quiet leaves the newest bar sitting as "current" while real time
+   * moves on. The chart appears to freeze — bars stack at one position — and
+   * then lurches forward several buckets at once when a trade finally prints.
+   *
+   * The fill is a flat bar at the last close, which is the honest statement:
+   * nothing traded, the price did not move. Deliberately no tick is recorded,
+   * so `priceAt` never gains a price that was not actually observed — settlement
+   * still only ever sees real quotes.
+   */
+  private carryForward(state: SymbolState, now: number): void {
+    const seconds = Math.floor(now / 1000);
+
+    for (const resolution of RESOLUTIONS) {
+      const series = state.candles.get(resolution)!;
+      const last = series[series.length - 1];
+      if (!last) continue;
+
+      const bucket = Math.floor(seconds / resolution) * resolution;
+      if (bucket <= last.time) continue;
+
+      const close = last.close;
+      let time = last.time + resolution;
+      // Bounded: waking from sleep could otherwise ask for tens of thousands of
+      // bars in one pass. The remainder fills on subsequent ticks.
+      let budget = 300;
+      while (time <= bucket && budget-- > 0) {
+        series.push({ time, open: close, high: close, low: close, close });
+        time += resolution;
+      }
+
+      if (series.length > MAX_CANDLES + TRIM_SLACK) {
+        series.splice(0, series.length - MAX_CANDLES);
+      }
+    }
   }
 
   private emit(symbol: string, tick: Tick): void {
