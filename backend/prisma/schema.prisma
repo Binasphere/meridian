@@ -1,0 +1,298 @@
+// Meridian — data model
+//
+// Two invariants drive the shape of this schema, and everything else follows:
+//
+//   1. Money moves only through balanced double-entry transactions. Every
+//      LedgerTransaction has >= 2 LedgerEntry rows whose signed amounts sum to
+//      exactly zero. Value is never created or destroyed, only moved between
+//      accounts — including the house's own accounts. `Account.balanceMinor` is
+//      a cache of `sum(entries.amountMinor)` and is rewritten inside the same
+//      database transaction that writes the entries.
+//
+//   2. Every amount is a BigInt in *minor units* (cents). Floating point never
+//      touches a balance. Prices are Decimal, which is exact in Postgres.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  role         UserRole @default(USER)
+
+  // Deterministic avatar generation — no image uploads, no CDN, no PII.
+  avatarSeed String
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastSeenAt DateTime?
+
+  accounts     Account[]
+  trades       Trade[]
+  sessions     Session[]
+  chatMessages ChatMessage[]
+
+  @@index([createdAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Sessions are stateless JWTs, but this row is what makes them *revocable*:
+  // logout and forced sign-out delete it, and every request checks it exists.
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ip        String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Money
+// ---------------------------------------------------------------------------
+
+enum AccountKind {
+  /// Practice money. Isolated from LIVE in every query; can be reset freely.
+  DEMO
+  /// Real customer funds.
+  LIVE
+  /// The platform's own book — counterparty to every customer trade.
+  HOUSE
+  /// Clearing account facing the outside world (PSP / bank / mobile money).
+  /// Deposits move GATEWAY -> LIVE; withdrawals move LIVE -> GATEWAY.
+  GATEWAY
+}
+
+model Account {
+  id       String      @id @default(cuid())
+  kind     AccountKind
+  currency String      @default("KES")
+
+  // Null for system accounts (HOUSE, GATEWAY), set for DEMO/LIVE.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Cached balance in minor units. Authoritative value is the sum of entries;
+  /// this column exists so the terminal does not aggregate the ledger on every
+  /// read. `scripts/audit` re-derives and compares the two.
+  balanceMinor BigInt @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries LedgerEntry[]
+  trades  Trade[]
+
+  // A user holds at most one account of each kind; system accounts are unique
+  // by kind because userId is null.
+  @@unique([userId, kind, currency])
+  @@index([kind])
+}
+
+enum LedgerTxKind {
+  DEPOSIT
+  WITHDRAWAL
+  TRADE_STAKE
+  TRADE_PAYOUT
+  TRADE_REFUND
+  DEMO_TOPUP
+  ADJUSTMENT
+}
+
+model LedgerTransaction {
+  id   String       @id @default(cuid())
+  kind LedgerTxKind
+
+  /// Makes every money-moving operation safely retryable. A duplicated request
+  /// (double-clicked button, retried webhook, network replay) collides here and
+  /// returns the original transaction instead of moving money twice.
+  idempotencyKey String @unique
+
+  memo      String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  entries LedgerEntry[]
+
+  @@index([kind, createdAt])
+}
+
+model LedgerEntry {
+  id            String            @id @default(cuid())
+  transactionId String
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  /// Signed minor units. Positive credits the account, negative debits it.
+  /// Sum across a transaction's entries is always exactly 0.
+  amountMinor BigInt
+
+  /// Running balance of the account immediately after this entry — lets the
+  /// statement view render without a window function and makes tampering
+  /// detectable.
+  balanceAfterMinor BigInt
+
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt])
+  @@index([transactionId])
+}
+
+// ---------------------------------------------------------------------------
+// Market
+// ---------------------------------------------------------------------------
+
+enum InstrumentKind {
+  CRYPTO
+  FOREX
+  COMMODITY
+  INDEX
+  /// Exchange-independent synthetic index driven purely by the price engine.
+  SYNTHETIC
+}
+
+model Instrument {
+  id          String         @id @default(cuid())
+  symbol      String         @unique
+  displayName String
+  kind        InstrumentKind
+
+  /// Digits after the decimal point in a quoted price.
+  precision Int @default(5)
+
+  /// Payout on a winning trade, in basis points of the stake. 8700 = 87%,
+  /// meaning a 100 stake returns 187 (100 stake + 87 profit).
+  payoutBps Int @default(8500)
+
+  minStakeMinor BigInt @default(10000) // KES 100.00
+  maxStakeMinor BigInt @default(30000000) // KES 300,000.00
+
+  // --- Simulated-feed parameters (ignored by a real market-data adapter) ---
+  basePrice     Decimal @db.Decimal(20, 8)
+  /// Annualised volatility, e.g. 0.65 = 65%.
+  volatility    Decimal @db.Decimal(10, 6) @default(0.4)
+  /// Annualised drift.
+  drift         Decimal @db.Decimal(10, 6) @default(0)
+  /// Half-spread in price units, applied symmetrically around mid.
+  halfSpread    Decimal @db.Decimal(20, 8) @default(0)
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  trades Trade[]
+
+  @@index([isActive, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Trading
+// ---------------------------------------------------------------------------
+
+enum TradeDirection {
+  UP
+  DOWN
+}
+
+enum TradeStatus {
+  OPEN
+  WON
+  LOST
+  /// Close price exactly equalled open price — stake refunded in full.
+  TIE
+  /// Cancelled before expiry by an operator; stake refunded.
+  VOIDED
+}
+
+model Trade {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  instrumentId String
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+
+  direction TradeDirection
+  status    TradeStatus    @default(OPEN)
+
+  stakeMinor BigInt
+  /// Snapshotted at open. Changing an instrument's payout never retroactively
+  /// alters a trade that is already live.
+  payoutBps  Int
+
+  /// Both prices are the oracle mid at the exact tick used, recorded so any
+  /// settlement can be re-derived and disputed after the fact.
+  openPrice  Decimal  @db.Decimal(20, 8)
+  closePrice Decimal? @db.Decimal(20, 8)
+
+  durationSec Int
+  openedAt    DateTime @default(now())
+  expiresAt   DateTime
+  settledAt   DateTime?
+
+  /// Signed profit/loss in minor units: +profit on a win, -stake on a loss,
+  /// 0 on a tie. Null while the trade is open.
+  pnlMinor BigInt?
+
+  idempotencyKey String @unique
+
+  @@index([userId, openedAt(sort: Desc)])
+  @@index([status, expiresAt])
+  @@index([instrumentId, openedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Community
+// ---------------------------------------------------------------------------
+
+/// Real messages written by real signed-in users.
+///
+/// Deliberately absent: any mechanism for the server to fabricate "so-and-so
+/// just withdrew KES 12,200" activity. Synthetic social proof of that kind is
+/// the defining mechanic of a binary-options scam funnel, and this platform
+/// does not have the capability to emit it. System messages exist, but only an
+/// operator can post one and they are visibly badged as official.
+model ChatMessage {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  body String @db.VarChar(500)
+
+  /// True only for messages posted by an ADMIN through the operator console.
+  isOfficial Boolean @default(false)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([createdAt(sort: Desc)])
+}

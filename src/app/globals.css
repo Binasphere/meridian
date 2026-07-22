@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Meridian design system
+   ==========================================================================
+
+   One rule governs colour here: **chrome is monochrome, only the market is
+   coloured.** Navigation, panels, buttons and type live on a neutral ramp; the
+   two directional hues are reserved for price, direction and P&L. When almost
+   nothing on screen is saturated, the one thing that is reads instantly — which
+   is the whole job of a trading interface.
+
+   The directional pair was chosen by measurement, not taste. Under simulated
+   deuteranopia (Machado 2009, severity 1.0) #1FD8A4 vs #FF4757 separate by
+   OKLab ΔE 12.1 against a target of 8, and by 37.7 under normal vision. The
+   naive "trading green/red" (#2ED3A0/#FF5C6C) manages only 8.3 — technically
+   passing, but sitting on the floor. Direction is additionally carried by a
+   ▲/▼ glyph and a signed number everywhere it appears, so hue is never the
+   only channel doing the work.
+   ========================================================================== */
+
+@theme {
+  /* --- Neutral ramp: the chrome ------------------------------------------ */
+  --color-base: #08090d;
+  --color-surface-1: #0e1116;
+  --color-surface-2: #141922;
+  --color-surface-3: #1b2230;
+  --color-surface-4: #232c3d;
+
+  --color-ink: #f2f5f9;
+  --color-ink-secondary: #9ba6b7;
+  --color-ink-muted: #6b7688;
+  --color-ink-faint: #4a5364;
+
+  --color-line: #ffffff12;
+  --color-line-strong: #ffffff1f;
+
+  /* --- Directional: the market ------------------------------------------- */
+  --color-up: #1fd8a4;
+  --color-up-soft: #1fd8a41f;
+  --color-up-line: #1fd8a44d;
+  --color-down: #ff4757;
+  --color-down-soft: #ff47571f;
+  --color-down-line: #ff47574d;
+
+  /* --- Brand accent: focus, links, active nav. Never directional. -------- */
+  --color-accent: #7c8cff;
+  --color-accent-soft: #7c8cff1f;
+
+  /* --- Cash actions: deposit, create account -----------------------------
+     A single flat, deep green. No gradient: a two-stop fill on a small solid
+     button reads as a smear rather than as a colour, and the eye cannot name
+     it. Deliberately darker and less cyan than the "up" hue so a money-in
+     button is never mistaken for a directional control.
+     Measured: 4.60:1 against white text (AA for normal text), 4.33:1 against
+     the page. The hover step goes *darker*, not lighter — lightening this hue
+     drops white text under 4.5:1. */
+  --color-cash: #00874a;
+  --color-cash-hover: #00713e;
+
+  /* --- Status: reserved, always shipped with an icon and a label --------- */
+  --color-warning: #fab219;
+  --color-critical: #ff4757;
+  --color-info: #3987e5;
+
+  /* --- Auxiliary categorical series -------------------------------------- */
+  /* The reference dark ramp, re-validated against #12161D: all six checks
+     pass, worst adjacent CVD ΔE 8.4. Assigned in fixed order, never cycled. */
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
+  --color-series-4: #c98500;
+  --color-series-5: #d55181;
+  --color-series-6: #008300;
+  --color-series-7: #9085e9;
+  --color-series-8: #e66767;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, "SF Mono", monospace;
+
+  /* Square. Every card, panel and control has hard corners — the interface
+     reads as instrument panelling rather than as consumer software. */
+  --radius-panel: 0px;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--color-base);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  /* Every number in a trading UI is read in a column and compared against the
+     number above it. Proportional figures make digits jitter horizontally as
+     they tick; tabular figures hold the column still. This is the single
+     highest-leverage typographic decision in the whole interface. */
+  .tnum,
+  input[inputmode="decimal"],
+  table {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Scrollbars are chrome; keep them recessive. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-surface-4);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* A panel: the single repeated surface the whole app is built from. The
+     inset highlight on the top edge is what reads as "lit from above" and does
+     most of the work of making a flat dark UI feel like an object. */
+  .panel {
+    /* Flat fill, not a two-stop gradient. On a square-cornered dark panel a
+       vertical gradient reads as a smudge rather than as lighting; the inset
+       top highlight below does the "lit from above" work on its own, in one
+       pixel. */
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    box-shadow:
+      inset 0 1px 0 0 #ffffff0a,
+      0 1px 2px 0 #00000040,
+      0 8px 24px -12px #00000080;
+  }
+
+  .panel-flat {
+    background: var(--color-surface-1);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+  }
+
+  /* Hairline separators that fade at both ends — a full-bleed 1px line across a
+     dark panel reads as a crack; a faded one reads as a seam. */
+  .hairline-x {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-line-strong) 15%,
+      var(--color-line-strong) 85%,
+      transparent
+    );
+    height: 1px;
+  }
+}
+
+@layer utilities {
+  /* There is deliberately no per-tick price flash.
+     At four ticks a second a background that pulses green/red never settles —
+     it reads as a flickering panel behind the number and actively makes the
+     digits harder to read, which is the opposite of what a price display is
+     for. The number changing IS the signal. Direction is carried where it is
+     stable enough to be legible: the candles, the position rows, and the P&L. */
+
+  @keyframes pulse-ring {
+    0% { transform: scale(0.85); opacity: 0.7; }
+    70% { transform: scale(1.6); opacity: 0; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+  .pulse-ring { animation: pulse-ring 2s ease-out infinite; }
+
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, #ffffff0d, transparent);
+    animation: shimmer 1.8s infinite;
+  }
+
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .rise-in { animation: rise-in 340ms var(--ease-out-quint) both; }
+
+  /* Bottom-sheet entrance. Radix stamps data-state on the elements; these are
+     the only two keyframes needed, so a dependency for it would not pay. */
+  @keyframes sheet-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes sheet-rise {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .sheet-overlay[data-state="open"] {
+    animation: sheet-fade 180ms ease-out;
+  }
+  .sheet-content[data-state="open"] {
+    animation: sheet-rise 260ms var(--ease-out-quint);
+  }
+
+  @keyframes panel-slide-in {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  .panel-slide[data-state="open"] {
+    animation: panel-slide-in 240ms var(--ease-out-quint);
+  }
+
+  .grid-noise {
+    background-image:
+      linear-gradient(var(--color-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-line) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+}
+
+/* Motion is decoration here, never information — nothing is communicated only
+   by an animation, so removing all of it costs the user nothing. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
