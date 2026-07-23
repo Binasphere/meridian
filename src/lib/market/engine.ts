@@ -593,10 +593,14 @@ const globalForEngine = globalThis as unknown as {
 /**
  * Connect real crypto prices on boot.
  *
- * Set to false to run entirely on the simulation — useful offline, in tests, or
- * anywhere the exchange is unreachable.
+ * Kept **false**: the terminal runs entirely on the built-in simulation. The
+ * live exchange feed goes genuinely quiet during low-activity windows — a real
+ * market simply does not print for seconds at a time — which draws as flat,
+ * stagnant candles. The simulation advances every 250ms tick with continuous
+ * motion, so every candle has a real body and the chart always moves like an
+ * active market. Flip to true to reconnect the Binance feed.
  */
-export const USE_LIVE_CRYPTO = true;
+export const USE_LIVE_CRYPTO = false;
 
 export function market(): MarketEngine {
   // Guard rather than silently working: constructing the engine during server

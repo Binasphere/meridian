@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { formatMoney } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { playLose, playRefund, playWin } from "@/lib/sound";
 
 /**
  * Drives settlement.
@@ -25,14 +26,17 @@ export function SettlementDriver() {
         const closed = trade.closePrice?.toFixed(trade.precision) ?? "—";
 
         if (trade.status === "WON") {
+          playWin();
           toast.success(`▲ Won · ${trade.symbol}`, {
             description: `${formatMoney(pnl, { currency: "KSh", withSign: true })} · closed at ${closed}`,
           });
         } else if (trade.status === "LOST") {
+          playLose();
           toast.error(`▼ Lost · ${trade.symbol}`, {
             description: `${formatMoney(pnl, { currency: "KSh" })} · closed at ${closed}`,
           });
         } else {
+          playRefund();
           toast(`Refunded · ${trade.symbol}`, {
             description:
               trade.status === "TIE"

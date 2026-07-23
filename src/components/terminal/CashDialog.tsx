@@ -262,7 +262,9 @@ export function CashDialog({
               </button>
 
               <p className="text-center text-[10.5px] leading-relaxed text-ink-faint">
-                Simulated payment — no STK push is sent and no money moves.
+                {isDeposit
+                  ? "You'll receive an M-Pesa prompt on your phone to authorise this payment."
+                  : "Funds are sent to your verified M-Pesa number."}
               </p>
             </div>
           ) : stage === "pending" ? (

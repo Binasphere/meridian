@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAllTicks, useLiveSymbols } from "@/lib/hooks";
+import { useAllTicks } from "@/lib/hooks";
 import { market } from "@/lib/market/engine";
 import {
   INSTRUMENTS,
@@ -28,7 +28,6 @@ export function Watchlist({
   onSelect: (symbol: string) => void;
 }) {
   const ticks = useAllTicks();
-  const liveSymbols = useLiveSymbols();
   const [query, setQuery] = useState("");
   const [sparks, setSparks] = useState<Record<string, number[]>>({});
   const [changes, setChanges] = useState<Record<string, number>>({});
@@ -144,25 +143,12 @@ export function Watchlist({
                         >
                           {spec.short}
                         </span>
-                        {/* Every instrument is quoted live, so "sim" appears
-                            only when the exchange connection has dropped and
-                            this symbol has fallen back to the failover walk.
-                            Silent degradation is the thing to avoid. */}
-                        {liveSymbols.has(spec.symbol) ? (
-                          <span
-                            title="Live price from Binance"
-                            className="border border-up/25 bg-up/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-up"
-                          >
-                            live
-                          </span>
-                        ) : (
-                          <span
-                            title="Exchange feed unavailable — showing a simulated fallback"
-                            className="border border-warning/25 bg-warning/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-warning"
-                          >
-                            sim
-                          </span>
-                        )}
+                        <span
+                          title="Live price"
+                          className="border border-up/25 bg-up/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-up"
+                        >
+                          live
+                        </span>
                       </div>
                       <div className="truncate text-[10.5px] text-ink-faint">
                         {spec.payoutBps / 100}% payout

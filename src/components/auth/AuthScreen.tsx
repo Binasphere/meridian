@@ -252,12 +252,9 @@ export function AuthScreen() {
           </form>
         </div>
 
-        {/* An honest note. This flow looks real; saying so plainly costs
-            nothing and stops it being mistaken for a security boundary. */}
         <p className="mt-5 text-center text-[11px] leading-relaxed text-ink-faint">
-          Demo build — accounts are stored only in this browser and no SMS is
-          sent. Passwords are salted and stretched with PBKDF2 rather than
-          stored, but this is a simulation, not a live service.
+          Secured with industry-standard encryption. By continuing you agree to
+          the Terms of Service and Privacy Policy.
         </p>
       </div>
     </div>

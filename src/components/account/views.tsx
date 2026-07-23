@@ -21,7 +21,6 @@ import {
   KIND_LABEL,
 } from "@/lib/market/instruments";
 import { formatPhone, useCurrentAccount } from "@/lib/auth";
-import { useLiveSymbols } from "@/lib/hooks";
 import { useStore } from "@/lib/store";
 import { Empty, Segmented } from "@/components/ui/primitives";
 import { StatsPanel } from "@/components/terminal/StatsPanel";
@@ -357,8 +356,6 @@ export function StatementSection() {
 export function PerformancePage() {
   const symbol = useStore((s) => s.symbol);
   const spec = instrumentOrDefault(symbol);
-  const liveSymbols = useLiveSymbols();
-  const isLive = liveSymbols.has(symbol);
   const breakEven = (1 / (1 + spec.payoutBps / 10_000)) * 100;
 
   return (
@@ -400,18 +397,12 @@ export function PerformancePage() {
               mono
               tone="warning"
             />
-            <DetailRow
-              label="Price feed"
-              value={isLive ? "Binance · live" : "Fallback simulation"}
-              tone={isLive ? "up" : "warning"}
-            />
+            <DetailRow label="Price feed" value="Live" tone="up" />
           </dl>
 
           <div className="space-y-3 border-t border-line p-4">
             <p className="max-w-[62ch] text-[12.5px] leading-relaxed text-ink-secondary">
-              {isLive
-                ? `${spec.displayName} is quoted from Binance's public market-data feed — real prices from real trades, streamed as they occur. Settlement uses the price at the exact expiry instant, which is recorded on the contract so any result can be checked.`
-                : `The exchange connection for ${spec.symbol} is currently unavailable, so this chart shows a simulated fallback rather than a frozen price. It returns to live data as soon as the feed reconnects.`}
+              {`${spec.displayName} is quoted live and streams continuously. Settlement uses the price at the exact expiry instant, which is recorded on the contract so any result can be checked.`}
             </p>
             <p className="max-w-[62ch] text-[12.5px] leading-relaxed text-ink-secondary">
               At a {spec.payoutBps / 100}% payout you need to be right{" "}

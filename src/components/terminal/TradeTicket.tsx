@@ -13,6 +13,7 @@ import {
   profitFromStake,
 } from "@/lib/trading";
 import { selectBalance, useStore } from "@/lib/store";
+import { playPlace } from "@/lib/sound";
 import { Button, Segmented } from "@/components/ui/primitives";
 import { ActivityFeed } from "./ActivityFeed";
 
@@ -83,6 +84,9 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
       toast.error(result.reason);
       return;
     }
+    // The press is a user gesture, so this is also where the audio context is
+    // unlocked for the later settlement cue.
+    playPlace();
     toast.success(
       `${direction === "UP" ? "▲ Buy" : "▼ Sell"} · ${spec.short}`,
       {
