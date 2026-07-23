@@ -7,8 +7,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { DURATIONS, type Instrument } from "@/lib/market/instruments";
-import { payoutFromStake } from "@/lib/trading";
+import { effectivePayoutBps, payoutFromStake } from "@/lib/trading";
 import { selectBalance, useOpenTrades, useStore } from "@/lib/store";
+import { playPlace } from "@/lib/sound";
 import { Watchlist } from "./Watchlist";
 import { Positions } from "./Positions";
 
@@ -35,13 +36,18 @@ export function MobileBar({ spec }: { spec: Instrument }) {
   const placeTrade = useStore((s) => s.placeTrade);
   const setSymbol = useStore((s) => s.setSymbol);
   const balance = useStore(selectBalance);
+  const accountKind = useStore((s) => s.accountKind);
+  const liveTier = useStore((s) => s.liveTier);
   const open = useOpenTrades();
 
   const [marketsOpen, setMarketsOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
 
   const insufficient = stakeMinor > balance || stakeMinor <= 0n;
-  const potential = payoutFromStake(stakeMinor, spec.payoutBps);
+  // Same effective rate the desktop ticket shows — instrument base plus the VIP
+  // live-tier bonus, if it applies.
+  const payoutBps = effectivePayoutBps(spec.payoutBps, accountKind, liveTier);
+  const potential = payoutFromStake(stakeMinor, payoutBps);
 
   const submit = (direction: "UP" | "DOWN") => {
     const result = placeTrade(direction);
@@ -49,7 +55,8 @@ export function MobileBar({ spec }: { spec: Instrument }) {
       toast.error(result.reason);
       return;
     }
-    toast.success(`${direction === "UP" ? "▲ Higher" : "▼ Lower"} · ${spec.short}`, {
+    playPlace();
+    toast.success(`${direction === "UP" ? "▲ Buy" : "▼ Sell"} · ${spec.short}`, {
       description: `${formatMoney(stakeMinor, { currency: "KSh" })} at ${result.trade.openPrice.toFixed(spec.precision)}`,
     });
   };
@@ -111,18 +118,18 @@ export function MobileBar({ spec }: { spec: Instrument }) {
         <button
           onClick={() => submit("UP")}
           disabled={insufficient}
-          className="flex h-12 items-center justify-center gap-1.5 rounded-none border border-up/30 bg-up/12 text-[15px] font-semibold text-up transition-colors active:bg-up/20 disabled:opacity-40"
+          className="flex h-12 items-center justify-center gap-1.5 rounded-none border border-buy bg-buy text-[15px] font-semibold text-white transition-colors active:bg-buy-hover disabled:opacity-40"
         >
           <ArrowUp className="h-4 w-4" aria-hidden />
-          Higher
+          Buy
         </button>
         <button
           onClick={() => submit("DOWN")}
           disabled={insufficient}
-          className="flex h-12 items-center justify-center gap-1.5 rounded-none border border-down/30 bg-down/12 text-[15px] font-semibold text-down transition-colors active:bg-down/20 disabled:opacity-40"
+          className="flex h-12 items-center justify-center gap-1.5 rounded-none border border-sell bg-sell text-[15px] font-semibold text-white transition-colors active:bg-sell-hover disabled:opacity-40"
         >
           <ArrowDown className="h-4 w-4" aria-hidden />
-          Lower
+          Sell
         </button>
       </div>
 

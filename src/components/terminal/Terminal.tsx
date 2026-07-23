@@ -22,7 +22,7 @@ import { SettlementDriver } from "./SettlementDriver";
  *
  * Three columns: markets on the left to choose from, price in the middle to
  * read, ticket on the right to act on. Nothing scrolls except the lists —
- * hunting for the Higher button is not an acceptable cost of having scrolled.
+ * hunting for the Buy button is not an acceptable cost of having scrolled.
  *
  * Small screens rearrange the *same* mounted components rather than swapping in
  * a parallel mobile tree, so the chart is mounted exactly once and rotating a

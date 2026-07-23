@@ -39,21 +39,25 @@ export function MarketHeader({
   const { tick } = useTick(spec.symbol);
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-4 border-b border-line px-4">
+    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-3 sm:gap-4 sm:px-4">
       <div className="min-w-0">
-        <h1 className="truncate text-[14px] font-medium tracking-tight text-ink">
+        <h1 className="truncate text-[13px] font-medium tracking-tight text-ink sm:text-[14px]">
           {spec.displayName}
         </h1>
-        <div className="font-mono text-[10.5px] text-ink-faint">
+        <div className="truncate font-mono text-[10.5px] text-ink-faint">
           {spec.symbol}
         </div>
       </div>
 
       <LivePrice price={tick?.mid ?? null} precision={spec.precision} />
 
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      {/* On a narrow phone the interval control can be wider than the space
+          left after the price; let this group scroll horizontally rather than
+          clip the header. min-w-0 is what allows it to shrink below its
+          content and reveal the internal scroll. */}
+      <div className="ml-auto flex min-w-0 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <Segmented
-          className="hidden sm:inline-flex"
+          className="hidden shrink-0 sm:inline-flex"
           options={[
             { value: "candles" as const, label: "Candles" },
             { value: "area" as const, label: "Area" },
@@ -62,6 +66,7 @@ export function MarketHeader({
           onChange={onChartStyleChange}
         />
         <Segmented
+          className="shrink-0"
           options={RESOLUTION_OPTIONS}
           value={resolution}
           onChange={onResolutionChange}
@@ -86,14 +91,18 @@ function LivePrice({
   precision: number;
 }) {
   if (price === null) {
-    return <div className="tnum shrink-0 font-mono text-[26px] text-ink-faint">—</div>;
+    return (
+      <div className="tnum shrink-0 font-mono text-[20px] text-ink-faint sm:text-[26px]">
+        —
+      </div>
+    );
   }
 
   const text = price.toFixed(precision);
   const cut = Math.max(0, text.length - 2);
 
   return (
-    <div className="tnum shrink-0 font-mono text-[26px] leading-none tracking-tight">
+    <div className="tnum shrink-0 font-mono text-[20px] leading-none tracking-tight sm:text-[26px]">
       <span className="text-ink-secondary">{text.slice(0, cut)}</span>
       <span className="text-ink">{text.slice(cut)}</span>
     </div>

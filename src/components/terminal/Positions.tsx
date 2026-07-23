@@ -266,7 +266,7 @@ function HistoryList({ trades }: { trades: Trade[] }) {
                       "font-mono text-[11px]",
                       trade.direction === "UP" ? "text-up" : "text-down",
                     )}
-                    aria-label={trade.direction === "UP" ? "Higher" : "Lower"}
+                    aria-label={trade.direction === "UP" ? "Buy" : "Sell"}
                   >
                     {trade.direction === "UP" ? "▲" : "▼"}
                   </span>

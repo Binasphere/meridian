@@ -665,7 +665,7 @@ export function HelpPage() {
   const faqs = [
     {
       q: "How is a contract decided?",
-      a: "At expiry the price at that exact instant is compared with your entry price. Higher wins if it closed above, Lower if it closed below. Both prices are recorded on the contract, so any result can be checked afterwards rather than taken on trust.",
+      a: "At expiry the price at that exact instant is compared with your entry price. Buy wins if it closed above, Sell if it closed below. Both prices are recorded on the contract, so any result can be checked afterwards rather than taken on trust.",
     },
     {
       q: "What happens if it closes exactly at my entry price?",
