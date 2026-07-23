@@ -159,6 +159,11 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 export interface StoredAccount {
   phone: string;
+  /**
+   * Chosen display name. Optional on the type because accounts created before
+   * usernames existed persist without one; the UI falls back to the phone.
+   */
+  username?: string;
   salt: string;
   hash: string;
   createdAt: number;
@@ -170,12 +175,18 @@ interface AuthState {
   accounts: Record<string, StoredAccount>;
   currentPhone: string | null;
 
-  register: (phone: string, password: string) => Promise<AuthResult>;
+  register: (
+    phone: string,
+    username: string,
+    password: string,
+  ) => Promise<AuthResult>;
   signIn: (phone: string, password: string) => Promise<AuthResult>;
   signOut: () => void;
 }
 
 export const MIN_PASSWORD_LENGTH = 8;
+export const MIN_USERNAME_LENGTH = 2;
+export const MAX_USERNAME_LENGTH = 24;
 
 export const useAuth = create<AuthState>()(
   persist(
@@ -183,10 +194,23 @@ export const useAuth = create<AuthState>()(
       accounts: {},
       currentPhone: null,
 
-      register: async (phoneInput, password) => {
+      register: async (phoneInput, usernameInput, password) => {
         const phone = normalisePhone(phoneInput);
         if (!phone) {
           return { ok: false, reason: "Enter a valid Kenyan mobile number" };
+        }
+        const username = usernameInput.trim();
+        if (username.length < MIN_USERNAME_LENGTH) {
+          return {
+            ok: false,
+            reason: `Username must be at least ${MIN_USERNAME_LENGTH} characters`,
+          };
+        }
+        if (username.length > MAX_USERNAME_LENGTH) {
+          return {
+            ok: false,
+            reason: `Username must be at most ${MAX_USERNAME_LENGTH} characters`,
+          };
         }
         if (password.length < MIN_PASSWORD_LENGTH) {
           return {
@@ -209,6 +233,7 @@ export const useAuth = create<AuthState>()(
             ...state.accounts,
             [phone]: {
               phone,
+              username,
               salt: toBase64(salt),
               hash,
               createdAt: Date.now(),

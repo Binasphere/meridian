@@ -7,7 +7,11 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { DURATIONS, type Instrument } from "@/lib/market/instruments";
-import { payoutFromStake, profitFromStake } from "@/lib/trading";
+import {
+  effectivePayoutBps,
+  payoutFromStake,
+  profitFromStake,
+} from "@/lib/trading";
 import { selectBalance, useStore } from "@/lib/store";
 import { Button, Segmented } from "@/components/ui/primitives";
 import { ActivityFeed } from "./ActivityFeed";
@@ -40,13 +44,19 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
   const placeTrade = useStore((s) => s.placeTrade);
   const balance = useStore(selectBalance);
   const accountKind = useStore((s) => s.accountKind);
+  const liveTier = useStore((s) => s.liveTier);
+
+  // The rate the customer will actually be booked at — instrument base plus the
+  // VIP live-tier bonus, if it applies. Shown in the quote and the badge so what
+  // is displayed matches what `placeTrade` freezes onto the contract.
+  const payoutBps = effectivePayoutBps(spec.payoutBps, accountKind, liveTier);
 
   const quote = useMemo(
     () => ({
-      profit: profitFromStake(stakeMinor, spec.payoutBps),
-      total: payoutFromStake(stakeMinor, spec.payoutBps),
+      profit: profitFromStake(stakeMinor, payoutBps),
+      total: payoutFromStake(stakeMinor, payoutBps),
     }),
-    [stakeMinor, spec.payoutBps],
+    [stakeMinor, payoutBps],
   );
 
   const tooLow = stakeMinor < MIN_STAKE;
@@ -74,7 +84,7 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
       return;
     }
     toast.success(
-      `${direction === "UP" ? "▲ Higher" : "▼ Lower"} · ${spec.short}`,
+      `${direction === "UP" ? "▲ Buy" : "▼ Sell"} · ${spec.short}`,
       {
         description: `${formatMoney(stakeMinor, { currency: "KSh" })} at ${result.trade.openPrice.toFixed(spec.precision)} · settles in ${
           DURATIONS.find((d) => d.seconds === durationSec)?.label ?? `${durationSec}s`
@@ -183,7 +193,7 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
             Payout if correct
           </span>
           <span className="tnum rounded-none bg-up/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-up">
-            +{spec.payoutBps / 100}%
+            +{payoutBps / 100}%
           </span>
         </div>
 
@@ -258,14 +268,15 @@ function DirectionButton({
       className={cn(
         "h-[52px] flex-col gap-0 rounded-none border font-semibold",
         // Both directions get identical visual weight. Neither is "primary".
+        // Deep, solid fills rather than soft tints — see --color-buy/--color-sell.
         isUp
-          ? "border-up/30 bg-up/12 text-up hover:bg-up/20"
-          : "border-down/30 bg-down/12 text-down hover:bg-down/20",
+          ? "border-buy bg-buy text-white hover:bg-buy-hover"
+          : "border-sell bg-sell text-white hover:bg-sell-hover",
       )}
     >
       <span className="flex items-center gap-1.5 text-[15px]">
         <Icon className="h-4 w-4" aria-hidden />
-        {isUp ? "Higher" : "Lower"}
+        {isUp ? "Buy" : "Sell"}
       </span>
     </Button>
   );

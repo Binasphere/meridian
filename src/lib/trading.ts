@@ -35,6 +35,36 @@ export interface Trade {
 
 export type AccountKind = "DEMO" | "LIVE";
 
+/**
+ * Live-account tier.
+ *
+ * A separate axis from `AccountKind`: the practice/real split decides which
+ * balance a contract draws on, the tier decides the terms a real contract
+ * trades at. Demo is always practised at Standard terms so results transfer.
+ */
+export type LiveTier = "STANDARD" | "VIP";
+
+/** Extra payout, in bps, the VIP tier adds on top of an instrument's base. */
+export const VIP_PAYOUT_BONUS_BPS = 200;
+
+/**
+ * The payout actually applied to a contract, given who is placing it.
+ *
+ * The instrument sets the base rate; VIP adds a fixed bonus on top. The bonus
+ * is a live-account perk only — the demo account always trades at the base rate,
+ * so a strategy practised on demo matches a Standard live account rather than
+ * flattering itself with VIP terms.
+ */
+export function effectivePayoutBps(
+  basePayoutBps: number,
+  kind: AccountKind,
+  tier: LiveTier,
+): number {
+  return kind === "LIVE" && tier === "VIP"
+    ? basePayoutBps + VIP_PAYOUT_BONUS_BPS
+    : basePayoutBps;
+}
+
 const BPS_DENOMINATOR = 10_000n;
 
 /**

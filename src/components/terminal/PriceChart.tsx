@@ -73,8 +73,12 @@ export function PriceChart({
     const container = containerRef.current;
     if (!container) return;
 
+    // The area series line keeps the measured "up" hue; candles get their own
+    // louder palette (see --color-candle-* in globals.css). The "down" hue is
+    // used only by the position entry lines, in the effect further below.
     const up = cssVar("--color-up", "#1FD8A4");
-    const down = cssVar("--color-down", "#FF4757");
+    const candleUp = cssVar("--color-candle-up", "#00E676");
+    const candleDown = cssVar("--color-candle-down", "#FF1744");
     const ink = cssVar("--color-ink-secondary", "#9BA6B7");
     const muted = cssVar("--color-ink-faint", "#4A5364");
 
@@ -148,12 +152,12 @@ export function PriceChart({
         ? {
             kind: "candles",
             api: chart.addCandlestickSeries({
-              upColor: up,
-              downColor: down,
-              borderUpColor: up,
-              borderDownColor: down,
-              wickUpColor: up,
-              wickDownColor: down,
+              upColor: candleUp,
+              downColor: candleDown,
+              borderUpColor: candleUp,
+              borderDownColor: candleDown,
+              wickUpColor: candleUp,
+              wickDownColor: candleDown,
               priceFormat,
             }),
           }
@@ -214,11 +218,35 @@ export function PriceChart({
       }
     };
 
-    load(engine.candles(symbol, resolution, 500));
-    // Show a fixed number of bars rather than fitting all 500 into the width —
-    // fitContent() would shrink them back to the hairlines the wide barSpacing
-    // above exists to avoid.
-    chart.timeScale().scrollToRealTime();
+    // Time of the most recent bar handed to the chart. lightweight-charts'
+    // `update()` can only revise the last bar or append the single next one, so
+    // it is only safe while we stay within one bucket of what it already holds.
+    let lastTime = 0;
+    let previous = "";
+
+    /**
+     * Full reload: replace the series and snap to the live edge.
+     *
+     * Used on mount and whenever the incremental stream can no longer be
+     * trusted to be contiguous — a backgrounded tab throttles this timer and
+     * suspends the price socket, so on return the engine has rolled forward
+     * many bars at once. Appending only the newest via `update()` would leave a
+     * hole (or a lone future bar), which reads exactly as "the chart froze then
+     * jumped". Reloading the whole window is cheap and always correct.
+     */
+    const resync = () => {
+      // Show a fixed number of bars rather than fitting all 500 into the width —
+      // fitContent() would shrink them back to the hairlines the wide barSpacing
+      // above exists to avoid.
+      const history = engine.candles(symbol, resolution, 500);
+      load(history);
+      chart.timeScale().scrollToRealTime();
+      const newest = history[history.length - 1];
+      lastTime = newest ? newest.time : 0;
+      previous = "";
+    };
+
+    resync();
 
     /**
      * Redraw on a steady beat rather than on tick arrival.
@@ -233,11 +261,18 @@ export function PriceChart({
      * `series.update` with unchanged data is a no-op inside lightweight-charts,
      * so idle instruments cost nothing.
      */
-    let previous = "";
     const timer = setInterval(() => {
       const latest = engine.candles(symbol, resolution, 2);
       const point = latest[latest.length - 1];
       if (!point) return;
+
+      // A jump of more than one bucket means bars were created while we were not
+      // painting (throttled or hidden tab). `update()` cannot fill that gap —
+      // reload the whole series instead of tearing a hole into the chart.
+      if (lastTime && point.time > lastTime + resolution) {
+        resync();
+        return;
+      }
 
       // Skip the call entirely when nothing about the bar has changed.
       const signature = `${point.time}:${point.open}:${point.high}:${point.low}:${point.close}`;
@@ -245,9 +280,21 @@ export function PriceChart({
       previous = signature;
 
       push(point);
+      lastTime = point.time;
     }, 250);
 
-    return () => clearInterval(timer);
+    // Browsers throttle timers and suspend socket delivery for hidden tabs, so
+    // the chart drifts out of sync while backgrounded. Re-sync the instant it
+    // becomes visible again rather than waiting for the poll to notice the gap.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") resync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [symbol, resolution, style]);
 
   // Entry-price lines for live positions on this instrument. Reconciled against

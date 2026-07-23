@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Loader2, Smartphone } from "lucide-react";
+import { Eye, EyeOff, Loader2, Smartphone, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MIN_PASSWORD_LENGTH, useAuth } from "@/lib/auth";
 import { Wordmark } from "@/components/Wordmark";
@@ -18,6 +18,7 @@ type Mode = "signin" | "register";
 export function AuthScreen() {
   const [mode, setMode] = useState<Mode>("register");
   const [phone, setPhone] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [reveal, setReveal] = useState(false);
@@ -40,7 +41,7 @@ export function AuthScreen() {
     // PBKDF2 at 210k iterations takes a beat; that is the point of it.
     const result =
       mode === "register"
-        ? await register(phone, password)
+        ? await register(phone, username, password)
         : await signIn(phone, password);
     setBusy(false);
 
@@ -50,6 +51,7 @@ export function AuthScreen() {
   const switchTo = (next: Mode) => {
     setMode(next);
     setError(null);
+    setUsername("");
     setPassword("");
     setConfirm("");
   };
@@ -99,6 +101,33 @@ export function AuthScreen() {
           </div>
 
           <form onSubmit={submit} className="flex flex-col gap-4">
+            {/* --- Username (register only) -------------------------------- */}
+            {mode === "register" ? (
+              <div>
+                <label
+                  htmlFor="username"
+                  className="mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted"
+                >
+                  Username
+                </label>
+                <div className="flex items-stretch border border-line bg-surface-1 transition-colors focus-within:border-line-strong">
+                  <span className="flex items-center border-r border-line px-2.5 text-ink-muted">
+                    <User className="h-3.5 w-3.5" aria-hidden />
+                  </span>
+                  <input
+                    id="username"
+                    type="text"
+                    autoComplete="username"
+                    maxLength={24}
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="e.g. akinyi_254"
+                    className="w-full bg-transparent px-3 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-faint"
+                  />
+                </div>
+              </div>
+            ) : null}
+
             {/* --- Phone --------------------------------------------------- */}
             <div>
               <label
@@ -196,7 +225,12 @@ export function AuthScreen() {
 
             <button
               type="submit"
-              disabled={busy || !phone || !password}
+              disabled={
+                busy ||
+                !phone ||
+                !password ||
+                (mode === "register" && !username.trim())
+              }
               className={cn(
                 "mt-1 flex h-11 items-center justify-center gap-2",
                 "bg-cash text-[14px] font-semibold text-white hover:bg-cash-hover",

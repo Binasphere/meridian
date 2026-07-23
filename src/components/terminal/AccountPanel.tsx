@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { formatPhone, useAuth, useCurrentAccount } from "@/lib/auth";
 import { instrumentOrDefault } from "@/lib/market/instruments";
+import { VIP_PAYOUT_BONUS_BPS } from "@/lib/trading";
 import { useHistory, useStore } from "@/lib/store";
 import { CashDialog } from "./CashDialog";
 
@@ -48,6 +49,8 @@ export function AccountPanel({
 
   const balances = useStore((s) => s.balances);
   const accountKind = useStore((s) => s.accountKind);
+  const liveTier = useStore((s) => s.liveTier);
+  const setLiveTier = useStore((s) => s.setLiveTier);
   const symbol = useStore((s) => s.symbol);
   const history = useHistory();
   const spec = instrumentOrDefault(symbol);
@@ -84,17 +87,60 @@ export function AccountPanel({
                   className="grid h-10 w-10 shrink-0 place-items-center border border-line bg-surface-3 text-[13px] font-semibold text-ink"
                   aria-hidden
                 >
-                  {account ? account.phone.slice(-2) : "—"}
+                  {account
+                    ? (account.username?.slice(0, 2) ?? account.phone.slice(-2)).toUpperCase()
+                    : "—"}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="tnum truncate font-mono text-[13.5px] text-ink">
-                    {account ? formatPhone(account.phone) : "Not signed in"}
-                  </div>
-                  <div className="text-[11px] text-ink-muted">
+                  <div className="truncate text-[13.5px] font-medium text-ink">
                     {account
-                      ? `Since ${new Date(account.createdAt).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })}`
-                      : "—"}
+                      ? (account.username ?? formatPhone(account.phone))
+                      : "Not signed in"}
                   </div>
+                  <div className="tnum truncate font-mono text-[11px] text-ink-muted">
+                    {account ? formatPhone(account.phone) : "—"}
+                  </div>
+                </div>
+                {account ? (
+                  <span
+                    className={cn(
+                      "shrink-0 border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide",
+                      liveTier === "VIP"
+                        ? "border-accent/40 bg-accent-soft text-accent"
+                        : "border-line bg-surface-3 text-ink-muted",
+                    )}
+                  >
+                    {liveTier === "VIP" ? "VIP" : "Standard"}
+                  </span>
+                ) : null}
+              </div>
+
+              {/* --- Live account tier ------------------------------------- */}
+              <div className="border-b border-line p-3.5">
+                <div className="mb-2 text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+                  Live account tier
+                </div>
+                <div className="grid grid-cols-2 gap-px border border-line bg-line">
+                  {(["STANDARD", "VIP"] as const).map((tier) => (
+                    <button
+                      key={tier}
+                      onClick={() => setLiveTier(tier)}
+                      aria-pressed={liveTier === tier}
+                      className={cn(
+                        "flex flex-col items-center gap-0.5 py-2.5 text-[12.5px] font-medium transition-colors",
+                        liveTier === tier
+                          ? "bg-surface-3 text-ink"
+                          : "bg-surface-2 text-ink-muted hover:text-ink",
+                      )}
+                    >
+                      <span>{tier === "VIP" ? "VIP" : "Standard"}</span>
+                      <span className="text-[9.5px] uppercase tracking-wide text-ink-faint">
+                        {tier === "VIP"
+                          ? `+${VIP_PAYOUT_BONUS_BPS / 100}% payout`
+                          : "base payout"}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -149,7 +195,7 @@ export function AccountPanel({
                   icon={BadgeCheck}
                   label="Account"
                   hint="Profile · verification · settings"
-                  value="Tier 1"
+                  value={liveTier === "VIP" ? "VIP" : "Standard"}
                   onNavigate={close}
                 />
                 <PanelLink

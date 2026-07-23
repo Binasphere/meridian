@@ -8,10 +8,12 @@ import { market, type Resolution } from "./market/engine";
 import { DEFAULT_SYMBOL, instrument } from "./market/instruments";
 import {
   decide,
+  effectivePayoutBps,
   pnlFor,
   returnFor,
   type AccountKind,
   type Direction,
+  type LiveTier,
   type Trade,
 } from "./trading";
 
@@ -80,6 +82,8 @@ export interface Balances {
 interface State {
   // --- Account ------------------------------------------------------------
   accountKind: AccountKind;
+  /** The tier a Live contract trades at. Irrelevant on Demo. */
+  liveTier: LiveTier;
   balances: Balances;
 
   // --- Market selection ---------------------------------------------------
@@ -99,6 +103,7 @@ interface State {
 
   // --- Actions ------------------------------------------------------------
   setAccountKind: (kind: AccountKind) => void;
+  setLiveTier: (tier: LiveTier) => void;
   setSymbol: (symbol: string) => void;
   setResolution: (resolution: Resolution) => void;
   setChartStyle: (style: ChartStyle) => void;
@@ -131,6 +136,7 @@ export const useStore = create<State>()(
   persist(
     (set, get) => ({
       accountKind: "DEMO",
+      liveTier: "STANDARD",
       balances: {
         DEMO: DEMO_STARTING_BALANCE.toString(),
         LIVE: LIVE_STARTING_BALANCE.toString(),
@@ -155,6 +161,7 @@ export const useStore = create<State>()(
       cashEvents: [],
 
       setAccountKind: (accountKind) => set({ accountKind }),
+      setLiveTier: (liveTier) => set({ liveTier }),
       setSymbol: (symbol) => set({ symbol }),
       setResolution: (resolution) => set({ resolution }),
       setChartStyle: (chartStyle) => set({ chartStyle }),
@@ -194,7 +201,14 @@ export const useStore = create<State>()(
           direction,
           status: "OPEN",
           stakeMinor: stake.toString(),
-          payoutBps: spec.payoutBps,
+          // Freeze the effective payout at placement — the VIP bonus (if any)
+          // is baked into the contract here, so settlement, which reads
+          // trade.payoutBps, needs no knowledge of tiers.
+          payoutBps: effectivePayoutBps(
+            spec.payoutBps,
+            state.accountKind,
+            state.liveTier,
+          ),
           openPrice: tick.mid,
           closePrice: null,
           durationSec: state.durationSec,

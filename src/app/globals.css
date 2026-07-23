@@ -43,6 +43,28 @@
   --color-down-soft: #ff47571f;
   --color-down-line: #ff47574d;
 
+  /* --- Candle bodies: deliberately louder than the UI directional pair ------
+     The chart is the one place a saturated, unambiguous red/green earns its
+     keep — a candle should read as up or down at a glance from across a room.
+     The measured, colour-blind-tuned --color-up/--color-down still govern every
+     other directional cue (P&L, position rows, entry lines); these two are the
+     chart's own vivid voice. Direction on the chart is also carried by the
+     candle's position and the ▲/▼ entry glyphs, so hue is never the sole
+     channel. */
+  --color-candle-up: #00e676;
+  --color-candle-down: #ff1744;
+
+  /* --- Buy / Sell commit buttons ----------------------------------------
+     The one saturated control pair in the ticket: deep, solid directional
+     fills so the commit reads as substantial rather than as a soft tint. White
+     text clears 3:1 on both at the large button size, and the ▲/▼ glyph plus
+     the Buy/Sell label carry direction independently of hue. Kept equal weight
+     — neither side is styled as the primary action. */
+  --color-buy: #00a35c;
+  --color-buy-hover: #008f4f;
+  --color-sell: #f0313d;
+  --color-sell-hover: #d81f2b;
+
   /* --- Brand accent: focus, links, active nav. Never directional. -------- */
   --color-accent: #7c8cff;
   --color-accent-soft: #7c8cff1f;

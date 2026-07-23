@@ -6,6 +6,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Check,
+  Gift,
   Loader2,
   Smartphone,
   X,
@@ -16,9 +17,23 @@ import { formatMoney, formatRelative } from "@/lib/format";
 import { formatPhone, useCurrentAccount } from "@/lib/auth";
 import { useStore, type CashEvent } from "@/lib/store";
 
-const QUICK_AMOUNTS = [50_000n, 100_000n, 250_000n, 500_000n, 1_000_000n, 5_000_000n];
-const MIN_DEPOSIT = 5_000n; // KSh 50
+// The KSh 100 minimum leads the list so it is one tap to prefill the smallest
+// allowed deposit. Six chips keep the 3-column grid even.
+const QUICK_AMOUNTS = [10_000n, 50_000n, 100_000n, 250_000n, 500_000n, 1_000_000n];
+const MIN_DEPOSIT = 10_000n; // KSh 100
 const MIN_WITHDRAWAL = 10_000n; // KSh 100
+
+/**
+ * First-deposit bonus, shown as a promo only.
+ *
+ * The customer is credited an extra 20% of their first deposit, capped at the
+ * bonus on KSh 500 — i.e. a maximum of KSh 100. This is display copy for now;
+ * no bonus funds are credited client-side. The crediting moves server-side with
+ * Supabase, where it can be enforced once per account.
+ */
+const FIRST_DEPOSIT_BONUS_PCT = 20;
+const FIRST_DEPOSIT_BONUS_BASE = 50_000n; // KSh 500 — the amount the bonus is figured on
+const FIRST_DEPOSIT_BONUS_MAX = 10_000n; // KSh 100 — 20% of KSh 500
 
 type Stage = "form" | "pending" | "done";
 
@@ -43,6 +58,13 @@ export function CashDialog({
   const requestDeposit = useStore((s) => s.requestDeposit);
   const requestWithdrawal = useStore((s) => s.requestWithdrawal);
   const liveBalance = useStore((s) => BigInt(s.balances.LIVE));
+  const cashEvents = useStore((s) => s.cashEvents);
+
+  // The bonus is a first-deposit offer, so it disappears once any deposit has
+  // completed. A pending one does not count — it may yet fail.
+  const hasDeposited = cashEvents.some(
+    (e) => e.kind === "DEPOSIT" && e.status === "COMPLETED",
+  );
 
   const [amountMinor, setAmountMinor] = useState<bigint>(100_000n);
   const [stage, setStage] = useState<Stage>("form");
@@ -129,6 +151,25 @@ export function CashDialog({
 
           {stage === "form" ? (
             <div className="flex flex-col gap-4 p-4">
+              {/* --- First-deposit bonus (promo only) ---------------------- */}
+              {isDeposit && !hasDeposited ? (
+                <div className="flex items-start gap-2.5 border border-cash/40 bg-cash/10 p-3">
+                  <Gift className="mt-0.5 h-4 w-4 shrink-0 text-cash" aria-hidden />
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-semibold text-ink">
+                      First deposit bonus · +{FIRST_DEPOSIT_BONUS_PCT}%
+                    </div>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-ink-muted">
+                      Get an extra {FIRST_DEPOSIT_BONUS_PCT}% on your first{" "}
+                      {formatMoney(FIRST_DEPOSIT_BONUS_BASE, { currency: "KSh" })}{" "}
+                      deposited — up to{" "}
+                      {formatMoney(FIRST_DEPOSIT_BONUS_MAX, { currency: "KSh" })}{" "}
+                      free.
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
               {/* --- Number (fixed) ---------------------------------------- */}
               <div>
                 <div className="mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
