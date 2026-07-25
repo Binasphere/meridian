@@ -22,6 +22,7 @@ import {
 } from "@/lib/market/instruments";
 import { formatPhone, useCurrentAccount } from "@/lib/auth";
 import { useStore } from "@/lib/store";
+import { canWithdraw, WITHDRAWAL_REQUIRES_VIP } from "@/lib/trading";
 import { Empty, Segmented } from "@/components/ui/primitives";
 import { StatsPanel } from "@/components/terminal/StatsPanel";
 import { CashDialog, CashRow } from "@/components/terminal/CashDialog";
@@ -91,6 +92,7 @@ function BalancesBlock({
   const balances = useStore((s) => s.balances);
   const accountKind = useStore((s) => s.accountKind);
   const setAccountKind = useStore((s) => s.setAccountKind);
+  const withdrawable = canWithdraw(useStore((s) => s.liveTier));
 
   return (
     <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0">
@@ -126,22 +128,36 @@ function BalancesBlock({
           </div>
 
           {kind === "LIVE" ? (
-            <div className="mt-3.5 flex flex-wrap gap-2">
-              <button
-                onClick={() => onCash("deposit")}
-                className="flex h-9 items-center gap-1.5 bg-cash px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-cash-hover"
-              >
-                <ArrowDownToLine className="h-3.5 w-3.5" aria-hidden />
-                Deposit
-              </button>
-              <button
-                onClick={() => onCash("withdraw")}
-                className="flex h-9 items-center gap-1.5 border border-line-strong bg-surface-3 px-3.5 text-[12.5px] font-medium text-ink transition-colors hover:bg-surface-4"
-              >
-                <ArrowUpFromLine className="h-3.5 w-3.5" aria-hidden />
-                Withdraw
-              </button>
-            </div>
+            <>
+              <div className="mt-3.5 flex flex-wrap gap-2">
+                <button
+                  onClick={() => onCash("deposit")}
+                  className="flex h-9 items-center gap-1.5 bg-cash px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-cash-hover"
+                >
+                  <ArrowDownToLine className="h-3.5 w-3.5" aria-hidden />
+                  Deposit
+                </button>
+                <button
+                  onClick={() => onCash("withdraw")}
+                  disabled={!withdrawable}
+                  title={withdrawable ? undefined : WITHDRAWAL_REQUIRES_VIP}
+                  className={cn(
+                    "flex h-9 items-center gap-1.5 border px-3.5 text-[12.5px] font-medium transition-colors",
+                    withdrawable
+                      ? "border-line-strong bg-surface-3 text-ink hover:bg-surface-4"
+                      : "cursor-not-allowed border-line bg-surface-2 text-ink-faint",
+                  )}
+                >
+                  <ArrowUpFromLine className="h-3.5 w-3.5" aria-hidden />
+                  Withdraw
+                </button>
+              </div>
+              {withdrawable ? null : (
+                <p className="mt-2.5 text-[11.5px] leading-relaxed text-ink-muted">
+                  {WITHDRAWAL_REQUIRES_VIP}
+                </p>
+              )}
+            </>
           ) : (
             <p className="mt-3 text-[11.5px] leading-relaxed text-ink-muted">
               Practice funds. Reset any time from Settings.
@@ -160,6 +176,7 @@ function MovementsBlock({
 }) {
   const cashEvents = useStore((s) => s.cashEvents);
   const account = useCurrentAccount();
+  const withdrawable = canWithdraw(useStore((s) => s.liveTier));
 
   return (
     <>
@@ -181,7 +198,14 @@ function MovementsBlock({
           </button>
           <button
             onClick={() => onCash("withdraw")}
-            className="h-9 border border-line-strong bg-surface-3 px-3.5 text-[12.5px] font-medium text-ink transition-colors hover:bg-surface-4"
+            disabled={!withdrawable}
+            title={withdrawable ? undefined : WITHDRAWAL_REQUIRES_VIP}
+            className={cn(
+              "h-9 border px-3.5 text-[12.5px] font-medium transition-colors",
+              withdrawable
+                ? "border-line-strong bg-surface-3 text-ink hover:bg-surface-4"
+                : "cursor-not-allowed border-line bg-surface-2 text-ink-faint",
+            )}
           >
             Withdraw
           </button>

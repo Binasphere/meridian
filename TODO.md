@@ -64,10 +64,25 @@ is self-contained.
   a plain client-side `signInWithPassword`. `src/lib/auth.ts` keeps the
   localStorage simulation as the fallback for when Supabase is unconfigured.
 
+- [x] **11. Tier is server-owned; withdrawals are VIP-only.**
+  - The customer-facing tier switcher in `AccountPanel` is gone. `store.setLiveTier`
+    became `syncLiveTier`, called only by `auth.ts` when a profile is read, so
+    `profiles.live_tier` is the single source and the admin console is the only
+    writer. Customers see their tier; they cannot set it.
+  - Withdraw is disabled on Standard and enabled on VIP, at all three buttons
+    (account panel, wallet balances, wallet movements) and again inside
+    `store.requestWithdrawal` — a disabled control is a courtesy, not a control.
+    The rule itself is `canWithdraw()` in `trading.ts`.
+  - The tier is re-read when the tab regains focus, so an admin upgrade lands
+    without the customer signing out and back in.
+
 ## Follow-ups
 - Persist balances / deposits / trades to Supabase tables. Balances still live in
   `store.ts` (localStorage), so the figure in the terminal is not the one
   `profiles.demo_balance` / `live_balance` holds and the admin console shows.
+- Withdrawals are still simulated in `store.ts`. When they become real, the
+  VIP check has to move to the server too — the client-side one is a UI
+  affordance, not an authorisation boundary.
 - Actually credit the first-deposit bonus server-side.
 - Admin panel, once real auth exists: replace the shared passcode with an
   `is_admin` flag on `profiles` — `src/lib/admin/guard.ts` is the single place

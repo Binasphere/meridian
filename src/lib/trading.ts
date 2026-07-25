@@ -65,6 +65,29 @@ export function effectivePayoutBps(
     : basePayoutBps;
 }
 
+// ---------------------------------------------------------------------------
+// Withdrawal eligibility
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether a live account may withdraw.
+ *
+ * Withdrawals are a VIP entitlement; a Standard account can deposit and trade
+ * but not cash out. Stated here, once, rather than as a `disabled` attribute on
+ * each of the three Withdraw buttons — a rule that lives only in the UI is a
+ * rule the next button forgets, and this one decides whether money moves.
+ *
+ * The tier itself is set by Meridian, never by the customer: it is read from
+ * `profiles.live_tier` and is only writable through the admin console.
+ */
+export function canWithdraw(tier: LiveTier): boolean {
+  return tier === "VIP";
+}
+
+/** Why a Standard account cannot withdraw. Shown, never merely implied. */
+export const WITHDRAWAL_REQUIRES_VIP =
+  "Withdrawals are available on VIP accounts. Contact support to upgrade.";
+
 const BPS_DENOMINATOR = 10_000n;
 
 /**

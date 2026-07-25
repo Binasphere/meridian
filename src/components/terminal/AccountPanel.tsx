@@ -11,6 +11,7 @@ import {
   ChevronRight,
   CircleHelp,
   LogOut,
+  ShieldCheck,
   Wallet,
   X,
 } from "lucide-react";
@@ -18,7 +19,11 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { formatPhone, useAuth, useCurrentAccount } from "@/lib/auth";
 import { instrumentOrDefault } from "@/lib/market/instruments";
-import { VIP_PAYOUT_BONUS_BPS } from "@/lib/trading";
+import {
+  canWithdraw,
+  VIP_PAYOUT_BONUS_BPS,
+  WITHDRAWAL_REQUIRES_VIP,
+} from "@/lib/trading";
 import { useHistory, useStore } from "@/lib/store";
 import { CashDialog } from "./CashDialog";
 
@@ -50,10 +55,11 @@ export function AccountPanel({
   const balances = useStore((s) => s.balances);
   const accountKind = useStore((s) => s.accountKind);
   const liveTier = useStore((s) => s.liveTier);
-  const setLiveTier = useStore((s) => s.setLiveTier);
   const symbol = useStore((s) => s.symbol);
   const history = useHistory();
   const spec = instrumentOrDefault(symbol);
+
+  const withdrawable = canWithdraw(liveTier);
 
   const close = () => onOpenChange(false);
 
@@ -115,33 +121,35 @@ export function AccountPanel({
                 ) : null}
               </div>
 
-              {/* --- Live account tier ------------------------------------- */}
+              {/* --- Live account tier -------------------------------------
+                  Shown, not offered. The tier is an entitlement Meridian
+                  grants: it decides payout terms and whether money can leave
+                  the account, so a control that let the holder set it would be
+                  a self-service upgrade button. */}
               <div className="border-b border-line p-3.5">
                 <div className="mb-2 text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
                   Live account tier
                 </div>
-                <div className="grid grid-cols-2 gap-px border border-line bg-line">
-                  {(["STANDARD", "VIP"] as const).map((tier) => (
-                    <button
-                      key={tier}
-                      onClick={() => setLiveTier(tier)}
-                      aria-pressed={liveTier === tier}
-                      className={cn(
-                        "flex flex-col items-center gap-0.5 py-2.5 text-[12.5px] font-medium transition-colors",
-                        liveTier === tier
-                          ? "bg-surface-3 text-ink"
-                          : "bg-surface-2 text-ink-muted hover:text-ink",
-                      )}
-                    >
-                      <span>{tier === "VIP" ? "VIP" : "Standard"}</span>
-                      <span className="text-[9.5px] uppercase tracking-wide text-ink-faint">
-                        {tier === "VIP"
-                          ? `+${VIP_PAYOUT_BONUS_BPS / 100}% payout`
-                          : "base payout"}
-                      </span>
-                    </button>
-                  ))}
+                <div className="flex items-center gap-3 border border-line bg-surface-2 px-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-medium text-ink">
+                      {liveTier === "VIP" ? "VIP" : "Standard"}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-ink-muted">
+                      {liveTier === "VIP"
+                        ? `+${VIP_PAYOUT_BONUS_BPS / 100}% payout · withdrawals enabled`
+                        : "Base payout · withdrawals unavailable"}
+                    </div>
+                  </div>
+                  {liveTier === "VIP" ? (
+                    <ShieldCheck className="h-4 w-4 shrink-0 text-accent" aria-hidden />
+                  ) : null}
                 </div>
+                {liveTier === "VIP" ? null : (
+                  <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+                    Contact support to upgrade to VIP.
+                  </p>
+                )}
               </div>
 
               {/* --- Money, immediately ------------------------------------- */}
@@ -155,12 +163,25 @@ export function AccountPanel({
                 </button>
                 <button
                   onClick={() => setCash("withdraw")}
-                  className="flex items-center justify-center gap-1.5 bg-surface-2 py-3 text-[13px] font-medium text-ink transition-colors hover:bg-surface-3"
+                  disabled={!withdrawable}
+                  title={withdrawable ? undefined : WITHDRAWAL_REQUIRES_VIP}
+                  className={cn(
+                    "flex items-center justify-center gap-1.5 py-3 text-[13px] font-medium transition-colors",
+                    withdrawable
+                      ? "bg-surface-2 text-ink hover:bg-surface-3"
+                      : "cursor-not-allowed bg-surface-2 text-ink-faint",
+                  )}
                 >
                   <ArrowUpFromLine className="h-3.5 w-3.5" aria-hidden />
                   Withdraw
                 </button>
               </div>
+
+              {withdrawable ? null : (
+                <p className="border-b border-line bg-surface-1 px-3.5 py-2 text-[11px] leading-relaxed text-ink-muted">
+                  {WITHDRAWAL_REQUIRES_VIP}
+                </p>
+              )}
 
               {/* --- Routes --------------------------------------------------
                   Four destinations, not eight. Balances, moving money and the

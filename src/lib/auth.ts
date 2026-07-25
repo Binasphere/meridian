@@ -6,6 +6,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { hasSubtleCrypto, pbkdf2Sha256 } from "./pbkdf2";
 import { supabase } from "./supabase/client";
 import { identityEmail, normalisePhone, validateRegistration } from "./phone";
+import { useStore } from "./store";
+import type { LiveTier } from "./trading";
 
 /**
  * Authentication.
@@ -145,10 +147,26 @@ export interface StoredAccount {
    */
   username?: string;
   createdAt: number;
+  /**
+   * The live tier, as the server has it.
+   *
+   * Read from `profiles.live_tier` and never written from here. RLS lets a
+   * customer read their own profile row, and the update policy plus the admin
+   * route mean only the console can change it — so this is something the
+   * account *is*, not something it can choose. The UI displays it; it does not
+   * offer it.
+   */
+  liveTier: LiveTier;
 }
 
-/** A local-simulation account: the profile plus its password verifier. */
-interface LocalCredential extends StoredAccount {
+/**
+ * A local-simulation account: the profile plus its password verifier.
+ *
+ * Carries no tier, deliberately. A tier is something a server grants; the
+ * fallback has no server, so signing in there always yields Standard rather
+ * than letting a value in this browser's localStorage decide entitlements.
+ */
+interface LocalCredential extends Omit<StoredAccount, "liveTier"> {
   salt: string;
   hash: string;
 }
@@ -210,11 +228,13 @@ export const useAuth = create<AuthState>()(
             hash,
           };
 
-          set((state) => ({
-            accounts: { ...state.accounts, [phone]: account },
-            currentPhone: phone,
-            profile: { phone, username, createdAt: account.createdAt },
-          }));
+          set((state) => ({ accounts: { ...state.accounts, [phone]: account } }));
+          applyProfile(phone, {
+            phone,
+            username,
+            createdAt: account.createdAt,
+            liveTier: "STANDARD",
+          });
           return { ok: true };
         }
 
@@ -268,13 +288,11 @@ export const useAuth = create<AuthState>()(
             return { ok: false, reason: "Incorrect number or password" };
           }
 
-          set({
-            currentPhone: phone,
-            profile: {
-              phone: account.phone,
-              username: account.username,
-              createdAt: account.createdAt,
-            },
+          applyProfile(phone, {
+            phone: account.phone,
+            username: account.username,
+            createdAt: account.createdAt,
+            liveTier: "STANDARD",
           });
           return { ok: true };
         }
@@ -292,7 +310,7 @@ export const useAuth = create<AuthState>()(
           return { ok: false, reason: "Incorrect number or password" };
         }
 
-        set({ currentPhone: phone, profile: await readProfile(phone) });
+        applyProfile(phone, await readProfile(phone));
         return { ok: true };
       },
 
@@ -300,7 +318,7 @@ export const useAuth = create<AuthState>()(
       signOut: () => {
         // Clear locally first so the UI never sits on a stale session waiting
         // for a network call it does not need to wait for.
-        set({ currentPhone: null, profile: null });
+        applyProfile(null, null);
         void supabase()?.auth.signOut();
       },
     }),
@@ -337,11 +355,11 @@ export const useAuth = create<AuthState>()(
  */
 async function readProfile(phone: string): Promise<StoredAccount> {
   const db = supabase();
-  if (!db) return { phone, createdAt: Date.now() };
+  if (!db) return { phone, createdAt: Date.now(), liveTier: "STANDARD" };
 
   const { data } = await db
     .from("profiles")
-    .select("phone, username, created_at")
+    .select("phone, username, created_at, live_tier")
     .maybeSingle();
 
   if (data) {
@@ -349,6 +367,7 @@ async function readProfile(phone: string): Promise<StoredAccount> {
       phone: data.phone ?? phone,
       username: data.username ?? undefined,
       createdAt: new Date(data.created_at).getTime(),
+      liveTier: data.live_tier === "VIP" ? "VIP" : "STANDARD",
     };
   }
 
@@ -363,7 +382,23 @@ async function readProfile(phone: string): Promise<StoredAccount> {
     createdAt: auth.user?.created_at
       ? new Date(auth.user.created_at).getTime()
       : Date.now(),
+    // A missing profile row means the trigger did not run. Standard is the
+    // safe assumption: it is the tier that grants nothing.
+    liveTier: "STANDARD",
   };
+}
+
+/**
+ * Puts the profile into the store and mirrors the tier into the session store.
+ *
+ * `store.ts` needs the tier to price a contract (`effectivePayoutBps`) and to
+ * decide whether Withdraw is available. Rather than let it hold an opinion of
+ * its own — which is what allowed the customer to toggle their own tier — it is
+ * fed from here, so `profiles.live_tier` is the only thing that decides.
+ */
+function applyProfile(phone: string | null, profile: StoredAccount | null): void {
+  useAuth.setState({ currentPhone: phone, profile });
+  useStore.getState().syncLiveTier(profile?.liveTier ?? "STANDARD");
 }
 
 // ---------------------------------------------------------------------------
@@ -398,20 +433,34 @@ function bootstrap(): void {
     // The identity email is the normalised number with the domain appended.
     const phone = email ? (email.split("@")[0] ?? null) : null;
 
-    useAuth.setState({
-      currentPhone: phone,
-      profile: phone ? await readProfile(phone) : null,
-      hydrated: true,
-    });
+    applyProfile(phone, phone ? await readProfile(phone) : null);
+    useAuth.setState({ hydrated: true });
   })();
 
   // A token refresh failure or a sign-out in another tab has to land here too,
   // otherwise one tab keeps rendering a terminal for a session that is gone.
   db.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_OUT" || !session) {
-      useAuth.setState({ currentPhone: null, profile: null });
+      applyProfile(null, null);
     }
   });
+
+  // An admin promoting someone to VIP changes a row this tab is already
+  // showing. Re-reading whenever the tab comes back to the foreground means the
+  // upgrade lands the next time the customer looks at it, rather than only
+  // after a sign-out — without holding a realtime subscription open for a value
+  // that changes a handful of times in an account's life.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    void refreshProfile();
+  });
+}
+
+/** Re-reads the profile for the signed-in user, if there is one. */
+export async function refreshProfile(): Promise<void> {
+  const { currentPhone } = useAuth.getState();
+  if (!currentPhone || !supabase()) return;
+  applyProfile(currentPhone, await readProfile(currentPhone));
 }
 
 // ---------------------------------------------------------------------------

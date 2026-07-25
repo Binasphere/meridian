@@ -7,10 +7,12 @@ import { useShallow } from "zustand/react/shallow";
 import { market, type Resolution } from "./market/engine";
 import { DEFAULT_SYMBOL, instrument } from "./market/instruments";
 import {
+  canWithdraw,
   decide,
   effectivePayoutBps,
   pnlFor,
   returnFor,
+  WITHDRAWAL_REQUIRES_VIP,
   type AccountKind,
   type Direction,
   type LiveTier,
@@ -103,7 +105,16 @@ interface State {
 
   // --- Actions ------------------------------------------------------------
   setAccountKind: (kind: AccountKind) => void;
-  setLiveTier: (tier: LiveTier) => void;
+  /**
+   * Mirrors `profiles.live_tier` into the session.
+   *
+   * Called only by `auth.ts` when a profile is read — never by a component. The
+   * tier is an entitlement the platform grants, so there is deliberately no way
+   * for the interface to set it: the previous `setLiveTier` was wired to a pair
+   * of buttons in the account panel, which meant any customer could award
+   * themselves VIP payout terms.
+   */
+  syncLiveTier: (tier: LiveTier) => void;
   setSymbol: (symbol: string) => void;
   setResolution: (resolution: Resolution) => void;
   setChartStyle: (style: ChartStyle) => void;
@@ -161,7 +172,7 @@ export const useStore = create<State>()(
       cashEvents: [],
 
       setAccountKind: (accountKind) => set({ accountKind }),
-      setLiveTier: (liveTier) => set({ liveTier }),
+      syncLiveTier: (liveTier) => set({ liveTier }),
       setSymbol: (symbol) => set({ symbol }),
       setResolution: (resolution) => set({ resolution }),
       setChartStyle: (chartStyle) => set({ chartStyle }),
@@ -318,6 +329,9 @@ export const useStore = create<State>()(
       signOut: () =>
         set({
           accountKind: "DEMO",
+          // Back to the tier that grants nothing, so the next person to sign in
+          // on this browser never inherits the last one's entitlements.
+          liveTier: "STANDARD",
           balances: {
             DEMO: DEMO_STARTING_BALANCE.toString(),
             LIVE: LIVE_STARTING_BALANCE.toString(),
@@ -383,6 +397,12 @@ export const useStore = create<State>()(
         const state = get();
         const available = BigInt(state.balances.LIVE);
 
+        // Checked here as well as on the button. A disabled control is a
+        // courtesy, not a control — the rule has to hold even when the request
+        // arrives from somewhere the button isn't.
+        if (!canWithdraw(state.liveTier)) {
+          return { ok: false as const, reason: WITHDRAWAL_REQUIRES_VIP };
+        }
         if (amountMinor <= 0n) {
           return { ok: false as const, reason: "Enter an amount" };
         }
