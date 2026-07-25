@@ -48,7 +48,27 @@ is self-contained.
   guarded client, `.env.local` template, and a `supabase/schema.sql`. Credentials
   to be supplied later.
 
-## Follow-ups (after Supabase credentials arrive)
-- Move auth from localStorage simulation to Supabase Auth.
-- Persist accounts / deposits / trades to Supabase tables.
+- [x] **9. Admin panel.** `/admin`: passcode-gated user list with a Standard/VIP
+  tier switch. Every privileged read and write runs server-side in
+  `src/app/api/admin/*` under the service-role key, because row-level security
+  correctly forbids reading other users' rows from the browser.
+
+- [x] **10. Auth on Supabase.** Sign-up and sign-in run against Supabase Auth.
+  The Kenyan number is carried as the auth identity via
+  `identityEmail()` in `src/lib/phone.ts` (`254712345678@meridian.invalid`), so
+  the customer still signs in with a number and a password — no SMS provider, no
+  one-time code, no UX change. Creation goes through `POST /api/auth/register`,
+  which uses the service role to create the user *pre-confirmed*: the project has
+  email confirmation on, and the derived address is on a reserved domain that can
+  never receive mail, so a browser `signUp` would strand the account. Sign-in is
+  a plain client-side `signInWithPassword`. `src/lib/auth.ts` keeps the
+  localStorage simulation as the fallback for when Supabase is unconfigured.
+
+## Follow-ups
+- Persist balances / deposits / trades to Supabase tables. Balances still live in
+  `store.ts` (localStorage), so the figure in the terminal is not the one
+  `profiles.demo_balance` / `live_balance` holds and the admin console shows.
 - Actually credit the first-deposit bonus server-side.
+- Admin panel, once real auth exists: replace the shared passcode with an
+  `is_admin` flag on `profiles` — `src/lib/admin/guard.ts` is the single place
+  that changes — and add an audit trail of tier changes.

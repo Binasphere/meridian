@@ -97,6 +97,47 @@
   --color-series-7: #9085e9;
   --color-series-8: #e66767;
 
+  /* --- Admin console: a light surface, deliberately a different room -------
+     The terminal is dark because a trading screen is stared at for hours in a
+     dim room and every non-data pixel should recede. The admin console is the
+     opposite kind of tool: used in daylight, for minutes at a time, to read
+     records and make a decision. Light is the right substrate for that, and
+     the visual break is useful in itself — you always know whether you are
+     looking at the customer product or at the back office.
+
+     These are a parallel namespace (`adm-*`) rather than a theme swap, so
+     nothing here can leak into the terminal and no token is doing double duty
+     in two lightness regimes. */
+
+  --color-adm-canvas: #f6f7f9;
+  --color-adm-surface: #ffffff;
+  --color-adm-raise: #fbfbfd; /* sidebar — a half-step off the cards */
+  --color-adm-subtle: #f2f4f8; /* hover wash, inset tracks */
+  --color-adm-line: #e6e8ee;
+  --color-adm-line-strong: #d5d9e3;
+
+  /* Measured against #ffffff: 18.3 / 8.6 / 5.3. ink-4 is 2.6 — decorative
+     icons, disabled states and dividers only, never text that must be read. */
+  --color-adm-ink: #101426;
+  --color-adm-ink-2: #454c60;
+  --color-adm-ink-3: #636b7d;
+  --color-adm-ink-4: #98a0b3;
+
+  --color-adm-accent: #256abf; /* 5.4:1 on white */
+  --color-adm-accent-deep: #184f95; /* 8.1:1 — accent text */
+  --color-adm-accent-tint: #eaf1fb;
+  --color-adm-accent-line: #c9dcf5;
+
+  /* Tier is ordinal, not categorical: Standard → VIP is an ordered ladder, so
+     it takes one hue stepped light→dark rather than two competing hues. The
+     pair passes the ordinal gates on a white surface (monotone lightness,
+     ΔL 0.29, light end 2.11:1). */
+  --color-adm-tier-standard: #86b6ef;
+  --color-adm-tier-vip: #1c5cab;
+
+  --color-adm-pos: #0a7a4f;
+  --color-adm-neg: #b3261e;
+
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono-face), ui-monospace, "SF Mono", monospace;
 
@@ -193,6 +234,53 @@
     border-radius: var(--radius-panel);
   }
 
+  /* --- Admin console ------------------------------------------------------
+     Scoped to `.adm-root`. The base layer sets a dark default border colour on
+     `*` and a dark `color-scheme` on `html`; both have to be undone inside the
+     console or every hairline renders as white-on-white and native controls
+     come back dark. */
+  .adm-root,
+  .adm-root * {
+    border-color: var(--color-adm-line);
+  }
+
+  .adm-root {
+    color-scheme: light;
+    background: var(--color-adm-canvas);
+    color: var(--color-adm-ink);
+  }
+
+  .adm-root ::-webkit-scrollbar-thumb {
+    background: #cfd4de;
+    background-clip: content-box;
+  }
+  .adm-root ::-webkit-scrollbar-thumb:hover {
+    background: #b9c0cd;
+    background-clip: content-box;
+  }
+
+  /* The one repeated surface, as `.panel` is in the terminal.
+
+     Square, and defined by a hairline alone — no shadow. Two things follow from
+     that. The console keeps the terminal's hard-cornered discipline, so the two
+     halves of the product read as one piece of software rather than as an app
+     and somebody's dashboard template. And on a light surface a drop shadow is
+     the first thing that makes a UI look cheap: what reads as quality is a
+     crisp edge and the white space around it, not a card pretending to hover. */
+  .adm-card {
+    background: var(--color-adm-surface);
+    border: 1px solid var(--color-adm-line);
+  }
+
+  /* Section labels in the sidebar and above card groups. */
+  .adm-eyebrow {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-adm-ink-3);
+  }
+
   /* Hairline separators that fade at both ends — a full-bleed 1px line across a
      dark panel reads as a crack; a faded one reads as a seam. */
   .hairline-x {
@@ -232,6 +320,11 @@
     transform: translateX(-100%);
     background: linear-gradient(90deg, transparent, #ffffff0d, transparent);
     animation: shimmer 1.8s infinite;
+  }
+
+  @keyframes adm-toast-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   @keyframes rise-in {
