@@ -76,6 +76,29 @@ is self-contained.
   - The tier is re-read when the tab regains focus, so an admin upgrade lands
     without the customer signing out and back in.
 
+- [x] **12. Ten-second contracts + countdown.** Every contract is fixed at
+  `FIXED_DURATION_SEC = 10`; the expiry ladder and its three selectors are gone,
+  replaced by a stated value. Placing a contract raises `TradeCountdown`, a
+  non-blocking panel with the clock, entry, live price and ahead/behind, which
+  shows the outcome and dismisses itself. Placement toasts were removed — the
+  panel is the confirmation. Session store bumped to `meridian.session.v6`
+  because a persisted v5 blob holds a 60-second expiry.
+
+- [x] **13. Staged deposits.** `CashEvent` gained a `stage`
+  (`REQUESTING → AWAITING_CUSTOMER → CONFIRMING → SETTLED`) and `requestDeposit`
+  now returns `{ id, done }` so the dialog can follow the request instead of
+  showing one spinner. Modelled on the real Daraja lifecycle.
+
+## Money: decided 2026-07-25
+- **No real money moves yet.** Deposits stay simulated until a shortcode and
+  Daraja credentials exist. The staged flow above is what the real integration
+  will slot into: `requestDeposit` is the seam — `REQUESTING` becomes the
+  STK-push call, `CONFIRMING` becomes waiting on the Daraja callback.
+- **VIP is a verification tier, not a privilege.** Every account can reach it by
+  completing verification; an admin then marks it VIP and withdrawals open. This
+  is why the withdrawal gate is legitimate — do not turn it into a tier a
+  customer cannot reach, since that would mean taking deposits with no route out.
+
 ## Follow-ups
 - Persist balances / deposits / trades to Supabase tables. Balances still live in
   `store.ts` (localStorage), so the figure in the terminal is not the one
@@ -83,6 +106,10 @@ is self-contained.
 - Withdrawals are still simulated in `store.ts`. When they become real, the
   VIP check has to move to the server too — the client-side one is a UI
   affordance, not an authorisation boundary.
+- Real M-Pesa needs: a registered paybill/till, Daraja consumer key + secret,
+  passkey, and a public HTTPS callback URL. Build against the sandbox first
+  (shortcode 174379); the code path is identical bar the base URL.
+- Withdrawals need M-Pesa **B2C**, a separate Daraja product from STK push.
 - Actually credit the first-deposit bonus server-side.
 - Admin panel, once real auth exists: replace the shared passcode with an
   `is_admin` flag on `profiles` — `src/lib/admin/guard.ts` is the single place

@@ -2,11 +2,14 @@
 
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Minus, Plus, Wallet } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, Plus, Timer, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { DURATIONS, type Instrument } from "@/lib/market/instruments";
+import {
+  FIXED_DURATION_SEC,
+  type Instrument,
+} from "@/lib/market/instruments";
 import {
   effectivePayoutBps,
   payoutFromStake,
@@ -14,7 +17,7 @@ import {
 } from "@/lib/trading";
 import { selectBalance, useStore } from "@/lib/store";
 import { playPlace } from "@/lib/sound";
-import { Button, Segmented } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/primitives";
 import { ActivityFeed } from "./ActivityFeed";
 
 const QUICK_STAKES = [10_000n, 25_000n, 50_000n, 100_000n]; // KES 100 / 250 / 500 / 1,000
@@ -40,8 +43,6 @@ const MAX_STAKE = 30_000_000n;
 export function TradeTicket({ spec }: { spec: Instrument }) {
   const stakeMinor = useStore((s) => BigInt(s.stakeMinor));
   const setStakeMinor = useStore((s) => s.setStakeMinor);
-  const durationSec = useStore((s) => s.durationSec);
-  const setDuration = useStore((s) => s.setDuration);
   const placeTrade = useStore((s) => s.placeTrade);
   const balance = useStore(selectBalance);
   const accountKind = useStore((s) => s.accountKind);
@@ -87,14 +88,9 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
     // The press is a user gesture, so this is also where the audio context is
     // unlocked for the later settlement cue.
     playPlace();
-    toast.success(
-      `${direction === "UP" ? "▲ Buy" : "▼ Sell"} · ${spec.short}`,
-      {
-        description: `${formatMoney(stakeMinor, { currency: "KSh" })} at ${result.trade.openPrice.toFixed(spec.precision)} · settles in ${
-          DURATIONS.find((d) => d.seconds === durationSec)?.label ?? `${durationSec}s`
-        }`,
-      },
-    );
+    // No toast on placement. The countdown panel is now the confirmation, and
+    // stacking a toast on top of it says the same thing twice — while the toast
+    // outlives the ten seconds it is describing.
   };
 
   return (
@@ -177,17 +173,18 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
         </div>
       </div>
 
-      {/* --- Duration ------------------------------------------------------- */}
-      <div>
-        <div className="mb-2 text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+      {/* --- Expiry ----------------------------------------------------------
+          Stated, not chosen. Every contract runs ten seconds, so this is a fact
+          about the product rather than a control — and a segmented control with
+          one option is a control that lies about having a choice. */}
+      <div className="flex items-center justify-between border border-line bg-surface-1 px-3 py-2.5">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
           Expiry
-        </div>
-        <Segmented
-          className="w-full [&>button]:flex-1"
-          options={DURATIONS.map((d) => ({ value: d.seconds, label: d.label }))}
-          value={durationSec}
-          onChange={setDuration}
-        />
+        </span>
+        <span className="tnum flex items-center gap-1.5 font-mono text-[13px] text-ink">
+          <Timer className="h-3.5 w-3.5 text-ink-muted" aria-hidden />
+          {FIXED_DURATION_SEC}s
+        </span>
       </div>
 
       {/* --- Quote ---------------------------------------------------------- */}

@@ -15,7 +15,13 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney, formatRelative } from "@/lib/format";
 import { formatPhone, useCurrentAccount } from "@/lib/auth";
-import { useStore, type CashEvent } from "@/lib/store";
+import {
+  CASH_STAGE_DETAIL,
+  CASH_STAGE_LABEL,
+  useStore,
+  type CashEvent,
+  type CashStage,
+} from "@/lib/store";
 
 // The KSh 100 minimum leads the list so it is one tap to prefill the smallest
 // allowed deposit. Six chips keep the 3-column grid even.
@@ -71,6 +77,12 @@ export function CashDialog({
   const [result, setResult] = useState<CashEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The id of the request in flight, so the dialog can watch it move through
+  // the STK stages rather than waiting on one promise with nothing to show.
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const liveStage: CashStage =
+    cashEvents.find((e) => e.id === pendingId)?.stage ?? "REQUESTING";
+
   const isDeposit = mode === "deposit";
   const minimum = isDeposit ? MIN_DEPOSIT : MIN_WITHDRAWAL;
 
@@ -97,7 +109,10 @@ export function CashDialog({
     setStage("pending");
 
     if (isDeposit) {
-      const event = await requestDeposit(amountMinor, account.phone);
+      const { id, done } = requestDeposit(amountMinor, account.phone);
+      setPendingId(id);
+      const event = await done;
+      setPendingId(null);
       setResult(event);
       setStage("done");
       toast.success(`Deposit received · ${formatMoney(amountMinor, { currency: "KSh" })}`, {
@@ -258,7 +273,7 @@ export function CashDialog({
                     : "border border-line-strong bg-surface-3 text-ink hover:bg-surface-4",
                 )}
               >
-                {isDeposit ? "Send STK push" : "Confirm withdrawal"}
+                {isDeposit ? "Pay now" : "Confirm withdrawal"}
               </button>
 
               <p className="text-center text-[10.5px] leading-relaxed text-ink-faint">
@@ -268,17 +283,17 @@ export function CashDialog({
               </p>
             </div>
           ) : stage === "pending" ? (
-            <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-              <Loader2 className="h-7 w-7 animate-spin text-ink-muted" aria-hidden />
-              <p className="text-[14px] font-medium text-ink">
-                {isDeposit ? "Check your phone" : "Sending to M-Pesa"}
-              </p>
-              <p className="max-w-[260px] text-[12px] leading-relaxed text-ink-muted">
-                {isDeposit
-                  ? `Enter your M-Pesa PIN to authorise ${formatMoney(amountMinor, { currency: "KSh" })} to Meridian.`
-                  : `Transferring ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhone(account.phone) : "your number"}.`}
-              </p>
-            </div>
+            isDeposit ? (
+              <StkProgress stage={liveStage} amountMinor={amountMinor} />
+            ) : (
+              <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                <Loader2 className="h-7 w-7 animate-spin text-ink-muted" aria-hidden />
+                <p className="text-[14px] font-medium text-ink">Sending to M-Pesa</p>
+                <p className="max-w-[260px] text-[12px] leading-relaxed text-ink-muted">
+                  {`Transferring ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhone(account.phone) : "your number"}.`}
+                </p>
+              </div>
+            )
           ) : (
             <div className="flex flex-col items-center gap-3 px-6 py-8 text-center">
               <span className="grid h-11 w-11 place-items-center border border-cash/40 bg-cash/15">
@@ -306,6 +321,85 @@ export function CashDialog({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/**
+ * The STK push, step by step.
+ *
+ * Four rows rather than one spinner, because they are four genuinely different
+ * waits and only one of them is the customer's to act on. Showing which step is
+ * live is what turns "is this broken?" into "it's waiting for me" — the
+ * difference between a customer entering their PIN and a customer closing the
+ * dialog at four seconds.
+ */
+function StkProgress({
+  stage,
+  amountMinor,
+}: {
+  stage: CashStage;
+  amountMinor: bigint;
+}) {
+  const steps: CashStage[] = ["REQUESTING", "AWAITING_CUSTOMER", "CONFIRMING"];
+  const currentIndex = steps.indexOf(stage);
+  // The final stage is reached only as the dialog flips to its receipt, so
+  // treat it as "all steps done" rather than as an unknown index.
+  const activeIndex = currentIndex === -1 ? steps.length : currentIndex;
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <div className="text-center">
+        <div className="tnum font-mono text-[22px] leading-none text-ink">
+          {formatMoney(amountMinor, { currency: "KSh" })}
+        </div>
+        <p className="mt-1.5 text-[11.5px] text-ink-muted">
+          {CASH_STAGE_DETAIL[stage]}
+        </p>
+      </div>
+
+      <ol className="divide-y divide-line border border-line bg-surface-1">
+        {steps.map((step, index) => {
+          const complete = index < activeIndex;
+          const active = index === activeIndex;
+
+          return (
+            <li key={step} className="flex items-center gap-3 px-3 py-2.5">
+              <span
+                className={cn(
+                  "grid h-5 w-5 shrink-0 place-items-center border",
+                  complete && "border-cash/40 bg-cash/15 text-cash",
+                  active && "border-line-strong bg-surface-3 text-ink",
+                  !complete && !active && "border-line text-ink-faint",
+                )}
+              >
+                {complete ? (
+                  <Check className="h-3 w-3" aria-hidden />
+                ) : active ? (
+                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                ) : (
+                  <span className="text-[10px] font-mono">{index + 1}</span>
+                )}
+              </span>
+
+              <span
+                className={cn(
+                  "text-[12.5px]",
+                  active ? "font-medium text-ink" : "text-ink-muted",
+                )}
+              >
+                {CASH_STAGE_LABEL[step]}
+              </span>
+
+              {active ? (
+                <span className="ml-auto text-[10.5px] uppercase tracking-wide text-ink-faint">
+                  in progress
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

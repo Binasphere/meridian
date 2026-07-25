@@ -376,13 +376,19 @@ export function instrumentOrDefault(symbol: string): Instrument {
 }
 
 /** Contract durations offered in the trade panel. */
-export const DURATIONS = [
-  { seconds: 30, label: "30s" },
-  { seconds: 60, label: "1m" },
-  { seconds: 120, label: "2m" },
-  { seconds: 300, label: "5m" },
-  { seconds: 900, label: "15m" },
-] as const;
+/**
+ * Every contract runs for ten seconds.
+ *
+ * Fixed rather than chosen. One expiry means the ticket has one fewer decision
+ * in it, the countdown is the same shape every time, and a position list never
+ * mixes a contract that settles now with one that settles in a quarter of an
+ * hour. The ladder that used to be here (30s … 15m) is gone; if expiries come
+ * back, they come back as a ladder around this value rather than as this
+ * constant plus a selector.
+ */
+export const FIXED_DURATION_SEC = 10;
+
+export const DURATIONS = [{ seconds: FIXED_DURATION_SEC, label: "10s" }] as const;
 
 export const KIND_LABEL: Record<InstrumentKind, string> = {
   MAJOR: "Majors",

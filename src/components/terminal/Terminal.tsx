@@ -16,6 +16,7 @@ import { Positions } from "./Positions";
 import { TradeTicket } from "./TradeTicket";
 import { MobileBar } from "./MobileBar";
 import { SettlementDriver } from "./SettlementDriver";
+import { TradeCountdown } from "./TradeCountdown";
 
 /**
  * The terminal.
@@ -59,6 +60,7 @@ export function Terminal() {
     <div className="flex h-dvh flex-col overflow-hidden bg-base">
       <TopBar />
       <SettlementDriver />
+      <TradeCountdown />
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line lg:grid-cols-[236px_minmax(0,1fr)_300px]">
         {/* --- Markets ------------------------------------------------------ */}

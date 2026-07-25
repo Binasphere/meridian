@@ -2,11 +2,21 @@
 
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowDown, ArrowUp, LayoutList, ListOrdered, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  LayoutList,
+  ListOrdered,
+  Timer,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { DURATIONS, type Instrument } from "@/lib/market/instruments";
+import {
+  FIXED_DURATION_SEC,
+  type Instrument,
+} from "@/lib/market/instruments";
 import { effectivePayoutBps, payoutFromStake } from "@/lib/trading";
 import { selectBalance, useOpenTrades, useStore } from "@/lib/store";
 import { playPlace } from "@/lib/sound";
@@ -31,8 +41,6 @@ const QUICK_STAKES = [10_000n, 25_000n, 50_000n, 100_000n];
 export function MobileBar({ spec }: { spec: Instrument }) {
   const stakeMinor = useStore((s) => BigInt(s.stakeMinor));
   const setStakeMinor = useStore((s) => s.setStakeMinor);
-  const durationSec = useStore((s) => s.durationSec);
-  const setDuration = useStore((s) => s.setDuration);
   const placeTrade = useStore((s) => s.placeTrade);
   const setSymbol = useStore((s) => s.setSymbol);
   const balance = useStore(selectBalance);
@@ -56,9 +64,7 @@ export function MobileBar({ spec }: { spec: Instrument }) {
       return;
     }
     playPlace();
-    toast.success(`${direction === "UP" ? "▲ Buy" : "▼ Sell"} · ${spec.short}`, {
-      description: `${formatMoney(stakeMinor, { currency: "KSh" })} at ${result.trade.openPrice.toFixed(spec.precision)}`,
-    });
+    // The countdown panel confirms the contract; a toast would say it twice.
   };
 
   return (
@@ -99,15 +105,12 @@ export function MobileBar({ spec }: { spec: Instrument }) {
           </Chip>
         ))}
         <div className="mx-1 w-px shrink-0 bg-line" aria-hidden />
-        {DURATIONS.map((d) => (
-          <Chip
-            key={d.seconds}
-            active={durationSec === d.seconds}
-            onClick={() => setDuration(d.seconds)}
-          >
-            {d.label}
-          </Chip>
-        ))}
+        {/* Expiry is fixed at ten seconds — shown as a fact, not a chip you can
+            press and have nothing happen. */}
+        <span className="tnum flex shrink-0 items-center gap-1 px-2 font-mono text-[12px] text-ink-muted">
+          <Timer className="h-3.5 w-3.5" aria-hidden />
+          {FIXED_DURATION_SEC}s
+        </span>
       </div>
 
       {/* --- Commit --------------------------------------------------------- */}

@@ -5,7 +5,11 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { useShallow } from "zustand/react/shallow";
 import { market, type Resolution } from "./market/engine";
-import { DEFAULT_SYMBOL, instrument } from "./market/instruments";
+import {
+  DEFAULT_SYMBOL,
+  FIXED_DURATION_SEC,
+  instrument,
+} from "./market/instruments";
 import {
   canWithdraw,
   decide,
@@ -51,11 +55,44 @@ export type CashStatus = "PENDING" | "COMPLETED" | "FAILED";
  * payments integration that pretends otherwise breaks the first time a customer
  * is slow to type their PIN.
  */
+/**
+ * Where an in-flight request has got to.
+ *
+ * A real STK push is not one wait, it is four: the request reaches Safaricom,
+ * the prompt reaches the handset, the customer types a PIN, and the result comes
+ * back on a callback. Each of those can be slow and the third can take a minute
+ * if the customer is looking for their phone. Modelling them separately is what
+ * lets the dialog say which one you are waiting on — and every payments
+ * integration that collapses them into one spinner produces a customer who
+ * cancels at four seconds because nothing appeared to be happening.
+ */
+export type CashStage =
+  | "REQUESTING"
+  | "AWAITING_CUSTOMER"
+  | "CONFIRMING"
+  | "SETTLED";
+
+export const CASH_STAGE_LABEL: Record<CashStage, string> = {
+  REQUESTING: "Sending request to M-Pesa",
+  AWAITING_CUSTOMER: "Awaiting customer",
+  CONFIRMING: "Confirming payment",
+  SETTLED: "Complete",
+};
+
+export const CASH_STAGE_DETAIL: Record<CashStage, string> = {
+  REQUESTING: "Contacting Safaricom.",
+  AWAITING_CUSTOMER: "Check your phone and enter your M-Pesa PIN.",
+  CONFIRMING: "Waiting for M-Pesa to confirm the transaction.",
+  SETTLED: "Funds credited to your live account.",
+};
+
 export interface CashEvent {
   id: string;
   kind: CashKind;
   amountMinor: string;
   status: CashStatus;
+  /** The step an in-flight request is on. */
+  stage: CashStage;
   phone: string;
   /** M-Pesa-style transaction reference, issued on completion. */
   reference: string | null;
@@ -63,6 +100,13 @@ export interface CashEvent {
   settledAt: number | null;
   failureReason?: string;
 }
+
+/** How long each simulated stage lasts. Roughly what Daraja actually feels like. */
+const STAGE_DELAYS_MS: Record<"REQUESTING" | "AWAITING_CUSTOMER" | "CONFIRMING", number> = {
+  REQUESTING: 1_100,
+  AWAITING_CUSTOMER: 3_400,
+  CONFIRMING: 1_500,
+};
 
 const CASH_SETTLE_DELAY_MS = 4_000;
 
@@ -99,6 +143,15 @@ interface State {
 
   // --- Positions ----------------------------------------------------------
   trades: Trade[];
+  /**
+   * The contract the countdown is showing.
+   *
+   * Set by `placeTrade`, so every entry point — the desktop ticket, the mobile
+   * bar, anything added later — raises the countdown without having to remember
+   * to. Cleared when the customer dismisses it or when the next contract is
+   * placed.
+   */
+  focusTradeId: string | null;
 
   // --- Cash ---------------------------------------------------------------
   cashEvents: CashEvent[];
@@ -119,17 +172,26 @@ interface State {
   setResolution: (resolution: Resolution) => void;
   setChartStyle: (style: ChartStyle) => void;
   setStakeMinor: (minor: bigint) => void;
-  setDuration: (seconds: number) => void;
 
   placeTrade: (direction: Direction) => { ok: true; trade: Trade } | { ok: false; reason: string };
+  dismissFocusTrade: () => void;
   settleDue: () => Trade[];
   resetDemo: () => void;
   topUpDemo: (minor: bigint) => void;
   /** Clears the local session — balances, positions, preferences. */
   signOut: () => void;
 
-  /** Raises an STK push. Resolves when the simulated handset responds. */
-  requestDeposit: (amountMinor: bigint, phone: string) => Promise<CashEvent>;
+  /**
+   * Raises an STK push.
+   *
+   * Returns the event id immediately and a promise that resolves when the
+   * handset has responded, so the dialog can follow the request through its
+   * stages instead of staring at one spinner until the whole thing is over.
+   */
+  requestDeposit: (
+    amountMinor: bigint,
+    phone: string,
+  ) => { id: string; done: Promise<CashEvent> };
   requestWithdrawal: (
     amountMinor: bigint,
     phone: string,
@@ -166,9 +228,10 @@ export const useStore = create<State>()(
       chartStyle: "candles",
 
       stakeMinor: "10000", // KES 100.00
-      durationSec: 60,
+      durationSec: FIXED_DURATION_SEC,
 
       trades: [],
+      focusTradeId: null,
       cashEvents: [],
 
       setAccountKind: (accountKind) => set({ accountKind }),
@@ -177,7 +240,6 @@ export const useStore = create<State>()(
       setResolution: (resolution) => set({ resolution }),
       setChartStyle: (chartStyle) => set({ chartStyle }),
       setStakeMinor: (minor) => set({ stakeMinor: minor.toString() }),
-      setDuration: (durationSec) => set({ durationSec }),
 
       /**
        * Opens a contract.
@@ -238,10 +300,13 @@ export const useStore = create<State>()(
             ...state.balances,
             [state.accountKind]: (balance - stake).toString(),
           },
+          focusTradeId: trade.id,
         });
 
         return { ok: true, trade };
       },
+
+      dismissFocusTrade: () => set({ focusTradeId: null }),
 
       /**
        * Settles everything that has expired. Returns the trades just decided,
@@ -354,6 +419,7 @@ export const useStore = create<State>()(
           kind: "DEPOSIT",
           amountMinor: amountMinor.toString(),
           status: "PENDING",
+          stage: "REQUESTING",
           phone,
           reference: null,
           createdAt: Date.now(),
@@ -362,28 +428,49 @@ export const useStore = create<State>()(
 
         set((state) => ({ cashEvents: [event, ...state.cashEvents] }));
 
-        return new Promise<CashEvent>((resolve) => {
-          setTimeout(() => {
-            const completed: CashEvent = {
-              ...event,
-              status: "COMPLETED",
-              reference: mpesaReference(),
-              settledAt: Date.now(),
-            };
+        const advance = (stage: CashStage) =>
+          set((state) => ({
+            cashEvents: state.cashEvents.map((e) =>
+              e.id === event.id ? { ...e, stage } : e,
+            ),
+          }));
 
-            set((state) => ({
-              cashEvents: state.cashEvents.map((e) =>
-                e.id === event.id ? completed : e,
-              ),
-              balances: {
-                ...state.balances,
-                LIVE: (BigInt(state.balances.LIVE) + amountMinor).toString(),
-              },
-            }));
+        const wait = (ms: number) =>
+          new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-            resolve(completed);
-          }, CASH_SETTLE_DELAY_MS);
-        });
+        const done = (async () => {
+          await wait(STAGE_DELAYS_MS.REQUESTING);
+          advance("AWAITING_CUSTOMER");
+
+          await wait(STAGE_DELAYS_MS.AWAITING_CUSTOMER);
+          advance("CONFIRMING");
+
+          await wait(STAGE_DELAYS_MS.CONFIRMING);
+
+          const completed: CashEvent = {
+            ...event,
+            status: "COMPLETED",
+            stage: "SETTLED",
+            reference: mpesaReference(),
+            settledAt: Date.now(),
+          };
+
+          // The balance moves here and nowhere earlier: a pending deposit is
+          // not spendable, which is the entire point of the pending state.
+          set((state) => ({
+            cashEvents: state.cashEvents.map((e) =>
+              e.id === event.id ? completed : e,
+            ),
+            balances: {
+              ...state.balances,
+              LIVE: (BigInt(state.balances.LIVE) + amountMinor).toString(),
+            },
+          }));
+
+          return completed;
+        })();
+
+        return { id: event.id, done };
       },
 
       /**
@@ -415,6 +502,7 @@ export const useStore = create<State>()(
           kind: "WITHDRAWAL",
           amountMinor: amountMinor.toString(),
           status: "PENDING",
+          stage: "CONFIRMING",
           phone,
           reference: null,
           createdAt: Date.now(),
@@ -434,6 +522,7 @@ export const useStore = create<State>()(
             const completed: CashEvent = {
               ...event,
               status: "COMPLETED",
+              stage: "SETTLED",
               reference: mpesaReference(),
               settledAt: Date.now(),
             };
@@ -456,7 +545,10 @@ export const useStore = create<State>()(
       // longer offers and the segmented control would show nothing selected.
       // v4: the catalogue is crypto-only now, so a persisted "VOL50" would
       // restore a symbol that no longer exists and `instrument()` would throw.
-      name: "meridian.session.v5",
+      // v6: contracts are fixed at 10s, so a persisted 60 would keep booking
+      // minute-long trades for anyone who had used the app before; and cash
+      // events gained a `stage`, which a v5 blob has no value for.
+      name: "meridian.session.v6",
       storage: createJSONStorage(() => localStorage),
     },
   ),

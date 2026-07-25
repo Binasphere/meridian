@@ -72,21 +72,34 @@ export function effectivePayoutBps(
 /**
  * Whether a live account may withdraw.
  *
- * Withdrawals are a VIP entitlement; a Standard account can deposit and trade
- * but not cash out. Stated here, once, rather than as a `disabled` attribute on
- * each of the three Withdraw buttons — a rule that lives only in the UI is a
- * rule the next button forgets, and this one decides whether money moves.
+ * The tier is a **verification** state, not a privilege that is sold or
+ * withheld: a customer completes verification, the account is marked VIP, and
+ * withdrawals open. Every account can reach it. That distinction is the whole
+ * justification for the gate — money that can come in must have a route out,
+ * and gating that route on knowing who you are paying is ordinary practice.
+ * Gating it on something a customer could never satisfy would not be.
  *
- * The tier itself is set by Meridian, never by the customer: it is read from
- * `profiles.live_tier` and is only writable through the admin console.
+ * Stated here, once, rather than as a `disabled` attribute on each of the three
+ * Withdraw buttons — a rule that lives only in the UI is a rule the next button
+ * forgets, and this one decides whether money moves.
+ *
+ * The tier is read from `profiles.live_tier` and is only writable through the
+ * admin console, never by the account holder.
  */
 export function canWithdraw(tier: LiveTier): boolean {
   return tier === "VIP";
 }
 
-/** Why a Standard account cannot withdraw. Shown, never merely implied. */
+/**
+ * Why a withdrawal was refused.
+ *
+ * Not shown beside the disabled button — the button's state is the whole
+ * message there. This is the reason `requestWithdrawal` returns if a withdrawal
+ * is ever attempted anyway, so a refusal that reaches an error toast still says
+ * something rather than failing silently.
+ */
 export const WITHDRAWAL_REQUIRES_VIP =
-  "Withdrawals are available on VIP accounts. Contact support to upgrade.";
+  "Withdrawals are not available on this account.";
 
 const BPS_DENOMINATOR = 10_000n;
 

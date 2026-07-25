@@ -19,11 +19,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { formatPhone, useAuth, useCurrentAccount } from "@/lib/auth";
 import { instrumentOrDefault } from "@/lib/market/instruments";
-import {
-  canWithdraw,
-  VIP_PAYOUT_BONUS_BPS,
-  WITHDRAWAL_REQUIRES_VIP,
-} from "@/lib/trading";
+import { canWithdraw, VIP_PAYOUT_BONUS_BPS } from "@/lib/trading";
 import { useHistory, useStore } from "@/lib/store";
 import { CashDialog } from "./CashDialog";
 
@@ -137,19 +133,14 @@ export function AccountPanel({
                     </div>
                     <div className="mt-0.5 text-[11px] text-ink-muted">
                       {liveTier === "VIP"
-                        ? `+${VIP_PAYOUT_BONUS_BPS / 100}% payout · withdrawals enabled`
-                        : "Base payout · withdrawals unavailable"}
+                        ? `+${VIP_PAYOUT_BONUS_BPS / 100}% payout`
+                        : "Base payout"}
                     </div>
                   </div>
                   {liveTier === "VIP" ? (
                     <ShieldCheck className="h-4 w-4 shrink-0 text-accent" aria-hidden />
                   ) : null}
                 </div>
-                {liveTier === "VIP" ? null : (
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-                    Contact support to upgrade to VIP.
-                  </p>
-                )}
               </div>
 
               {/* --- Money, immediately ------------------------------------- */}
@@ -164,7 +155,6 @@ export function AccountPanel({
                 <button
                   onClick={() => setCash("withdraw")}
                   disabled={!withdrawable}
-                  title={withdrawable ? undefined : WITHDRAWAL_REQUIRES_VIP}
                   className={cn(
                     "flex items-center justify-center gap-1.5 py-3 text-[13px] font-medium transition-colors",
                     withdrawable
@@ -176,12 +166,6 @@ export function AccountPanel({
                   Withdraw
                 </button>
               </div>
-
-              {withdrawable ? null : (
-                <p className="border-b border-line bg-surface-1 px-3.5 py-2 text-[11px] leading-relaxed text-ink-muted">
-                  {WITHDRAWAL_REQUIRES_VIP}
-                </p>
-              )}
 
               {/* --- Routes --------------------------------------------------
                   Four destinations, not eight. Balances, moving money and the
