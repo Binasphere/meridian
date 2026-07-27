@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { serverSecret } from "@/lib/server/secrets";
 
 /**
  * The admin panel's door. **Server only.**
@@ -26,13 +27,13 @@ export const ADMIN_COOKIE = "meridian_admin";
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
 function passcode(): string {
-  return process.env.ADMIN_PASSCODE ?? "";
+  return serverSecret("ADMIN_PASSCODE");
 }
 
 function secret(): string {
   // Falls back to the passcode so a half-configured env still signs cookies
   // with *something* secret rather than with a constant.
-  return process.env.AUTH_SECRET || passcode();
+  return serverSecret("AUTH_SECRET") || passcode();
 }
 
 /** True when a passcode has been set. When false, /admin serves nothing. */

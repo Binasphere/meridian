@@ -31,6 +31,12 @@ export interface Trade {
   settledAt: number | null;
   pnlMinor: string | null;
   accountKind: AccountKind;
+  /**
+   * The id of the server-side `trades` row backing a LIVE contract, set once
+   * the booking RPC returns. Absent on demo trades and on anything placed
+   * while Supabase is unconfigured.
+   */
+  serverId?: string | null;
 }
 
 export type AccountKind = "DEMO" | "LIVE";
@@ -68,38 +74,12 @@ export function effectivePayoutBps(
 // ---------------------------------------------------------------------------
 // Withdrawal eligibility
 // ---------------------------------------------------------------------------
-
-/**
- * Whether a live account may withdraw.
- *
- * The tier is a **verification** state, not a privilege that is sold or
- * withheld: a customer completes verification, the account is marked VIP, and
- * withdrawals open. Every account can reach it. That distinction is the whole
- * justification for the gate — money that can come in must have a route out,
- * and gating that route on knowing who you are paying is ordinary practice.
- * Gating it on something a customer could never satisfy would not be.
- *
- * Stated here, once, rather than as a `disabled` attribute on each of the three
- * Withdraw buttons — a rule that lives only in the UI is a rule the next button
- * forgets, and this one decides whether money moves.
- *
- * The tier is read from `profiles.live_tier` and is only writable through the
- * admin console, never by the account holder.
- */
-export function canWithdraw(tier: LiveTier): boolean {
-  return tier === "VIP";
-}
-
-/**
- * Why a withdrawal was refused.
- *
- * Not shown beside the disabled button — the button's state is the whole
- * message there. This is the reason `requestWithdrawal` returns if a withdrawal
- * is ever attempted anyway, so a refusal that reaches an error toast still says
- * something rather than failing silently.
- */
-export const WITHDRAWAL_REQUIRES_VIP =
-  "Withdrawals are not available on this account.";
+// Withdrawals are open to every live account. The control is no longer a tier
+// gate: each request lands in the admin console's queue, where a human reviews
+// it and pays it out via M-Pesa — the review *is* the check. The old VIP-only
+// gate existed while withdrawals were instant and simulated; an instant path
+// out of the platform needed the verification tier in front of it, a manually
+// approved one does not.
 
 const BPS_DENOMINATOR = 10_000n;
 

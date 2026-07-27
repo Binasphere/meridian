@@ -89,28 +89,36 @@ is self-contained.
   now returns `{ id, done }` so the dialog can follow the request instead of
   showing one spinner. Modelled on the real Daraja lifecycle.
 
-## Money: decided 2026-07-25
-- **No real money moves yet.** Deposits stay simulated until a shortcode and
-  Daraja credentials exist. The staged flow above is what the real integration
-  will slot into: `requestDeposit` is the seam — `REQUESTING` becomes the
-  STK-push call, `CONFIRMING` becomes waiting on the Daraja callback.
-- **VIP is a verification tier, not a privilege.** Every account can reach it by
-  completing verification; an admin then marks it VIP and withdrawals open. This
-  is why the withdrawal gate is legitimate — do not turn it into a tier a
-  customer cannot reach, since that would mean taking deposits with no route out.
+## Money: went live 2026-07-27 (see GO-LIVE.md)
+- **Real deposits via PayHero STK push.** `POST /api/payments/deposit` raises
+  the push; `/api/payments/payhero/callback` (HMAC-signed URL) settles it and
+  credits `profiles.live_balance` via `deposit_settle`. The first-deposit
+  bonus (+20%, cap KSh 100) is credited there, server-side, once per account.
+- **Withdrawals are a manual queue, open to Standard.** `withdrawal_request`
+  debits the balance atomically and books a PENDING event; the admin console's
+  Withdrawals view lists the queue; an admin pays via M-Pesa by hand and
+  confirms with the reference (`withdrawal_decide`), or rejects and the hold
+  refunds. The old VIP-only gate was removed — with instant simulated payouts
+  it was the only control, with a human reviewing every payout it isn't.
+- **Live balance is server-owned.** `lib/wallet.ts` mirrors
+  `profiles.live_balance` and `cash_events` into the store; LIVE contracts are
+  booked (`live_trade_open`) and settled (`live_trade_settle`) against the
+  server balance. Demo remains entirely local, and the whole simulation still
+  works when Supabase is unconfigured.
+- **Secrets** come from env vars or the gitignored `secrets.local.json`
+  (`lib/server/secrets.ts`; env wins). Never from the repo — it is public.
 
 ## Follow-ups
-- Persist balances / deposits / trades to Supabase tables. Balances still live in
-  `store.ts` (localStorage), so the figure in the terminal is not the one
-  `profiles.demo_balance` / `live_balance` holds and the admin console shows.
-- Withdrawals are still simulated in `store.ts`. When they become real, the
-  VIP check has to move to the server too — the client-side one is a UI
-  affordance, not an authorisation boundary.
-- Real M-Pesa needs: a registered paybill/till, Daraja consumer key + secret,
-  passkey, and a public HTTPS callback URL. Build against the sandbox first
-  (shortcode 174379); the code path is identical bar the base URL.
-- Withdrawals need M-Pesa **B2C**, a separate Daraja product from STK push.
-- Actually credit the first-deposit bonus server-side.
-- Admin panel, once real auth exists: replace the shared passcode with an
-  `is_admin` flag on `profiles` — `src/lib/admin/guard.ts` is the single place
-  that changes — and add an audit trail of tier changes.
+- **Settlement still trusts the client's verdict** (`live_trade_settle` takes
+  a status from the browser). Bounded — stake debited at open, credit computed
+  in SQL from the booked stake and a payout clamped at 9200 bps — but a
+  tampered client could report false wins. The manual withdrawal review is the
+  backstop; before scale, settlement must move behind a server price feed.
+- Trades placed on LIVE now exist as server rows; surface them in the admin
+  console (the "Trades" nav slot) so withdrawal review can check win rates.
+- Demo balances still live only in localStorage; `profiles.demo_balance` is
+  vestigial.
+- Rate-limit `/api/payments/deposit` (register route has the pattern).
+- Admin panel: replace the shared passcode with an `is_admin` flag on
+  `profiles` — `src/lib/admin/guard.ts` is the single place that changes — and
+  add an audit trail of tier changes and payout decisions.

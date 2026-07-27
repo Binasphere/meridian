@@ -13,21 +13,22 @@ import {
  * onto: this module gives the rest of the app one place to reach the backend,
  * so wiring a feature to real persistence is an import rather than a rewrite.
  *
- * Configuration is **optional and lazy**. Until the environment variables are
- * set the app runs exactly as before — `supabase()` returns `null` and callers
- * fall back to the local simulation. That keeps the demo working with no
- * credentials while the real backend is stood up, and means a missing key is a
- * graceful degradation rather than a boot crash.
+ * Configuration comes from `config.ts`, which falls back to baked-in literals
+ * so a deployment needs no environment at all. If those are ever blank,
+ * `supabase()` returns `null` and callers degrade to the local simulation
+ * rather than crashing at boot.
  *
  * Only the anon (publishable) key belongs here — it is safe to ship to the
  * browser precisely because row-level security, not the key, is what guards the
  * data. The service-role key must never appear in client code.
  */
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./config";
 
-/** True when both public Supabase variables are present. */
+const url = SUPABASE_URL;
+const anonKey = SUPABASE_ANON_KEY;
+
+/** True when both public Supabase values are present. */
 export function isSupabaseConfigured(): boolean {
   return Boolean(url && anonKey);
 }

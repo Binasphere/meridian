@@ -7,6 +7,7 @@ import { hasSubtleCrypto, pbkdf2Sha256 } from "./pbkdf2";
 import { supabase } from "./supabase/client";
 import { identityEmail, normalisePhone, validateRegistration } from "./phone";
 import { useStore } from "./store";
+import { refreshWallet } from "./wallet";
 import type { LiveTier } from "./trading";
 
 /**
@@ -399,6 +400,12 @@ async function readProfile(phone: string): Promise<StoredAccount> {
 function applyProfile(phone: string | null, profile: StoredAccount | null): void {
   useAuth.setState({ currentPhone: phone, profile });
   useStore.getState().syncLiveTier(profile?.liveTier ?? "STANDARD");
+
+  // The live balance and movement history live server-side; pull them into
+  // the session mirror whenever a profile lands. No-op on the local fallback,
+  // and importing the wallet module here is also what registers the store's
+  // live-sync hooks before the first contract can be placed.
+  if (phone) void refreshWallet();
 }
 
 // ---------------------------------------------------------------------------

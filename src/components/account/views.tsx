@@ -22,7 +22,6 @@ import {
 } from "@/lib/market/instruments";
 import { formatPhone, useCurrentAccount } from "@/lib/auth";
 import { useStore } from "@/lib/store";
-import { canWithdraw } from "@/lib/trading";
 import { Empty, Segmented } from "@/components/ui/primitives";
 import { StatsPanel } from "@/components/terminal/StatsPanel";
 import { CashDialog, CashRow } from "@/components/terminal/CashDialog";
@@ -92,7 +91,6 @@ function BalancesBlock({
   const balances = useStore((s) => s.balances);
   const accountKind = useStore((s) => s.accountKind);
   const setAccountKind = useStore((s) => s.setAccountKind);
-  const withdrawable = canWithdraw(useStore((s) => s.liveTier));
 
   return (
     <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0">
@@ -138,13 +136,7 @@ function BalancesBlock({
               </button>
               <button
                 onClick={() => onCash("withdraw")}
-                disabled={!withdrawable}
-                className={cn(
-                  "flex h-9 items-center gap-1.5 border px-3.5 text-[12.5px] font-medium transition-colors",
-                  withdrawable
-                    ? "border-line-strong bg-surface-3 text-ink hover:bg-surface-4"
-                    : "cursor-not-allowed border-line bg-surface-2 text-ink-faint",
-                )}
+                className="flex h-9 items-center gap-1.5 border border-line-strong bg-surface-3 px-3.5 text-[12.5px] font-medium text-ink transition-colors hover:bg-surface-4"
               >
                 <ArrowUpFromLine className="h-3.5 w-3.5" aria-hidden />
                 Withdraw
@@ -168,7 +160,6 @@ function MovementsBlock({
 }) {
   const cashEvents = useStore((s) => s.cashEvents);
   const account = useCurrentAccount();
-  const withdrawable = canWithdraw(useStore((s) => s.liveTier));
 
   return (
     <>
@@ -190,13 +181,7 @@ function MovementsBlock({
           </button>
           <button
             onClick={() => onCash("withdraw")}
-            disabled={!withdrawable}
-            className={cn(
-              "h-9 border px-3.5 text-[12.5px] font-medium transition-colors",
-              withdrawable
-                ? "border-line-strong bg-surface-3 text-ink hover:bg-surface-4"
-                : "cursor-not-allowed border-line bg-surface-2 text-ink-faint",
-            )}
+            className="h-9 border border-line-strong bg-surface-3 px-3.5 text-[12.5px] font-medium text-ink transition-colors hover:bg-surface-4"
           >
             Withdraw
           </button>
@@ -687,8 +672,8 @@ export function HelpPage() {
       a: "Because a win pays back less than 100% of your stake as profit, being right half the time loses money over any meaningful number of contracts. At an 85% payout you need to be right 54.1% of the time simply to stay level. Each instrument's exact figure is on the Performance page.",
     },
     {
-      q: "How long do deposits take?",
-      a: "An M-Pesa STK push arrives on your handset within a few seconds. Once you enter your PIN the balance updates immediately. Withdrawals are sent to the same number your account is registered with.",
+      q: "How long do deposits and withdrawals take?",
+      a: "An M-Pesa STK push arrives on your handset within a few seconds. Once you enter your PIN the balance updates immediately. Withdrawal requests are reviewed by our team and paid to the same number your account is registered with, usually within a few hours.",
     },
     {
       q: "Can I change the number my money is paid to?",

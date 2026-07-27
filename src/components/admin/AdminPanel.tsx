@@ -7,8 +7,10 @@ import { AdminSidebar, type AdminView } from "./AdminSidebar";
 import { OverviewView } from "./OverviewView";
 import { PasscodeGate } from "./PasscodeGate";
 import { UsersView } from "./UsersView";
+import { WithdrawalsView } from "./WithdrawalsView";
 import { Button, ToastHost } from "./ui";
 import { useUsers } from "./useUsers";
+import { useWithdrawals } from "./useWithdrawals";
 
 /**
  * The admin console.
@@ -27,6 +29,11 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
   users: {
     title: "Users",
     description: "Every account, and the tier its live contracts are booked at.",
+  },
+  withdrawals: {
+    title: "Withdrawals",
+    description:
+      "Requests with funds already held. Pay via M-Pesa, confirm with the reference — or reject to refund.",
   },
 };
 
@@ -62,6 +69,11 @@ function Console({
   // fresh identity each render would re-request in a loop.
   const handleUnauthorised = useCallback(() => onSignedOut(), [onSignedOut]);
   const state = useUsers(handleUnauthorised);
+  const withdrawalsState = useWithdrawals(handleUnauthorised);
+
+  const pendingWithdrawals =
+    withdrawalsState.withdrawals?.filter((w) => w.status === "PENDING").length ??
+    null;
 
   async function signOut() {
     await fetch("/api/admin/session", { method: "DELETE" }).catch(() => {});
@@ -83,6 +95,7 @@ function Console({
           view={view}
           onNavigate={navigate}
           userCount={state.users?.length ?? null}
+          pendingWithdrawals={pendingWithdrawals}
           projectRef={projectRef}
           onSignOut={() => void signOut()}
         />
@@ -100,6 +113,7 @@ function Console({
               view={view}
               onNavigate={navigate}
               userCount={state.users?.length ?? null}
+              pendingWithdrawals={pendingWithdrawals}
               projectRef={projectRef}
               onSignOut={() => void signOut()}
               onClose={() => setMenuOpen(false)}
@@ -137,13 +151,20 @@ function Console({
           </div>
 
           <Button
-            onClick={() => void state.reload()}
-            disabled={state.loading}
+            onClick={() => {
+              void state.reload();
+              void withdrawalsState.reload();
+            }}
+            disabled={state.loading || withdrawalsState.loading}
             title="Reload from Supabase"
           >
             <RefreshCw
               size={14}
-              className={state.loading ? "animate-spin" : undefined}
+              className={
+                state.loading || withdrawalsState.loading
+                  ? "animate-spin"
+                  : undefined
+              }
             />
             Refresh
           </Button>
@@ -152,8 +173,10 @@ function Console({
         <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
           {view === "overview" ? (
             <OverviewView users={state.users} />
-          ) : (
+          ) : view === "users" ? (
             <UsersView state={state} />
+          ) : (
+            <WithdrawalsView state={withdrawalsState} />
           )}
         </main>
       </div>

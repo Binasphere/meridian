@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { formatPhone, useAuth, useCurrentAccount } from "@/lib/auth";
 import { instrumentOrDefault } from "@/lib/market/instruments";
-import { canWithdraw, VIP_PAYOUT_BONUS_BPS } from "@/lib/trading";
+import { VIP_PAYOUT_BONUS_BPS } from "@/lib/trading";
 import { useHistory, useStore } from "@/lib/store";
 import { CashDialog } from "./CashDialog";
 
@@ -54,8 +54,6 @@ export function AccountPanel({
   const symbol = useStore((s) => s.symbol);
   const history = useHistory();
   const spec = instrumentOrDefault(symbol);
-
-  const withdrawable = canWithdraw(liveTier);
 
   const close = () => onOpenChange(false);
 
@@ -154,13 +152,7 @@ export function AccountPanel({
                 </button>
                 <button
                   onClick={() => setCash("withdraw")}
-                  disabled={!withdrawable}
-                  className={cn(
-                    "flex items-center justify-center gap-1.5 py-3 text-[13px] font-medium transition-colors",
-                    withdrawable
-                      ? "bg-surface-2 text-ink hover:bg-surface-3"
-                      : "cursor-not-allowed bg-surface-2 text-ink-faint",
-                  )}
+                  className="flex items-center justify-center gap-1.5 bg-surface-2 py-3 text-[13px] font-medium text-ink transition-colors hover:bg-surface-3"
                 >
                   <ArrowUpFromLine className="h-3.5 w-3.5" aria-hidden />
                   Withdraw

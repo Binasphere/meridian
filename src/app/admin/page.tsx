@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { ADMIN_COOKIE, isAdminEnabled, verifyToken } from "@/lib/admin/session";
 import { isAdminDbConfigured } from "@/lib/supabase/admin";
+import { supabaseProjectRef } from "@/lib/supabase/config";
 
 export const metadata: Metadata = { title: "Admin console" };
 
@@ -24,24 +25,13 @@ export default async function Page() {
   const token = (await cookies()).get(ADMIN_COOKIE)?.value;
 
   return (
-    <AdminPanel initiallySignedIn={verifyToken(token)} projectRef={projectRef()} />
+    <AdminPanel
+      initiallySignedIn={verifyToken(token)}
+      projectRef={supabaseProjectRef()}
+    />
   );
 }
 
-/**
- * The Supabase project the console is pointed at, for the sidebar's context
- * card. Shown so nobody promotes a customer on the wrong project — the URL is
- * already public, so displaying its ref discloses nothing.
- */
-function projectRef(): string | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) return null;
-  try {
-    return new URL(url).hostname.split(".")[0] ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /** Shown when the environment is incomplete. Never hints at the passcode. */
 function SetupNotice({ hasPasscode, hasDb }: { hasPasscode: boolean; hasDb: boolean }) {
@@ -61,7 +51,11 @@ function SetupNotice({ hasPasscode, hasDb }: { hasPasscode: boolean; hasDb: bool
           <code className="rounded-none bg-adm-subtle px-1 py-0.5 font-mono text-[12px] text-adm-ink-2">
             .env.local
           </code>{" "}
-          and restart the dev server:
+          or{" "}
+          <code className="rounded-none bg-adm-subtle px-1 py-0.5 font-mono text-[12px] text-adm-ink-2">
+            secrets.local.json
+          </code>{" "}
+          and restart the server:
         </p>
 
         <ul className="mt-4 space-y-2">

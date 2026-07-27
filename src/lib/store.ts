@@ -11,12 +11,10 @@ import {
   instrument,
 } from "./market/instruments";
 import {
-  canWithdraw,
   decide,
   effectivePayoutBps,
   pnlFor,
   returnFor,
-  WITHDRAWAL_REQUIRES_VIP,
   type AccountKind,
   type Direction,
   type LiveTier,
@@ -196,6 +194,14 @@ interface State {
     amountMinor: bigint,
     phone: string,
   ) => Promise<CashEvent> | { ok: false; reason: string };
+
+  // --- Server mirror ------------------------------------------------------
+  /** Overwrites the LIVE balance and movement list with the server's truth. */
+  syncServerWallet: (liveBalanceMinor: string, events: CashEvent[]) => void;
+  /** Records the server row a LIVE contract was booked as. */
+  setTradeServerId: (tradeId: string, serverId: string) => void;
+  /** Voids a still-open trade whose server booking was refused; refunds the stake. */
+  voidTradeLocal: (tradeId: string) => void;
 }
 
 function newId(): string {
@@ -203,6 +209,34 @@ function newId(): string {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Live-account server sync
+// ---------------------------------------------------------------------------
+
+/**
+ * The seam real money flows through.
+ *
+ * When Supabase is configured, `lib/wallet.ts` registers hooks here and the
+ * store calls them for every LIVE contract: `open` books the stake against
+ * `profiles.live_balance` on the server, `settle` reports the outcome. The
+ * store's own balance stays the instant local mirror; the server's figure is
+ * the one deposits credit and withdrawals draw on, and the hooks are what keep
+ * the two telling the same story.
+ *
+ * Registered late (from the wallet module) rather than imported, because the
+ * wallet module imports this one — a direct import each way would be a cycle.
+ */
+export interface LiveSyncHooks {
+  open: (trade: Trade) => void;
+  settle: (trade: Trade) => void;
+}
+
+let liveSync: LiveSyncHooks | null = null;
+
+export function registerLiveSync(hooks: LiveSyncHooks): void {
+  liveSync = hooks;
 }
 
 export const useStore = create<State>()(
@@ -303,6 +337,11 @@ export const useStore = create<State>()(
           focusTradeId: trade.id,
         });
 
+        // A LIVE contract is also booked server-side, where the balance that
+        // deposits credit and withdrawals draw on lives. If the server refuses
+        // the stake, the hook voids this trade and refunds the mirror.
+        if (trade.accountKind === "LIVE") liveSync?.open(trade);
+
         return { ok: true, trade };
       },
 
@@ -370,6 +409,12 @@ export const useStore = create<State>()(
             LIVE: (BigInt(state.balances.LIVE) + credited.LIVE).toString(),
           },
         });
+
+        // Report LIVE outcomes to the server ledger; the credit applied there
+        // is derived from the booked stake and payout, not from this client.
+        for (const trade of settled) {
+          if (trade.accountKind === "LIVE") liveSync?.settle(trade);
+        }
 
         return settled;
       },
@@ -484,12 +529,6 @@ export const useStore = create<State>()(
         const state = get();
         const available = BigInt(state.balances.LIVE);
 
-        // Checked here as well as on the button. A disabled control is a
-        // courtesy, not a control — the rule has to hold even when the request
-        // arrives from somewhere the button isn't.
-        if (!canWithdraw(state.liveTier)) {
-          return { ok: false as const, reason: WITHDRAWAL_REQUIRES_VIP };
-        }
         if (amountMinor <= 0n) {
           return { ok: false as const, reason: "Enter an amount" };
         }
@@ -535,6 +574,57 @@ export const useStore = create<State>()(
           }, CASH_SETTLE_DELAY_MS);
         });
       },
+
+      // --- Server mirror ----------------------------------------------------
+
+      syncServerWallet: (liveBalanceMinor, events) =>
+        set((state) => ({
+          balances: { ...state.balances, LIVE: liveBalanceMinor },
+          cashEvents: events,
+        })),
+
+      setTradeServerId: (tradeId, serverId) =>
+        set((state) => ({
+          trades: state.trades.map((t) =>
+            t.id === tradeId ? { ...t, serverId } : t,
+          ),
+        })),
+
+      /**
+       * The server refused to book a LIVE contract the mirror had already
+       * opened — usually because the real balance was lower than the mirrored
+       * one. The trade is voided and the stake returned, the same treatment an
+       * unsubstantiatable settlement gets.
+       */
+      voidTradeLocal: (tradeId) =>
+        set((state) => {
+          const trade = state.trades.find(
+            (t) => t.id === tradeId && t.status === "OPEN",
+          );
+          if (!trade) return state;
+
+          const stake = BigInt(trade.stakeMinor);
+          return {
+            trades: state.trades.map((t) =>
+              t.id === tradeId
+                ? {
+                    ...t,
+                    status: "VOIDED" as const,
+                    settledAt: Date.now(),
+                    pnlMinor: "0",
+                  }
+                : t,
+            ),
+            balances: {
+              ...state.balances,
+              [trade.accountKind]: (
+                BigInt(state.balances[trade.accountKind]) + stake
+              ).toString(),
+            },
+            focusTradeId:
+              state.focusTradeId === tradeId ? null : state.focusTradeId,
+          };
+        }),
     }),
     {
       // Bumped from v1: the persisted shape lost two preference keys and the

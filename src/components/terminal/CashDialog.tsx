@@ -22,6 +22,11 @@ import {
   type CashEvent,
   type CashStage,
 } from "@/lib/store";
+import {
+  serverWalletActive,
+  startServerDeposit,
+  startServerWithdrawal,
+} from "@/lib/wallet";
 
 // The KSh 100 minimum leads the list so it is one tap to prefill the smallest
 // allowed deposit. Six chips keep the 3-column grid even.
@@ -79,9 +84,13 @@ export function CashDialog({
 
   // The id of the request in flight, so the dialog can watch it move through
   // the STK stages rather than waiting on one promise with nothing to show.
+  // On the real-money path the stages arrive from `startServerDeposit`'s
+  // callback instead of from a store event.
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [serverStage, setServerStage] = useState<CashStage>("REQUESTING");
   const liveStage: CashStage =
-    cashEvents.find((e) => e.id === pendingId)?.stage ?? "REQUESTING";
+    (pendingId ? cashEvents.find((e) => e.id === pendingId)?.stage : undefined) ??
+    serverStage;
 
   const isDeposit = mode === "deposit";
   const minimum = isDeposit ? MIN_DEPOSIT : MIN_WITHDRAWAL;
@@ -108,6 +117,50 @@ export function CashDialog({
     setError(null);
     setStage("pending");
 
+    // --- Real money: Supabase configured, PayHero raises the push ----------
+    if (serverWalletActive()) {
+      try {
+        if (isDeposit) {
+          setServerStage("REQUESTING");
+          const { event, timedOut } = await startServerDeposit(
+            amountMinor,
+            setServerStage,
+          );
+          setResult(event);
+          setStage("done");
+          if (timedOut) {
+            toast("Deposit pending", {
+              description:
+                "Your balance updates automatically once M-Pesa confirms.",
+            });
+          } else {
+            toast.success(
+              `Deposit received · ${formatMoney(amountMinor, { currency: "KSh" })}`,
+              { description: `M-Pesa ref ${event.reference}` },
+            );
+          }
+        } else {
+          const event = await startServerWithdrawal(amountMinor);
+          setResult(event);
+          setStage("done");
+          toast.success(
+            `Withdrawal requested · ${formatMoney(amountMinor, { currency: "KSh" })}`,
+            {
+              description:
+                "Reviewed and paid to your M-Pesa number, usually within a few hours.",
+            },
+          );
+        }
+      } catch (cause) {
+        setError(
+          cause instanceof Error ? cause.message : "Something went wrong",
+        );
+        setStage("form");
+      }
+      return;
+    }
+
+    // --- Local simulation (Supabase unconfigured) --------------------------
     if (isDeposit) {
       const { id, done } = requestDeposit(amountMinor, account.phone);
       setPendingId(id);
@@ -279,7 +332,7 @@ export function CashDialog({
               <p className="text-center text-[10.5px] leading-relaxed text-ink-faint">
                 {isDeposit
                   ? "You'll receive an M-Pesa prompt on your phone to authorise this payment."
-                  : "Funds are sent to your verified M-Pesa number."}
+                  : "Requests are reviewed and paid to your verified M-Pesa number."}
               </p>
             </div>
           ) : stage === "pending" ? (
@@ -288,9 +341,9 @@ export function CashDialog({
             ) : (
               <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
                 <Loader2 className="h-7 w-7 animate-spin text-ink-muted" aria-hidden />
-                <p className="text-[14px] font-medium text-ink">Sending to M-Pesa</p>
+                <p className="text-[14px] font-medium text-ink">Submitting request</p>
                 <p className="max-w-[260px] text-[12px] leading-relaxed text-ink-muted">
-                  {`Transferring ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhone(account.phone) : "your number"}.`}
+                  {`Requesting ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhone(account.phone) : "your number"}.`}
                 </p>
               </div>
             )
@@ -300,7 +353,13 @@ export function CashDialog({
                 <Check className="h-5 w-5 text-cash" aria-hidden />
               </span>
               <p className="text-[14px] font-medium text-ink">
-                {isDeposit ? "Deposit received" : "Withdrawal sent"}
+                {isDeposit
+                  ? result?.status === "PENDING"
+                    ? "Deposit pending"
+                    : "Deposit received"
+                  : result?.status === "PENDING"
+                    ? "Withdrawal requested"
+                    : "Withdrawal sent"}
               </p>
               <p className="tnum font-mono text-[24px] leading-none text-ink">
                 {formatMoney(amountMinor, { currency: "KSh" })}
@@ -308,6 +367,13 @@ export function CashDialog({
               {result?.reference ? (
                 <p className="font-mono text-[11px] text-ink-muted">
                   Ref {result.reference}
+                </p>
+              ) : null}
+              {result?.status === "PENDING" ? (
+                <p className="max-w-[280px] text-[12px] leading-relaxed text-ink-muted">
+                  {isDeposit
+                    ? "Waiting on M-Pesa. Your balance updates automatically once the payment confirms."
+                    : "Your request is being reviewed. The money is sent to your verified M-Pesa number once approved — usually within a few hours."}
                 </p>
               ) : null}
               <button

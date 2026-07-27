@@ -27,3 +27,24 @@ export const LIVE_TIERS = ["STANDARD", "VIP"] as const;
 export function isLiveTier(value: unknown): value is LiveTier {
   return typeof value === "string" && (LIVE_TIERS as readonly string[]).includes(value);
 }
+
+/**
+ * A withdrawal request as the console sees it: the cash event joined with
+ * enough of the requester's profile to know who is being paid.
+ *
+ * PENDING rows are the queue — the funds are already held (debited when the
+ * request was raised), and the admin either pays the number via M-Pesa and
+ * confirms with the reference, or rejects and the hold is refunded.
+ */
+export interface AdminWithdrawal {
+  id: string;
+  userId: string;
+  phone: string;
+  username: string;
+  amountMinor: string;
+  status: "PENDING" | "COMPLETED" | "FAILED";
+  reference: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  settledAt: string | null;
+}

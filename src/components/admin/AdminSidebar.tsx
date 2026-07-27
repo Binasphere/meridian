@@ -3,6 +3,7 @@
 import {
   ArrowLeftRight,
   ArrowUpRight,
+  Banknote,
   LayoutGrid,
   LogOut,
   Users,
@@ -28,7 +29,7 @@ import { cn } from "@/lib/utils";
  * being one lonely link.
  */
 
-export type AdminView = "overview" | "users";
+export type AdminView = "overview" | "users" | "withdrawals";
 
 interface NavItem {
   id: AdminView;
@@ -45,6 +46,12 @@ const NAV: readonly NavItem[] = [
     description: "Accounts at a glance",
   },
   { id: "users", label: "Users", icon: Users, description: "Manage accounts and tiers" },
+  {
+    id: "withdrawals",
+    label: "Withdrawals",
+    icon: Banknote,
+    description: "Review requests and record payouts",
+  },
 ];
 
 const UPCOMING: ReadonlyArray<{ label: string; icon: LucideIcon }> = [
@@ -56,6 +63,7 @@ export function AdminSidebar({
   view,
   onNavigate,
   userCount,
+  pendingWithdrawals,
   projectRef,
   onSignOut,
   onClose,
@@ -63,6 +71,8 @@ export function AdminSidebar({
   view: AdminView;
   onNavigate: (view: AdminView) => void;
   userCount: number | null;
+  /** Requests awaiting payment — the number an admin signs in to deal with. */
+  pendingWithdrawals: number | null;
   projectRef: string | null;
   onSignOut: () => void;
   /** Present only when rendered as the mobile drawer. */
@@ -134,6 +144,15 @@ export function AdminSidebar({
                       )}
                     >
                       {userCount}
+                    </span>
+                  ) : null}
+                  {item.id === "withdrawals" &&
+                  pendingWithdrawals !== null &&
+                  pendingWithdrawals > 0 ? (
+                    // Its own colour even when inactive: a pending payout is
+                    // the one number in this nav that is work waiting.
+                    <span className="tnum rounded-none bg-adm-accent-tint px-1.5 py-0.5 text-[11px] font-semibold text-adm-accent-deep">
+                      {pendingWithdrawals}
                     </span>
                   ) : null}
                 </button>
