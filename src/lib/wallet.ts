@@ -1,6 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
+import { BACKEND_ORIGIN } from "./backend";
 import { supabase } from "./supabase/client";
 import {
   registerLiveSync,
@@ -115,20 +116,6 @@ const DEPOSIT_POLL_MS = 2_500;
 const DEPOSIT_DEADLINE_MS = 120_000;
 
 /**
- * Where the payments backend lives. Empty means this deployment's own
- * `/api/payments` routes, which remain in place. When the split-out payments
- * service (its own repo, hosted on Render) is up, paste its origin here —
- * like the Supabase URL in `supabase/config.ts`, the value is public by
- * design, so a literal is fine. `NEXT_PUBLIC_PAYMENTS_URL` overrides at build
- * time either way.
- */
-const FALLBACK_PAYMENTS_ORIGIN = "https://trad-z5gt.onrender.com";
-
-const PAYMENTS_ORIGIN = (
-  process.env.NEXT_PUBLIC_PAYMENTS_URL || FALLBACK_PAYMENTS_ORIGIN
-).replace(/\/+$/, "");
-
-/**
  * Raises a real STK push and follows it to settlement.
  *
  * `onStage` drives the dialog's step display. Resolves with the settled event,
@@ -150,7 +137,7 @@ export async function startServerDeposit(
 
   onStage("REQUESTING");
 
-  const response = await fetch(`${PAYMENTS_ORIGIN}/api/payments/deposit`, {
+  const response = await fetch(`${BACKEND_ORIGIN}/api/payments/deposit`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

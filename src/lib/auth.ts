@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { hasSubtleCrypto, pbkdf2Sha256 } from "./pbkdf2";
+import { BACKEND_ORIGIN } from "./backend";
 import { supabase } from "./supabase/client";
 import { identityEmail, normalisePhone, validateRegistration } from "./phone";
 import { useStore } from "./store";
@@ -240,11 +241,11 @@ export const useAuth = create<AuthState>()(
         }
 
         // --- Supabase ---
-        // Creation goes through our own route so the user can be made
-        // pre-confirmed; see `api/auth/register`. The browser never calls
-        // `signUp` directly.
+        // Creation goes through the backend service so the user can be made
+        // pre-confirmed; see `api/auth/register` there. The browser never
+        // calls `signUp` directly.
         try {
-          const response = await fetch("/api/auth/register", {
+          const response = await fetch(`${BACKEND_ORIGIN}/api/auth/register`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ phone, username, password }),

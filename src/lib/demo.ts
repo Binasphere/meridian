@@ -26,7 +26,7 @@
  * claim these funnels manufacture, and it is the one claim that should only ever
  * come from a real ledger.
  */
-export const DEMO_COMMUNITY_ACTIVITY = true;
+export const DEMO_COMMUNITY_ACTIVITY = false;
 
 if (DEMO_COMMUNITY_ACTIVITY && typeof window !== "undefined") {
   console.warn(
