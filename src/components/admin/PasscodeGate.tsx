@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { adminFetch, setAdminToken } from "@/lib/admin/client";
 import { Button, Card } from "./ui";
 
 /**
@@ -24,18 +25,25 @@ export function PasscodeGate({ onUnlock }: { onUnlock: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch("/api/admin/session", {
+      const response = await adminFetch("/api/admin/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ passcode }),
       });
 
-      if (response.ok) {
+      const body = (await response.json().catch(() => ({}))) as {
+        token?: string;
+        error?: string;
+      };
+
+      if (response.ok && body.token) {
+        // The passcode bought a session token; the passcode itself is never
+        // kept anywhere.
+        setAdminToken(body.token);
         onUnlock();
         return;
       }
 
-      const body = (await response.json().catch(() => ({}))) as { error?: string };
       setError(body.error ?? "Incorrect passcode");
     } catch {
       setError("Could not reach the server");

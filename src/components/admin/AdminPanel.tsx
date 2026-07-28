@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Menu, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { adminFetch, setAdminToken } from "@/lib/admin/client";
 import { AdminSidebar, type AdminView } from "./AdminSidebar";
 import { OverviewView } from "./OverviewView";
 import { PasscodeGate } from "./PasscodeGate";
@@ -17,8 +18,14 @@ import { useWithdrawals } from "./useWithdrawals";
  *
  * Light, on its own canvas, in a fixed sidebar layout — deliberately nothing
  * like the terminal it administers. The whole surface is a client component
- * with no Supabase client of its own: everything it knows arrives from
- * `/api/admin/*`, which is the only place the service-role key exists.
+ * with no Supabase client of its own: everything it knows arrives from the
+ * backend service's `/api/admin/*`, which is the only place the service-role
+ * key exists.
+ *
+ * The session lives with the backend too, so what to render — setup notice,
+ * passcode gate, or console — is decided by probing `/api/admin/session` on
+ * mount. Until the probe answers, nothing renders: a console briefly painted
+ * and then snatched away would show data to whoever asked.
  */
 
 const VIEW_META: Record<AdminView, { title: string; description: string }> = {
@@ -37,21 +44,88 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
   },
 };
 
-export function AdminPanel({
-  initiallySignedIn,
-  projectRef,
-}: {
-  initiallySignedIn: boolean;
-  projectRef: string | null;
-}) {
-  const [signedIn, setSignedIn] = useState(initiallySignedIn);
+type Phase = "checking" | "setup" | "locked" | "open";
 
-  return signedIn ? (
+export function AdminPanel({ projectRef }: { projectRef: string | null }) {
+  const [phase, setPhase] = useState<Phase>("checking");
+  const [missing, setMissing] = useState<string[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const response = await adminFetch("/api/admin/session");
+        const body = (await response.json()) as {
+          enabled?: boolean;
+          db?: boolean;
+          signedIn?: boolean;
+        };
+
+        if (!body.enabled || !body.db) {
+          setMissing(
+            [
+              body.enabled ? null : "ADMIN_PASSCODE",
+              body.db ? null : "SUPABASE_SERVICE_ROLE_KEY",
+            ].filter((name): name is string => name !== null),
+          );
+          setPhase("setup");
+          return;
+        }
+
+        setPhase(body.signedIn ? "open" : "locked");
+      } catch {
+        // Unreachable backend: show the gate — its submit will say plainly
+        // that the server could not be reached.
+        setPhase("locked");
+      }
+    })();
+  }, []);
+
+  if (phase === "checking") {
+    return <div className="adm-root min-h-dvh" />;
+  }
+  if (phase === "setup") {
+    return <SetupNotice missing={missing} />;
+  }
+
+  return phase === "open" ? (
     <ToastHost>
-      <Console projectRef={projectRef} onSignedOut={() => setSignedIn(false)} />
+      <Console projectRef={projectRef} onSignedOut={() => setPhase("locked")} />
     </ToastHost>
   ) : (
-    <PasscodeGate onUnlock={() => setSignedIn(true)} />
+    <PasscodeGate onUnlock={() => setPhase("open")} />
+  );
+}
+
+/** Shown when the backend's environment is incomplete. Never hints at the passcode. */
+function SetupNotice({ missing }: { missing: string[] }) {
+  return (
+    <div className="adm-root flex min-h-dvh items-center justify-center px-5 py-10">
+      <div className="adm-card w-full max-w-[440px] p-6">
+        <h1 className="text-[17px] font-semibold tracking-[-0.015em] text-adm-ink">
+          Admin console is off
+        </h1>
+        <p className="mt-2 text-[13px] leading-relaxed text-adm-ink-3">
+          Set the following on the backend service (Render → Environment) and
+          redeploy:
+        </p>
+
+        <ul className="mt-4 space-y-2">
+          {missing.map((name) => (
+            <li
+              key={name}
+              className="rounded-none border border-adm-line bg-adm-subtle px-3 py-2 font-mono text-[12.5px] text-adm-ink-2"
+            >
+              {name}
+            </li>
+          ))}
+        </ul>
+
+        <p className="mt-5 border-t border-adm-line pt-4 text-[12px] leading-relaxed text-adm-ink-3">
+          There is no default passcode. Until one is set the console serves
+          nothing at all.
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -76,7 +150,9 @@ function Console({
     null;
 
   async function signOut() {
-    await fetch("/api/admin/session", { method: "DELETE" }).catch(() => {});
+    await adminFetch("/api/admin/session", { method: "DELETE" }).catch(() => {});
+    // The session is the token; forgetting it is the sign-out.
+    setAdminToken(null);
     onSignedOut();
   }
 

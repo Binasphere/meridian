@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { adminFetch } from "@/lib/admin/client";
 import type { AdminWithdrawal } from "@/lib/admin/types";
 
 /**
@@ -38,7 +39,7 @@ export function useWithdrawals(onUnauthorised: () => void): WithdrawalsState {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/admin/withdrawals");
+      const response = await adminFetch("/api/admin/withdrawals");
       const body = (await response.json().catch(() => ({}))) as {
         withdrawals?: AdminWithdrawal[];
         error?: string;
@@ -73,7 +74,7 @@ export function useWithdrawals(onUnauthorised: () => void): WithdrawalsState {
       setPending((state) => ({ ...state, [id]: true }));
 
       try {
-        const response = await fetch(`/api/admin/withdrawals/${id}`, {
+        const response = await adminFetch(`/api/admin/withdrawals/${id}`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(verdict),

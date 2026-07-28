@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { adminFetch } from "@/lib/admin/client";
 import type { AdminUser } from "@/lib/admin/types";
 import type { LiveTier } from "@/lib/trading";
 
@@ -40,7 +41,7 @@ export function useUsers(onUnauthorised: () => void): UsersState {
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/admin/users");
+      const response = await adminFetch("/api/admin/users");
       const body = (await response.json().catch(() => ({}))) as {
         users?: AdminUser[];
         error?: string;
@@ -88,7 +89,7 @@ export function useUsers(onUnauthorised: () => void): UsersState {
     );
 
     try {
-      const response = await fetch(`/api/admin/users/${user.id}`, {
+      const response = await adminFetch(`/api/admin/users/${user.id}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ liveTier: tier }),
