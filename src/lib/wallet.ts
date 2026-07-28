@@ -122,7 +122,7 @@ const DEPOSIT_DEADLINE_MS = 120_000;
  * design, so a literal is fine. `NEXT_PUBLIC_PAYMENTS_URL` overrides at build
  * time either way.
  */
-const FALLBACK_PAYMENTS_ORIGIN = "";
+const FALLBACK_PAYMENTS_ORIGIN = "https://trad-z5gt.onrender.com";
 
 const PAYMENTS_ORIGIN = (
   process.env.NEXT_PUBLIC_PAYMENTS_URL || FALLBACK_PAYMENTS_ORIGIN

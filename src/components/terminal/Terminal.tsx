@@ -7,7 +7,7 @@ import { useAuth, useAuthHydrated } from "@/lib/auth";
 import { useOpenTrades, useStore } from "@/lib/store";
 import { useMounted } from "@/lib/hooks";
 import { Panel } from "@/components/ui/primitives";
-import { AuthScreen } from "@/components/auth/AuthScreen";
+import { SignInGate } from "@/components/auth/SignInGate";
 import { TopBar } from "./TopBar";
 import { MarketHeader } from "./MarketHeader";
 import { PriceChart } from "./PriceChart";
@@ -36,6 +36,8 @@ export function Terminal() {
 
   const symbol = useStore((s) => s.symbol);
   const setSymbol = useStore((s) => s.setSymbol);
+  const accountKind = useStore((s) => s.accountKind);
+  const setAccountKind = useStore((s) => s.setAccountKind);
   const resolution = useStore((s) => s.resolution);
   const setResolution = useStore((s) => s.setResolution);
   const chartStyle = useStore((s) => s.chartStyle);
@@ -48,17 +50,32 @@ export function Terminal() {
     if (mounted) market();
   }, [mounted]);
 
-  // Hold the first paint until localStorage has been read. Rendering the auth
-  // screen and then swapping it for the terminal a frame later would flash the
-  // sign-in form at every already-signed-in user on every reload.
+  // The Live account belongs to a session. A visitor can arrive signed out
+  // with LIVE persisted — a session that expired, or a sign-out in another
+  // tab — and must land on Demo, not on a live ticket that would refuse every
+  // contract.
+  useEffect(() => {
+    if (authHydrated && !currentPhone && accountKind === "LIVE") {
+      setAccountKind("DEMO");
+    }
+  }, [authHydrated, currentPhone, accountKind, setAccountKind]);
+
+  // Hold the first paint until localStorage has been read, so a signed-in
+  // user's balance never flashes through its signed-out state on reload.
+  //
+  // There is no sign-in wall here, deliberately: an anonymous visitor lands
+  // straight on the funded demo terminal. The SignInGate below appears only
+  // when they reach for something that needs an account — the Live switch,
+  // Deposit, the account button — or when they visit the account pages, which
+  // gate themselves.
   if (!mounted || !authHydrated) return <Boot />;
-  if (!currentPhone) return <AuthScreen />;
 
   const spec = instrumentOrDefault(symbol);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-base">
       <TopBar />
+      <SignInGate />
       <SettlementDriver />
       <TradeCountdown />
 

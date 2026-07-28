@@ -4,11 +4,12 @@ import { useState } from "react";
 import { ArrowDownToLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { useCurrentAccount } from "@/lib/auth";
+import { useAuth, useCurrentAccount } from "@/lib/auth";
 import type { AccountKind } from "@/lib/trading";
 import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
 import { LiveDot } from "@/components/ui/primitives";
 import { Wordmark } from "@/components/Wordmark";
+import { useAuthGate } from "@/components/auth/SignInGate";
 import { AccountPanel } from "./AccountPanel";
 import { CashDialog } from "./CashDialog";
 
@@ -17,6 +18,10 @@ import { CashDialog } from "./CashDialog";
  *
  * Three things and nothing else: which account is active, what the balance is,
  * and the way in and out. Everything else moved behind the account panel.
+ *
+ * Signed out, the same bar stands, but every affordance that presumes an
+ * account — the Live switch, Deposit, the account button — summons the
+ * sign-in gate instead of acting. The demo remains fully usable throughout.
  */
 export function TopBar() {
   const [panelOpen, setPanelOpen] = useState(false);
@@ -26,6 +31,8 @@ export function TopBar() {
   const balance = useStore(selectBalance);
   const hydrated = useStoreHydrated();
   const account = useCurrentAccount();
+  const signedIn = useAuth((s) => s.currentPhone) !== null;
+  const showGate = useAuthGate((s) => s.show);
 
   return (
     <>
@@ -49,18 +56,32 @@ export function TopBar() {
             </div>
           </div>
 
-          <DepositButton onClick={() => setDepositOpen(true)} />
+          <DepositButton
+            onClick={() => (signedIn ? setDepositOpen(true) : showGate())}
+          />
 
-          <button
-            onClick={() => setPanelOpen(true)}
-            aria-label="Open account panel"
-            className={cn(
-              "grid h-9 w-9 shrink-0 place-items-center border border-line bg-surface-3",
-              "text-[11px] font-semibold text-ink transition-colors hover:bg-surface-4",
-            )}
-          >
-            {account ? account.phone.slice(-2) : "—"}
-          </button>
+          {signedIn ? (
+            <button
+              onClick={() => setPanelOpen(true)}
+              aria-label="Open account panel"
+              className={cn(
+                "grid h-9 w-9 shrink-0 place-items-center border border-line bg-surface-3",
+                "text-[11px] font-semibold text-ink transition-colors hover:bg-surface-4",
+              )}
+            >
+              {account ? account.phone.slice(-2) : "—"}
+            </button>
+          ) : (
+            <button
+              onClick={showGate}
+              className={cn(
+                "flex h-9 shrink-0 items-center border border-line bg-surface-3 px-3",
+                "text-[12.5px] font-medium text-ink transition-colors hover:bg-surface-4",
+              )}
+            >
+              Sign in
+            </button>
+          )}
         </div>
       </header>
 
@@ -86,6 +107,8 @@ function AccountSwitcher() {
   const setAccountKind = useStore((s) => s.setAccountKind);
   const balances = useStore((s) => s.balances);
   const hydrated = useStoreHydrated();
+  const signedIn = useAuth((s) => s.currentPhone) !== null;
+  const showGate = useAuthGate((s) => s.show);
 
   const options: Array<{ kind: AccountKind; label: string }> = [
     { kind: "DEMO", label: "Demo" },
@@ -105,7 +128,11 @@ function AccountSwitcher() {
             key={kind}
             role="tab"
             aria-selected={active}
-            onClick={() => setAccountKind(kind)}
+            // The Live account is a signed-in thing; reaching for it while
+            // signed out asks for the account rather than silently refusing.
+            onClick={() =>
+              kind === "LIVE" && !signedIn ? showGate() : setAccountKind(kind)
+            }
             title={
               hydrated
                 ? `${label} · ${formatMoney(BigInt(balances[kind]), { currency: "KSh" })}`
