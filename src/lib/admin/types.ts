@@ -20,6 +20,18 @@ export interface AdminUser {
   demoBalanceMinor: string;
   liveBalanceMinor: string;
   createdAt: string;
+
+  /**
+   * The M-Pesa clone wallet, when this VIP has one. `null` on every account the
+   * admin has not set up for the demo, which is all of them by default.
+   *
+   * `mpesaPin` is readable on purpose: an admin has to be able to tell the
+   * customer what to type into the handset. It is admin-assigned and guards a
+   * prop balance — it is never the customer's real M-Pesa PIN. See
+   * `supabase/mpesa-demo.sql`.
+   */
+  mpesaPin: string | null;
+  mpesaBalanceMinor: string | null;
 }
 
 export const LIVE_TIERS = ["STANDARD", "VIP"] as const;

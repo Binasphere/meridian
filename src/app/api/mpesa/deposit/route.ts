@@ -7,6 +7,7 @@ import {
 } from "@/lib/server/mpesaRail";
 import {
   InsufficientDemoFunds,
+  NoDemoWallet,
   demoReference,
   moveDemoFunds,
 } from "@/lib/server/mpesaWallet";
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
   let balanceMinor: number;
   try {
     const { state } = await moveDemoFunds({
+      userId,
       kind: "DEPOSIT",
       amountMinor,
       direction: "OUT",
@@ -63,11 +65,15 @@ export async function POST(request: NextRequest) {
         400,
       );
     }
+    if (cause instanceof NoDemoWallet) {
+      return railJson({ error: cause.message }, 409);
+    }
     return railJson({ error: "Could not reach your M-PESA account" }, 500);
   }
 
   const refund = () =>
     moveDemoFunds({
+      userId,
       kind: "DEPOSIT",
       amountMinor,
       direction: "IN",

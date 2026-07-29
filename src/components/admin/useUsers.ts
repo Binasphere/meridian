@@ -30,6 +30,18 @@ export interface UsersState {
     user: AdminUser,
     tier: LiveTier,
   ) => Promise<{ ok: true } | { ok: false; reason: string }>;
+  /**
+   * Assigns (or clears) the M-Pesa clone wallet for one account.
+   *
+   * `pin: null` unlinks the handset and deletes the wallet. Unlike `setTier`
+   * this is not optimistic: a PIN can be refused for being already in use, and
+   * showing a PIN the database rejected would have an admin reading the wrong
+   * four digits out to a customer.
+   */
+  setWallet: (
+    user: AdminUser,
+    input: { pin: string | null; balanceMinor?: string },
+  ) => Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
 export function useUsers(onUnauthorised: () => void): UsersState {
@@ -119,5 +131,52 @@ export function useUsers(onUnauthorised: () => void): UsersState {
     }
   }, []);
 
-  return { users, loading, error, pending, reload, setTier };
+  const setWallet = useCallback<UsersState["setWallet"]>(async (user, input) => {
+    setPending((state) => ({ ...state, [user.id]: true }));
+
+    try {
+      const response = await adminFetch(`/api/admin/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mpesaPin: input.pin,
+          ...(input.balanceMinor === undefined
+            ? {}
+            : { mpesaBalanceMinor: input.balanceMinor }),
+        }),
+      });
+
+      const body = (await response.json().catch(() => ({}))) as {
+        user?: AdminUser;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(body.error ?? `Update failed (${response.status})`);
+      }
+
+      // The route answers with the row as it now stands, so the table takes
+      // the server's version rather than guessing at what it wrote.
+      if (body.user) {
+        setUsers((state) =>
+          state?.map((row) => (row.id === user.id ? body.user! : row)) ?? state,
+        );
+      }
+
+      return { ok: true };
+    } catch (cause) {
+      return {
+        ok: false,
+        reason: cause instanceof Error ? cause.message : "Update failed",
+      };
+    } finally {
+      setPending((state) => {
+        const next = { ...state };
+        delete next[user.id];
+        return next;
+      });
+    }
+  }, []);
+
+  return { users, loading, error, pending, reload, setTier, setWallet };
 }

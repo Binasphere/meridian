@@ -1,18 +1,19 @@
 import { type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { railJson, railPreflight } from "@/lib/server/mpesaRail";
-import { DemoWalletUnavailable, readDemoWallet } from "@/lib/server/mpesaWallet";
+import { railJson, railPreflight, requireHandset } from "@/lib/server/mpesaRail";
+import { NoDemoWallet, readDemoWallet } from "@/lib/server/mpesaWallet";
 
 /**
  * GET /api/mpesa/account — everything the demo phone renders.
  *
- * The phone has no account of its own: it shows the VIP customer this demo is
- * running for. So the identity comes from `profiles` (the VIP row, or the one
- * named by `?phone=`) and the money comes from the demo wallet file.
+ * The phone has no account of its own: it shows the VIP customer whose PIN was
+ * typed into it. Which one that is comes from the device token it presents, so
+ * two handsets in the same room read two different wallets and neither can ask
+ * for the other's.
  *
- * Open on the LAN by design — the phone app has no Supabase session. What it
- * exposes is the demo account's number and a prop balance; nothing here reads
- * or writes a real balance, and no other profile is reachable through it.
+ * The identity comes from `profiles` and the money from that customer's demo
+ * wallet. Nothing here reads or writes a real balance beyond displaying the
+ * trading one the customer already sees on their own terminal.
  */
 
 export const runtime = "nodejs";
@@ -53,10 +54,6 @@ function splitName(username: string | null, phone: string) {
 
 export async function GET(request: NextRequest) {
   const db = supabaseAdmin();
-
-  // The wallet now lives in Supabase too, so an unconfigured project costs the
-  // phone everything rather than just its identity. Saying so plainly beats a
-  // balance the handset would render as real.
   if (!db) {
     return railJson(
       { error: "Demo rail unavailable — Supabase is not configured." },
@@ -64,32 +61,25 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const gate = await requireHandset(request);
+  if ("response" in gate) return gate.response;
+  const { userId } = gate.wallet;
+
   let wallet;
   try {
-    wallet = await readDemoWallet();
+    wallet = await readDemoWallet(userId);
   } catch (cause) {
-    return railJson(
-      {
-        error:
-          cause instanceof DemoWalletUnavailable
-            ? cause.message
-            : "Could not read the demo wallet",
-      },
-      503,
-    );
+    if (cause instanceof NoDemoWallet) {
+      return railJson({ error: cause.message, code: "NOT_LINKED" }, 401);
+    }
+    return railJson({ error: "Could not read the demo wallet" }, 503);
   }
 
-  const wanted = request.nextUrl.searchParams.get("phone");
-
-  let query = db
+  const { data: profile } = await db
     .from("profiles")
     .select("phone, username, live_tier, live_balance")
-    .order("created_at", { ascending: true })
-    .limit(1);
-
-  query = wanted ? query.eq("phone", wanted) : query.eq("live_tier", "VIP");
-
-  const { data: profile } = await query.maybeSingle();
+    .eq("id", userId)
+    .maybeSingle();
 
   if (!profile?.phone) {
     return railJson({ linked: false, profile: null, ...wallet });

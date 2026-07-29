@@ -1,5 +1,5 @@
 -- ============================================================================
--- Venti — the demo M-Pesa wallet
+-- Venti — the demo M-Pesa wallets
 -- ============================================================================
 --
 -- Run AFTER go-live.sql, in the Supabase SQL editor. Idempotent: safe to re-run.
@@ -8,43 +8,61 @@
 -- ----------------------------------------------------------------------------
 -- A VIP account's cash movements are settled against the companion M-Pesa clone
 -- app instead of PayHero, so a deposit can be shown landing on a handset in the
--- room. Both apps have to read one balance or they drift apart mid-demo, and
--- that balance used to be a JSON file on whichever laptop ran `npm run dev`.
+-- room. Each VIP gets **their own** wallet: the admin sets a PIN and an opening
+-- balance from the console, the customer types that PIN into the clone once,
+-- and from then on that handset is bound to that account.
 --
--- A file cannot survive the demo running anywhere else: a serverless frontend
--- gets a fresh, read-only filesystem per invocation, and Render's disk is wiped
--- on every deploy and cold start. Putting the wallet here means the terminal
--- (local or deployed), the payments service, and the phone all read the same
--- row — and a rehearsal balance survives the fifteen idle minutes before the
--- talk starts.
+-- The PIN is therefore the link between the two apps, and it is the only thing
+-- the phone knows — it has no Supabase session and no account of its own. On a
+-- correct PIN the wallet hands back a `device_token`, which the handset keeps
+-- and presents on every later read. So the PIN is typed once and the binding
+-- outlives the app being closed.
 --
--- This is a **presentation prop**. Nothing here touches a real balance: real
--- money moves only through cash_events and profiles.live_balance, via the
+-- On the PIN
+-- ----------------------------------------------------------------------------
+-- It is stored in plain text, deliberately, and that is safe here for one
+-- reason: it is **assigned by an admin, never chosen by the customer**, so it
+-- is not and cannot be anyone's real M-Pesa PIN. The console has to be able to
+-- read it back to tell the customer what to type. It guards a prop balance in a
+-- demo; it is not a credential and must never become one. If this ever gates
+-- anything real, it needs hashing and rate limiting first.
+--
+-- The wallet is a **presentation prop**. Nothing here touches a real balance:
+-- real money moves only through cash_events and profiles.live_balance, via the
 -- PayHero path that Standard accounts use.
 --
 -- Privilege model: service_role only. Both tables have RLS enabled and no
 -- policies, so `anon` and `authenticated` cannot read or write them at all —
--- the rail's routes reach them under the service key, having checked the
--- caller's tier first.
+-- the rail's routes reach them under the service key, having checked either the
+-- caller's tier or their device token first.
 -- ----------------------------------------------------------------------------
 
--- --- 1. The wallet -----------------------------------------------------------
+-- --- 1. The wallets ----------------------------------------------------------
 
--- KSh 256,700.00 — where the phone starts before anything is demonstrated.
--- A one-row table: `id` is constrained to true, so a second row cannot exist
--- and every reader can say `where id = true` without ordering or guessing.
 create table if not exists public.mpesa_demo_wallet (
-  id            boolean primary key default true check (id),
-  balance_minor bigint      not null default 25670000,
+  user_id       uuid        primary key references auth.users (id) on delete cascade,
+  pin           text        not null check (pin ~ '^\d{4}$'),
+  device_token  uuid        not null default gen_random_uuid(),
+  balance_minor bigint      not null default 0 check (balance_minor >= 0),
+  created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
 
-insert into public.mpesa_demo_wallet (id) values (true) on conflict (id) do nothing;
+-- The phone presents a PIN and nothing else, so a PIN must identify exactly one
+-- wallet. Assigning one that is already in use is refused rather than resolved
+-- arbitrarily — a handset that linked to the wrong customer would be invisible
+-- until it showed the wrong balance on stage.
+create unique index if not exists mpesa_demo_wallet_pin_key
+  on public.mpesa_demo_wallet (pin);
 
--- --- 2. The statement --------------------------------------------------------
+create unique index if not exists mpesa_demo_wallet_device_token_key
+  on public.mpesa_demo_wallet (device_token);
+
+-- --- 2. The statements -------------------------------------------------------
 
 create table if not exists public.mpesa_demo_tx (
   id                  uuid        primary key default gen_random_uuid(),
+  user_id             uuid        not null references auth.users (id) on delete cascade,
   kind                text        not null
     check (kind in ('DEPOSIT', 'WITHDRAWAL', 'AGENT_WITHDRAWAL')),
   title               text        not null,
@@ -56,27 +74,148 @@ create table if not exists public.mpesa_demo_tx (
   created_at          timestamptz not null default now()
 );
 
-create index if not exists mpesa_demo_tx_created_at_idx
-  on public.mpesa_demo_tx (created_at desc);
+create index if not exists mpesa_demo_tx_user_created_idx
+  on public.mpesa_demo_tx (user_id, created_at desc);
 
 alter table public.mpesa_demo_wallet enable row level security;
 alter table public.mpesa_demo_tx     enable row level security;
 
--- --- 3. Movement -------------------------------------------------------------
+-- --- 3. Admin: assign a PIN and an opening balance ---------------------------
 
 /*
- * One movement, applied atomically.
+ * Creates or updates one VIP's wallet.
  *
- * `for update` on the singleton row is what makes this safe: the terminal
+ * Both fields are optional so the console can change a PIN without disturbing a
+ * balance mid-demo, or top a handset up without reissuing a PIN. Creating a
+ * wallet requires a PIN, since a wallet no PIN reaches is a wallet no phone can
+ * ever link to.
+ *
+ * The statement is deliberately NOT cleared when a balance is set: an admin
+ * correcting an opening figure between rehearsals should not silently destroy
+ * the history that explains it. `mpesa_demo_reset` is the one that wipes.
+ */
+create or replace function public.mpesa_demo_set_wallet(
+  p_user    uuid,
+  p_pin     text    default null,
+  p_balance bigint  default null
+) returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_exists boolean;
+  v_row    public.mpesa_demo_wallet;
+begin
+  select exists (select 1 from public.mpesa_demo_wallet where user_id = p_user)
+    into v_exists;
+
+  if p_pin is not null and p_pin !~ '^\d{4}$' then
+    raise exception 'BAD_PIN';
+  end if;
+  if p_balance is not null and p_balance < 0 then
+    raise exception 'BAD_BALANCE';
+  end if;
+  if not v_exists and p_pin is null then
+    raise exception 'PIN_REQUIRED';
+  end if;
+
+  if v_exists then
+    update public.mpesa_demo_wallet
+       set pin           = coalesce(p_pin, pin),
+           balance_minor = coalesce(p_balance, balance_minor),
+           updated_at    = now()
+     where user_id = p_user
+    returning * into v_row;
+  else
+    insert into public.mpesa_demo_wallet (user_id, pin, balance_minor)
+         values (p_user, p_pin, coalesce(p_balance, 0))
+    returning * into v_row;
+  end if;
+
+  return to_jsonb(v_row);
+exception
+  when unique_violation then
+    raise exception 'PIN_TAKEN';
+end;
+$$;
+
+/** Removes a VIP's wallet and statement — unlinks any handset holding its token. */
+create or replace function public.mpesa_demo_clear_wallet(p_user uuid)
+returns boolean
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  delete from public.mpesa_demo_tx     where user_id = p_user;
+  delete from public.mpesa_demo_wallet where user_id = p_user;
+  return true;
+end;
+$$;
+
+-- --- 4. The handset: link by PIN, then read by token -------------------------
+
+/*
+ * Exchanges a PIN for a device token.
+ *
+ * Returns null when no wallet carries that PIN, which the route turns into
+ * "wrong PIN" — the same answer whether the PIN is unassigned or simply wrong,
+ * so the handset cannot be used to enumerate which PINs exist.
+ */
+create or replace function public.mpesa_demo_link(p_pin text)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_row public.mpesa_demo_wallet;
+begin
+  select * into v_row from public.mpesa_demo_wallet where pin = p_pin;
+  if not found then return null; end if;
+
+  return jsonb_build_object(
+    'userId',       v_row.user_id,
+    'deviceToken',  v_row.device_token,
+    'balanceMinor', v_row.balance_minor
+  );
+end;
+$$;
+
+/** The wallet behind a device token, or null when the token is unknown. */
+create or replace function public.mpesa_demo_by_token(p_token uuid)
+returns jsonb
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  v_row public.mpesa_demo_wallet;
+begin
+  select * into v_row from public.mpesa_demo_wallet where device_token = p_token;
+  if not found then return null; end if;
+
+  return jsonb_build_object(
+    'userId',       v_row.user_id,
+    'deviceToken',  v_row.device_token,
+    'balanceMinor', v_row.balance_minor
+  );
+end;
+$$;
+
+-- --- 5. Movement -------------------------------------------------------------
+
+/*
+ * One movement on one wallet, applied atomically.
+ *
+ * `for update` on that wallet's row is what makes this safe: the terminal
  * depositing while the phone polls and withdraws would otherwise each read the
  * same balance, and the second write would erase the first. Under the lock the
  * two serialise, and the second one sees the first one's balance.
  *
- * Returns the wallet as it stands afterwards plus the transaction just booked.
- * Raises INSUFFICIENT_FUNDS when the phone cannot cover a debit; the routes map
- * that to a 400 the handset can render.
+ * Raises NO_WALLET when the account has none — a VIP the admin has not set up
+ * yet — and INSUFFICIENT_FUNDS when the phone cannot cover a debit. The routes
+ * map both to something the handset can render.
  */
 create or replace function public.mpesa_demo_move(
+  p_user      uuid,
   p_kind      text,
   p_amount    bigint,
   p_direction text,
@@ -101,12 +240,14 @@ begin
 
   v_signed := case when p_direction = 'OUT' then -p_amount else p_amount end;
 
-  insert into public.mpesa_demo_wallet (id) values (true) on conflict (id) do nothing;
-
   select balance_minor into v_balance
     from public.mpesa_demo_wallet
-   where id = true
+   where user_id = p_user
      for update;
+
+  if not found then
+    raise exception 'NO_WALLET';
+  end if;
 
   v_balance := v_balance + v_signed;
   if v_balance < 0 then
@@ -116,11 +257,12 @@ begin
   update public.mpesa_demo_wallet
      set balance_minor = v_balance,
          updated_at    = now()
-   where id = true;
+   where user_id = p_user;
 
   insert into public.mpesa_demo_tx (
-    kind, title, subtitle, amount_minor, balance_after_minor, reference
+    user_id, kind, title, subtitle, amount_minor, balance_after_minor, reference
   ) values (
+    p_user,
     p_kind,
     p_title,
     coalesce(p_subtitle, ''),
@@ -137,39 +279,56 @@ begin
 end;
 $$;
 
--- --- 4. Reset ----------------------------------------------------------------
+-- --- 6. Reset ----------------------------------------------------------------
 
 /*
- * Back to the opening balance with an empty statement, for rehearsing: run the
- * demo, reset, run it again in front of the room.
+ * One wallet back to a chosen balance with an empty statement, for rehearsing:
+ * run the demo, reset, run it again in front of the room. The device token is
+ * left alone, so the handset stays linked.
  */
-create or replace function public.mpesa_demo_reset()
-returns bigint
+create or replace function public.mpesa_demo_reset(
+  p_user    uuid,
+  p_balance bigint default null
+) returns bigint
 language plpgsql
 security definer set search_path = public
 as $$
 declare
-  v_start bigint := 25670000;
+  v_balance bigint;
 begin
-  delete from public.mpesa_demo_tx;
+  delete from public.mpesa_demo_tx where user_id = p_user;
 
-  insert into public.mpesa_demo_wallet (id, balance_minor)
-       values (true, v_start)
-  on conflict (id) do update
-          set balance_minor = v_start,
-              updated_at    = now();
+  update public.mpesa_demo_wallet
+     set balance_minor = coalesce(p_balance, balance_minor),
+         updated_at    = now()
+   where user_id = p_user
+  returning balance_minor into v_balance;
 
-  return v_start;
+  if not found then raise exception 'NO_WALLET'; end if;
+
+  return v_balance;
 end;
 $$;
 
--- --- 5. Privileges -----------------------------------------------------------
+-- --- 7. Privileges -----------------------------------------------------------
 -- Nobody but the service role. These functions move a prop balance on the
 -- say-so of the caller, and the callers that may ask are route handlers that
--- have already verified the account's tier.
+-- have already verified the account's tier or the handset's device token.
 
-revoke all on function public.mpesa_demo_move(text, bigint, text, text, text, text) from public, anon, authenticated;
-revoke all on function public.mpesa_demo_reset() from public, anon, authenticated;
-
-grant execute on function public.mpesa_demo_move(text, bigint, text, text, text, text) to service_role;
-grant execute on function public.mpesa_demo_reset() to service_role;
+do $$
+declare
+  fn text;
+begin
+  foreach fn in array array[
+    'public.mpesa_demo_set_wallet(uuid, text, bigint)',
+    'public.mpesa_demo_clear_wallet(uuid)',
+    'public.mpesa_demo_link(text)',
+    'public.mpesa_demo_by_token(uuid)',
+    'public.mpesa_demo_move(uuid, text, bigint, text, text, text, text)',
+    'public.mpesa_demo_reset(uuid, bigint)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', fn);
+    execute format('grant execute on function %s to service_role', fn);
+  end loop;
+end;
+$$;

@@ -1,8 +1,13 @@
 import { type NextRequest } from "next/server";
-import { railJson, railPreflight } from "@/lib/server/mpesaRail";
+import {
+  railJson,
+  railPreflight,
+  requireHandset,
+} from "@/lib/server/mpesaRail";
 import {
   DemoWalletUnavailable,
   InsufficientDemoFunds,
+  NoDemoWallet,
   moveDemoFunds,
 } from "@/lib/server/mpesaWallet";
 
@@ -10,12 +15,13 @@ import {
  * POST /api/mpesa/agent-withdraw — the phone's own agent withdrawal.
  *
  * Nothing to do with the trading account: this is the demo phone spending its
- * demo balance at a demo agent. It lives here only so that one file remains
+ * demo balance at a demo agent. It lives here only so that one wallet remains
  * the single balance both apps read — a withdrawal made on the handset has to
  * be visible the next time the terminal deposits, or the two drift apart
  * mid-demo.
  *
- * Open on the LAN, like `/account`, because the phone has no session.
+ * Scoped by the handset's device token, so a phone can only ever spend the
+ * wallet whose PIN was typed into it.
  */
 
 export const runtime = "nodejs";
@@ -26,6 +32,10 @@ export function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requireHandset(request);
+  if ("response" in gate) return gate.response;
+  const { userId } = gate.wallet;
+
   let body: Record<string, unknown>;
   try {
     body = (await request.json()) as Record<string, unknown>;
@@ -47,6 +57,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const { state, tx } = await moveDemoFunds({
+      userId,
       kind: "AGENT_WITHDRAWAL",
       amountMinor: amountMinor + chargeMinor,
       direction: "OUT",
@@ -69,6 +80,9 @@ export async function POST(request: NextRequest) {
         },
         400,
       );
+    }
+    if (cause instanceof NoDemoWallet) {
+      return railJson({ error: cause.message, code: "NOT_LINKED" }, 401);
     }
     if (cause instanceof DemoWalletUnavailable) {
       return railJson({ error: cause.message }, 503);

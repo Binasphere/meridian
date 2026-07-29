@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  DemoWalletUnavailable,
+  walletByToken,
+  type MpesaDemoWallet,
+} from "./mpesaWallet";
 
 /**
  * Shared plumbing for the demo M-Pesa rail (`/api/mpesa/*`).
@@ -8,13 +13,14 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
  * Two kinds of caller reach these routes:
  *
  *   - the **terminal**, with the customer's Supabase access token, moving money
- *     between their live balance and the demo phone. `requireVipCaller` gates
+ *     between their live balance and their demo phone. `requireVipCaller` gates
  *     that: the token is verified server-side and the tier is read from
  *     `profiles`, never from the request, so a Standard account cannot ask for
  *     the demo rail and a customer cannot promote themselves into it.
- *   - the **phone app**, which has no Supabase session at all. It reads the
- *     wallet and spends from it, which is a demo prop with no bearing on
- *     anyone's real balance, so those routes are open on the LAN.
+ *   - the **phone app**, which has no Supabase session at all. It presents the
+ *     `device_token` it was given when its PIN was accepted, and that token is
+ *     what says which wallet it may see — see `requireHandset`. Before it has
+ *     one it can call `/link` and nothing else.
  */
 
 /** The phone app is a native client on the LAN; permissive CORS keeps the web build working too. */
@@ -93,6 +99,62 @@ export async function requireVipCaller(
       username: profile.username ?? null,
     },
   };
+}
+
+/**
+ * Resolves the handset's device token to the wallet it may act on.
+ *
+ * The token arrives as a bearer header or `?token=`. It is the phone's whole
+ * identity: it was issued when the admin-assigned PIN was accepted, and it
+ * scopes every read and every agent withdrawal to that one wallet. A handset
+ * without one has linked to nothing and is told so.
+ */
+export async function requireHandset(
+  request: NextRequest,
+): Promise<{ wallet: MpesaDemoWallet } | { response: NextResponse }> {
+  const token =
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
+    request.nextUrl.searchParams.get("token") ||
+    "";
+
+  if (!token) {
+    return {
+      response: railJson(
+        { error: "This phone is not linked yet.", code: "NOT_LINKED" },
+        401,
+      ),
+    };
+  }
+
+  let wallet: MpesaDemoWallet | null;
+  try {
+    wallet = await walletByToken(token);
+  } catch (cause) {
+    return {
+      response: railJson(
+        {
+          error:
+            cause instanceof DemoWalletUnavailable
+              ? cause.message
+              : "Could not reach the demo wallet",
+        },
+        503,
+      ),
+    };
+  }
+
+  if (!wallet) {
+    // The admin cleared the wallet, or this token belongs to a project the
+    // phone is no longer pointed at. Either way it must re-link.
+    return {
+      response: railJson(
+        { error: "This phone is no longer linked.", code: "NOT_LINKED" },
+        401,
+      ),
+    };
+  }
+
+  return { wallet };
 }
 
 /** Parses `amountMinor` from a request body, in whole shillings. */

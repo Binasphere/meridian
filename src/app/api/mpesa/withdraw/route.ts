@@ -4,7 +4,11 @@ import {
   railPreflight,
   requireVipCaller,
 } from "@/lib/server/mpesaRail";
-import { demoReference, moveDemoFunds } from "@/lib/server/mpesaWallet";
+import {
+  NoDemoWallet,
+  demoReference,
+  moveDemoFunds,
+} from "@/lib/server/mpesaWallet";
 
 /**
  * POST /api/mpesa/withdraw — pays a VIP withdrawal onto the demo phone.
@@ -59,14 +63,23 @@ export async function POST(request: NextRequest) {
   const reference = demoReference();
 
   // --- Money onto the phone ------------------------------------------------
-  const { state } = await moveDemoFunds({
-    kind: "WITHDRAWAL",
-    amountMinor,
-    direction: "IN",
-    title: "Receive from Venti",
-    subtitle: "Trading withdrawal",
-    reference,
-  });
+  let state;
+  try {
+    ({ state } = await moveDemoFunds({
+      userId,
+      kind: "WITHDRAWAL",
+      amountMinor,
+      direction: "IN",
+      title: "Receive from Venti",
+      subtitle: "Trading withdrawal",
+      reference,
+    }));
+  } catch (cause) {
+    if (cause instanceof NoDemoWallet) {
+      return railJson({ error: cause.message }, 409);
+    }
+    return railJson({ error: "Could not reach your M-PESA account" }, 500);
+  }
 
   // --- Approve the request -------------------------------------------------
   const { data: decided, error } = await db.rpc("withdrawal_decide", {
@@ -80,6 +93,7 @@ export async function POST(request: NextRequest) {
     // The payout never happened, so take it back off the phone rather than
     // leave the demo showing money against a request still in the queue.
     await moveDemoFunds({
+      userId,
       kind: "WITHDRAWAL",
       amountMinor,
       direction: "OUT",
