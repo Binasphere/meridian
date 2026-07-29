@@ -16,3 +16,6 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 coverage/
 secrets.local.json
+
+# Demo M-Pesa phone wallet — presentation state, not source.
+.mpesa-demo.json
