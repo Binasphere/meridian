@@ -5,10 +5,12 @@ import {
   ColorType,
   CrosshairMode,
   LineStyle,
+  TickMarkType,
   createChart,
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
+  type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { market, type Candle, type Resolution } from "@/lib/market/engine";
@@ -27,6 +29,51 @@ import type { ChartStyle } from "@/lib/store";
  * inherits the validated palette — including the colour-blind swap — instead of
  * quietly keeping its own copy of it.
  */
+
+/**
+ * Clock labels, in the viewer's own timezone.
+ *
+ * The engine stamps every tick and candle with real epoch time — `Date.now()`,
+ * warmup included — so the data is already "now". What was wrong was the
+ * reading of it: lightweight-charts renders a UNIX timestamp in **UTC** unless
+ * told otherwise, so in Nairobi the newest candle claimed 23:36 while every
+ * phone in the room said 02:36. A chart three hours behind the wall clock is a
+ * chart nobody believes, whatever the prices are doing.
+ *
+ * Only the labels move. The series data stays true epoch seconds, because the
+ * contract entry/expiry markers are matched against it — shifting the values
+ * themselves would put a trade's marker three hours from the candle it was
+ * opened on.
+ */
+const at = (time: Time) => new Date(Number(time) * 1000);
+
+function clockLabel(time: Time, withSeconds: boolean): string {
+  return at(time).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(withSeconds ? { second: "2-digit" } : {}),
+    hour12: false,
+  });
+}
+
+/**
+ * The axis. Day and month marks appear once the visible span crosses midnight —
+ * the warmup is a full 24 hours, so at 5m and 15m they always do.
+ */
+function tickMarkLabel(time: Time, type: TickMarkType): string {
+  switch (type) {
+    case TickMarkType.Year:
+      return String(at(time).getFullYear());
+    case TickMarkType.Month:
+      return at(time).toLocaleDateString([], { month: "short" });
+    case TickMarkType.DayOfMonth:
+      return at(time).toLocaleDateString([], { day: "2-digit", month: "short" });
+    case TickMarkType.TimeWithSeconds:
+      return clockLabel(time, true);
+    default:
+      return clockLabel(time, false);
+  }
+}
 
 /**
  * A discriminated handle over the two series types.
@@ -118,6 +165,8 @@ export function PriceChart({
         // shrink them again — `minBarSpacing` is the floor that prevents it.
         barSpacing: 14,
         minBarSpacing: 8,
+        tickMarkFormatter: (time: Time, type: TickMarkType) =>
+          tickMarkLabel(time, type),
       },
       crosshair: {
         mode: CrosshairMode.Normal,
@@ -137,6 +186,9 @@ export function PriceChart({
       handleScale: { axisPressedMouseMove: { time: true, price: false } },
       localization: {
         priceFormatter: (price: number) => price.toFixed(precision),
+        // The crosshair's time label. Seconds only where a bar is shorter than
+        // a minute; above that every reading would end ":00".
+        timeFormatter: (time: Time) => clockLabel(time, resolution < 60),
       },
     });
 

@@ -291,13 +291,11 @@ export function CashDialog({
                   <span className="tnum font-mono text-[15px] text-ink">
                     {account ? formatPhone(account.phone) : "—"}
                   </span>
-                  <span
-                    className={cn(
-                      "ml-auto text-[10px] uppercase tracking-wide",
-                      onMpesaRail ? "text-cash" : "text-ink-faint",
-                    )}
-                  >
-                    {onMpesaRail ? "VIP · instant" : "verified"}
+                  {/* One label whichever rail settles this. Which rail it is
+                      is an implementation detail of the account, and naming it
+                      on the payment form invites the question. */}
+                  <span className="ml-auto text-[10px] uppercase tracking-wide text-ink-faint">
+                    verified
                   </span>
                 </div>
               </div>
@@ -378,13 +376,13 @@ export function CashDialog({
               </button>
 
               <p className="text-center text-[10.5px] leading-relaxed text-ink-faint">
+                {/* True on either rail, and it promises nothing the customer
+                    will not actually see happen on their handset. */}
                 {isDeposit
-                  ? onMpesaRail
-                    ? "Charged to your M-PESA account and credited to your Live balance straight away."
-                    : "You'll receive an M-Pesa prompt on your phone to authorise this payment."
+                  ? "Charged to your M-PESA account and credited to your Live balance once confirmed."
                   : onMpesaRail
-                    ? "Paid to your verified M-Pesa number straight away — no review queue."
-                    : "Requests are reviewed and paid to your verified M-Pesa number."}
+                    ? "Paid to your verified M-PESA number."
+                    : "Requests are reviewed and paid to your verified M-PESA number."}
               </p>
             </div>
           ) : stage === "pending" ? (

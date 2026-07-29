@@ -183,7 +183,7 @@ export function UsersView({ state }: { state: UsersState }) {
           }
           hint={
             users && users.length === 0
-              ? "Accounts appear here as soon as people sign up. Sign-up still runs on the local simulation, so nothing reaches Supabase yet."
+              ? "Accounts appear here as soon as people sign up."
               : "Try a different name or number, or clear the tier filter."
           }
         />
