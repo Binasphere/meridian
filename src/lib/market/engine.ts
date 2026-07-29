@@ -586,8 +586,8 @@ export class MarketEngine {
  * disagree with the first.
  */
 const globalForEngine = globalThis as unknown as {
-  __meridianMarket?: MarketEngine;
-  __meridianFeed?: { stop(): void };
+  __ventiMarket?: MarketEngine;
+  __ventiFeed?: { stop(): void };
 };
 
 /**
@@ -614,10 +614,10 @@ export function market(): MarketEngine {
     );
   }
 
-  if (!globalForEngine.__meridianMarket) {
+  if (!globalForEngine.__ventiMarket) {
     const engine = new MarketEngine();
     engine.start();
-    globalForEngine.__meridianMarket = engine;
+    globalForEngine.__ventiMarket = engine;
 
     if (USE_LIVE_CRYPTO) {
       // Imported lazily so the exchange adapter is not in the bundle's critical
@@ -627,7 +627,7 @@ export function market(): MarketEngine {
           const feed = new BinanceFeed(engine, (status) => {
             notifyFeedStatus(status);
           });
-          globalForEngine.__meridianFeed = feed;
+          globalForEngine.__ventiFeed = feed;
           return feed.start();
         })
         .catch((error) => {
@@ -636,7 +636,7 @@ export function market(): MarketEngine {
         });
     }
   }
-  return globalForEngine.__meridianMarket;
+  return globalForEngine.__ventiMarket;
 }
 
 // --- Feed status ----------------------------------------------------------

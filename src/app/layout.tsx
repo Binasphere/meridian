@@ -24,12 +24,12 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Meridian — Fixed-time derivatives",
-    template: "%s · Meridian",
+    default: "Venti — Fixed-time derivatives",
+    template: "%s · Venti",
   },
   description:
     "A fixed-time derivatives terminal. Transparent payouts, server-priced settlement, and a practice account that behaves exactly like the live one.",
-  applicationName: "Meridian",
+  applicationName: "Venti",
   robots: { index: false, follow: false },
 };
 

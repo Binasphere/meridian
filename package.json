@@ -1,8 +1,8 @@
 {
-  "name": "meridian",
+  "name": "venti",
   "version": "0.1.0",
   "private": true,
-  "description": "Meridian — a fixed-time derivatives trading terminal",
+  "description": "Venti — a fixed-time derivatives trading terminal",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

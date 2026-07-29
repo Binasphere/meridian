@@ -1,5 +1,5 @@
 -- ============================================================================
--- Meridian — go-live migration: real money movement
+-- Venti — go-live migration: real money movement
 -- ============================================================================
 --
 -- Run AFTER schema.sql, in the Supabase SQL editor. Idempotent: safe to re-run.

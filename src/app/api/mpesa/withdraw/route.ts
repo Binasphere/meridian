@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     kind: "WITHDRAWAL",
     amountMinor,
     direction: "IN",
-    title: "Receive from Meridian",
+    title: "Receive from Venti",
     subtitle: "Trading withdrawal",
     reference,
   });
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       kind: "WITHDRAWAL",
       amountMinor,
       direction: "OUT",
-      title: "Reversal — Meridian",
+      title: "Reversal — Venti",
       subtitle: "Withdrawal could not be completed",
     }).catch(() => undefined);
 

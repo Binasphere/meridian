@@ -638,7 +638,7 @@ export const useStore = create<State>()(
       // v6: contracts are fixed at 10s, so a persisted 60 would keep booking
       // minute-long trades for anyone who had used the app before; and cash
       // events gained a `stage`, which a v5 blob has no value for.
-      name: "meridian.session.v6",
+      name: "venti.session.v6",
       storage: createJSONStorage(() => localStorage),
     },
   ),

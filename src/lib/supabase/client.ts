@@ -8,7 +8,7 @@ import {
 /**
  * Browser Supabase client.
  *
- * Meridian's auth, balances and trades currently run as a client-side
+ * Venti's auth, balances and trades currently run as a client-side
  * simulation (see `auth.ts` / `store.ts`). Supabase is the seam they migrate
  * onto: this module gives the rest of the app one place to reach the backend,
  * so wiring a feature to real persistence is an import rather than a rewrite.
@@ -36,7 +36,7 @@ export function isSupabaseConfigured(): boolean {
 // Memoised so React Fast Refresh and repeated calls do not each open a new
 // realtime connection.
 const globalForSupabase = globalThis as unknown as {
-  __meridianSupabase?: SupabaseClient | null;
+  __ventiSupabase?: SupabaseClient | null;
 };
 
 /**
@@ -48,8 +48,8 @@ const globalForSupabase = globalThis as unknown as {
  *   if (!db) return; // running on the client-side simulation
  */
 export function supabase(): SupabaseClient | null {
-  if (globalForSupabase.__meridianSupabase !== undefined) {
-    return globalForSupabase.__meridianSupabase;
+  if (globalForSupabase.__ventiSupabase !== undefined) {
+    return globalForSupabase.__ventiSupabase;
   }
 
   const client =
@@ -62,6 +62,6 @@ export function supabase(): SupabaseClient | null {
         })
       : null;
 
-  globalForSupabase.__meridianSupabase = client;
+  globalForSupabase.__ventiSupabase = client;
   return client;
 }

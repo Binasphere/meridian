@@ -281,7 +281,7 @@ function downloadStatement(rows: StatementRow[]): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `meridian-statement-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.download = `venti-statement-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
@@ -733,7 +733,7 @@ export function HelpPage() {
             >
               <Mail className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
               <span className="text-[13px] text-ink-secondary">
-                support@meridian.test
+                support@venti.test
               </span>
             </button>
           </div>

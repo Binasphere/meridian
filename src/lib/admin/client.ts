@@ -18,7 +18,7 @@ import { BACKEND_ORIGIN } from "@/lib/backend";
  * scripts and the token expires in eight hours regardless.
  */
 
-const TOKEN_KEY = "meridian.admin.token";
+const TOKEN_KEY = "venti.admin.token";
 
 export function adminToken(): string | null {
   try {

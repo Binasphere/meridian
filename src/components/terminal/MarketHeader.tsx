@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useTick } from "@/lib/hooks";
 import type { Instrument } from "@/lib/market/instruments";
 import type { ChartStyle } from "@/lib/store";
 import type { Resolution } from "@/lib/market/engine";
 import { Segmented } from "@/components/ui/primitives";
+import { Sheet } from "@/components/ui/Sheet";
+import { Watchlist } from "./Watchlist";
 
 const RESOLUTION_OPTIONS: ReadonlyArray<{ value: Resolution; label: string }> = [
   { value: 5, label: "5s" },
@@ -22,32 +26,62 @@ const RESOLUTION_OPTIONS: ReadonlyArray<{ value: Resolution; label: string }> = 
  * feed provenance all moved to the account panel — they are things you check
  * once when choosing a market, not things you read while a countdown is
  * running, and every one of them was competing with the price for attention.
+ *
+ * On a phone the instrument name is also the way to a different one. There is
+ * no markets rail on a small screen, and the name of the market you are on is
+ * where anyone would reach to change it — so it opens the list rather than
+ * spending a slot in the trading bar on a button that says "Markets".
  */
 export function MarketHeader({
   spec,
+  onSelectSymbol,
   resolution,
   onResolutionChange,
   chartStyle,
   onChartStyleChange,
 }: {
   spec: Instrument;
+  onSelectSymbol: (symbol: string) => void;
   resolution: Resolution;
   onResolutionChange: (resolution: Resolution) => void;
   chartStyle: ChartStyle;
   onChartStyleChange: (style: ChartStyle) => void;
 }) {
   const { tick } = useTick(spec.symbol);
+  const [marketsOpen, setMarketsOpen] = useState(false);
 
   return (
     <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-3 sm:gap-4 sm:px-4">
-      <div className="min-w-0">
-        <h1 className="truncate text-[13px] font-medium tracking-tight text-ink sm:text-[14px]">
-          {spec.displayName}
-        </h1>
-        <div className="truncate font-mono text-[10.5px] text-ink-faint">
-          {spec.symbol}
+      {/* The desktop has the markets rail beside it, so there the name is a
+          heading and nothing more. */}
+      <button
+        onClick={() => setMarketsOpen(true)}
+        aria-label="Change market"
+        className="flex min-w-0 items-center gap-1.5 text-left active:opacity-70 lg:pointer-events-none"
+      >
+        <div className="min-w-0">
+          <h1 className="truncate text-[13px] font-medium tracking-tight text-ink sm:text-[14px]">
+            {spec.displayName}
+          </h1>
+          <div className="truncate font-mono text-[10.5px] text-ink-faint">
+            {spec.symbol}
+          </div>
         </div>
-      </div>
+        <ChevronDown
+          className="h-3.5 w-3.5 shrink-0 text-ink-muted lg:hidden"
+          aria-hidden
+        />
+      </button>
+
+      <Sheet open={marketsOpen} onOpenChange={setMarketsOpen} title="Markets">
+        <Watchlist
+          active={spec.symbol}
+          onSelect={(symbol) => {
+            onSelectSymbol(symbol);
+            setMarketsOpen(false);
+          }}
+        />
+      </Sheet>
 
       <LivePrice price={tick?.mid ?? null} precision={spec.precision} />
 

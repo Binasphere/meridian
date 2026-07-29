@@ -14,7 +14,7 @@ export * from "./types";
  */
 
 const globalForOracle = globalThis as unknown as {
-  __meridianOracle: PriceOracle | undefined;
+  __ventiOracle: PriceOracle | undefined;
 };
 
 async function loadSpecs(): Promise<InstrumentSpec[]> {
@@ -58,7 +58,7 @@ export async function createOracle(): Promise<PriceOracle> {
 }
 
 export function setOracle(oracle: PriceOracle): void {
-  globalForOracle.__meridianOracle = oracle;
+  globalForOracle.__ventiOracle = oracle;
 }
 
 /**
@@ -68,7 +68,7 @@ export function setOracle(oracle: PriceOracle): void {
  * undefined would surface as a mysterious settlement failure much later.
  */
 export function oracle(): PriceOracle {
-  const instance = globalForOracle.__meridianOracle;
+  const instance = globalForOracle.__ventiOracle;
   if (!instance) {
     throw new Error(
       "Price oracle not initialised. The app must be started via `npm run dev` (server.ts), not `next dev`.",
@@ -78,5 +78,5 @@ export function oracle(): PriceOracle {
 }
 
 export function oracleOrNull(): PriceOracle | null {
-  return globalForOracle.__meridianOracle ?? null;
+  return globalForOracle.__ventiOracle ?? null;
 }

@@ -234,7 +234,7 @@ async function main() {
   heartbeat.unref?.();
 
   server.listen(port, () => {
-    console.log(`\n  Meridian ready on http://${hostname}:${port}\n`);
+    console.log(`\n  Venti ready on http://${hostname}:${port}\n`);
   });
 
   const shutdown = (signal: string) => {

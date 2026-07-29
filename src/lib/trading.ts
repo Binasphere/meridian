@@ -99,6 +99,31 @@ export function payoutFromStake(stakeMinor: bigint, payoutBps: number): bigint {
   return stakeMinor + profitFromStake(stakeMinor, payoutBps);
 }
 
+// ---------------------------------------------------------------------------
+// Stake bounds
+// ---------------------------------------------------------------------------
+
+/**
+ * What a contract may be staked at, in minor units.
+ *
+ * Shared by the desktop ticket and the mobile bar, which are two arrangements
+ * of one control rather than two controls — a phone that accepted a stake the
+ * desktop refuses would be a different product on a smaller screen.
+ */
+export const MIN_STAKE_MINOR = 10_000n; // KSh 100
+export const MAX_STAKE_MINOR = 30_000_000n; // KSh 300,000
+export const STAKE_STEP_MINOR = 10_000n; // KSh 100
+
+/** The one-tap amounts, in minor units: KSh 100 / 250 / 500 / 1,000. */
+export const QUICK_STAKES_MINOR = [10_000n, 25_000n, 50_000n, 100_000n];
+
+/** Clamps a stake into the permitted range. */
+export function clampStake(stakeMinor: bigint): bigint {
+  if (stakeMinor < MIN_STAKE_MINOR) return MIN_STAKE_MINOR;
+  if (stakeMinor > MAX_STAKE_MINOR) return MAX_STAKE_MINOR;
+  return stakeMinor;
+}
+
 /**
  * Decides an expired contract.
  *

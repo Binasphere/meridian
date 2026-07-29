@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownToLine } from "lucide-react";
+import { ArrowDownToLine, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { useAuth, useCurrentAccount } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import type { AccountKind } from "@/lib/trading";
 import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
 import { LiveDot } from "@/components/ui/primitives";
@@ -30,7 +30,6 @@ export function TopBar() {
   const accountKind = useStore((s) => s.accountKind);
   const balance = useStore(selectBalance);
   const hydrated = useStoreHydrated();
-  const account = useCurrentAccount();
   const signedIn = useAuth((s) => s.currentPhone) !== null;
   const showGate = useAuthGate((s) => s.show);
 
@@ -66,10 +65,13 @@ export function TopBar() {
               aria-label="Open account panel"
               className={cn(
                 "grid h-9 w-9 shrink-0 place-items-center border border-line bg-surface-3",
-                "text-[11px] font-semibold text-ink transition-colors hover:bg-surface-4",
+                "text-ink transition-colors hover:bg-surface-4",
               )}
             >
-              {account ? account.phone.slice(-2) : "—"}
+              {/* A menu glyph rather than the last two digits of the number:
+                  the button opens everything behind the account, and two digits
+                  read as a value to check rather than a door to open. */}
+              <Menu className="h-4 w-4" aria-hidden />
             </button>
           ) : (
             <button

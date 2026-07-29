@@ -36,14 +36,14 @@ const SETTLEMENT_INTERVAL_MS = 250;
 const BATCH_SIZE = 200;
 
 const globalForEngine = globalThis as unknown as {
-  __meridianEngine: { timer: NodeJS.Timeout | null; running: boolean } | undefined;
+  __ventiEngine: { timer: NodeJS.Timeout | null; running: boolean } | undefined;
 };
 
 function state() {
-  if (!globalForEngine.__meridianEngine) {
-    globalForEngine.__meridianEngine = { timer: null, running: false };
+  if (!globalForEngine.__ventiEngine) {
+    globalForEngine.__ventiEngine = { timer: null, running: false };
   }
-  return globalForEngine.__meridianEngine;
+  return globalForEngine.__ventiEngine;
 }
 
 function settlementKey(tradeId: string): string {

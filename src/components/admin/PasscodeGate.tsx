@@ -64,7 +64,7 @@ export function PasscodeGate({ onUnlock }: { onUnlock: () => void }) {
           </span>
           <div className="leading-tight">
             <div className="text-[14px] font-semibold tracking-[-0.01em] text-adm-ink">
-              Meridian
+              Venti
             </div>
             <div className="text-[12px] text-adm-ink-3">Admin console</div>
           </div>

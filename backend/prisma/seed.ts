@@ -57,7 +57,7 @@ const INSTRUMENTS: InstrumentSeed[] = [
 const DEMO_STARTING_BALANCE_MINOR = 10_000_000n; // KES 100,000.00 of practice money
 
 async function main() {
-  console.log("Seeding Meridian…\n");
+  console.log("Seeding Venti…\n");
 
   // --- Instruments --------------------------------------------------------
   for (const instrument of INSTRUMENTS) {
@@ -102,12 +102,12 @@ async function main() {
   console.log("  system accounts (HOUSE, GATEWAY)");
 
   // --- Demo users ---------------------------------------------------------
-  const passwordHash = await bcrypt.hash("meridian123", 12);
+  const passwordHash = await bcrypt.hash("venti123", 12);
 
   const users = [
-    { email: "admin@meridian.test", displayName: "Ops Admin", role: "ADMIN" as const },
-    { email: "trader@meridian.test", displayName: "Amina K.", role: "USER" as const },
-    { email: "second@meridian.test", displayName: "Brian O.", role: "USER" as const },
+    { email: "admin@venti.test", displayName: "Ops Admin", role: "ADMIN" as const },
+    { email: "trader@venti.test", displayName: "Amina K.", role: "USER" as const },
+    { email: "second@venti.test", displayName: "Brian O.", role: "USER" as const },
   ];
 
   for (const spec of users) {
@@ -176,7 +176,7 @@ async function main() {
       }
     }
   }
-  console.log(`  ${users.length} users (password: meridian123)`);
+  console.log(`  ${users.length} users (password: venti123)`);
 
   // Repair the HOUSE running balances written as 0n above, so the statement
   // view and the audit agree.
@@ -200,8 +200,8 @@ async function main() {
 
   console.log("\nDone.\n");
   console.log("  Sign in at /login");
-  console.log("    admin@meridian.test  / meridian123   (operator console)");
-  console.log("    trader@meridian.test / meridian123   (KES 100,000 practice)\n");
+  console.log("    admin@venti.test  / venti123   (operator console)");
+  console.log("    trader@venti.test / venti123   (KES 100,000 practice)\n");
 }
 
 main()

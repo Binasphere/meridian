@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       kind: "DEPOSIT",
       amountMinor,
       direction: "OUT",
-      title: "Pay to Meridian",
+      title: "Pay to Venti",
       subtitle: "Trading deposit",
       reference,
     });
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       kind: "DEPOSIT",
       amountMinor,
       direction: "IN",
-      title: "Reversal — Meridian",
+      title: "Reversal — Venti",
       subtitle: "Deposit could not be completed",
     }).catch(() => undefined);
 

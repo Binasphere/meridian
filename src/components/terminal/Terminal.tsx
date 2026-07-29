@@ -93,6 +93,7 @@ export function Terminal() {
           <Panel flat className="flex min-h-0 flex-col overflow-hidden border-0">
             <MarketHeader
               spec={spec}
+              onSelectSymbol={setSymbol}
               resolution={resolution}
               onResolutionChange={setResolution}
               chartStyle={chartStyle}

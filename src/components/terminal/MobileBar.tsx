@@ -1,15 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
-import {
-  ArrowDown,
-  ArrowUp,
-  LayoutList,
-  ListOrdered,
-  Timer,
-  X,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, Plus, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
@@ -17,21 +8,27 @@ import {
   FIXED_DURATION_SEC,
   type Instrument,
 } from "@/lib/market/instruments";
-import { effectivePayoutBps, payoutFromStake } from "@/lib/trading";
-import { selectBalance, useOpenTrades, useStore } from "@/lib/store";
+import {
+  clampStake,
+  effectivePayoutBps,
+  MAX_STAKE_MINOR,
+  MIN_STAKE_MINOR,
+  payoutFromStake,
+  QUICK_STAKES_MINOR,
+  STAKE_STEP_MINOR,
+} from "@/lib/trading";
+import { selectBalance, useStore } from "@/lib/store";
 import { playPlace } from "@/lib/sound";
-import { Watchlist } from "./Watchlist";
-import { Positions } from "./Positions";
-
-const QUICK_STAKES = [10_000n, 25_000n, 50_000n, 100_000n];
 
 /**
  * The mobile trading bar.
  *
  * Phones are the majority of this market, so the small-screen layout is a
  * designed thing rather than a reflow of the desktop grid. The chart keeps the
- * screen; everything needed to act sits in a fixed bar within thumb reach, and
- * the two lists become sheets.
+ * screen, and the bar within thumb reach holds only what a contract is made of:
+ * how much, and which way. Browsing markets moved onto the chart header, where
+ * the instrument name is already the thing you would reach for; positions live
+ * on the account pages, and the running contract announces itself.
  *
  * There is exactly one chart instance in the app — this bar and the desktop
  * rail arrange the *same* mounted chart rather than each rendering their own,
@@ -42,20 +39,23 @@ export function MobileBar({ spec }: { spec: Instrument }) {
   const stakeMinor = useStore((s) => BigInt(s.stakeMinor));
   const setStakeMinor = useStore((s) => s.setStakeMinor);
   const placeTrade = useStore((s) => s.placeTrade);
-  const setSymbol = useStore((s) => s.setSymbol);
   const balance = useStore(selectBalance);
   const accountKind = useStore((s) => s.accountKind);
   const liveTier = useStore((s) => s.liveTier);
-  const open = useOpenTrades();
 
-  const [marketsOpen, setMarketsOpen] = useState(false);
-  const [positionsOpen, setPositionsOpen] = useState(false);
+  // The same three refusals the desktop ticket applies, so a stake accepted on
+  // one screen size is accepted on the other.
+  const insufficient =
+    stakeMinor > balance ||
+    stakeMinor < MIN_STAKE_MINOR ||
+    stakeMinor > MAX_STAKE_MINOR;
 
-  const insufficient = stakeMinor > balance || stakeMinor <= 0n;
   // Same effective rate the desktop ticket shows — instrument base plus the VIP
   // live-tier bonus, if it applies.
   const payoutBps = effectivePayoutBps(spec.payoutBps, accountKind, liveTier);
   const potential = payoutFromStake(stakeMinor, payoutBps);
+
+  const adjust = (delta: bigint) => setStakeMinor(clampStake(stakeMinor + delta));
 
   const submit = (direction: "UP" | "DOWN") => {
     const result = placeTrade(direction);
@@ -69,48 +69,91 @@ export function MobileBar({ spec }: { spec: Instrument }) {
 
   return (
     <div className="shrink-0 border-t border-line bg-surface-1 lg:hidden">
-      {/* --- Sheet triggers + stake ---------------------------------------- */}
-      <div className="flex items-center gap-2 px-3 pb-2 pt-2.5">
-        <SheetButton
-          icon={<LayoutList className="h-4 w-4" />}
-          label="Markets"
-          onClick={() => setMarketsOpen(true)}
-        />
-        <SheetButton
-          icon={<ListOrdered className="h-4 w-4" />}
-          label="Positions"
-          badge={open.length || undefined}
-          onClick={() => setPositionsOpen(true)}
-        />
-
-        <div className="ml-auto text-right">
-          <div className="text-[9.5px] font-medium uppercase tracking-[0.08em] text-ink-muted">
-            Returns
-          </div>
-          <div className="tnum -mt-0.5 font-mono text-[14px] font-medium text-ink">
-            {formatMoney(potential, { currency: "KSh" })}
-          </div>
-        </div>
-      </div>
-
-      {/* --- Stake + expiry ------------------------------------------------- */}
-      <div className="flex gap-1.5 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {QUICK_STAKES.map((amount) => (
-          <Chip
-            key={amount.toString()}
-            active={stakeMinor === amount}
-            onClick={() => setStakeMinor(amount)}
+      {/* --- Stake ----------------------------------------------------------
+          The one thing above Buy and Sell, because it is the one decision left
+          to make there. Typed, stepped or tapped — the quick amounts are a
+          shortcut into the same field, not a substitute for it. */}
+      <div className="px-3 pb-2 pt-2.5">
+        <div className="mb-1.5 flex items-baseline gap-3">
+          <label
+            htmlFor="mobile-stake"
+            className="text-[9.5px] font-medium uppercase tracking-[0.08em] text-ink-muted"
           >
-            {formatMoney(amount, { compact: true })}
-          </Chip>
-        ))}
-        <div className="mx-1 w-px shrink-0 bg-line" aria-hidden />
-        {/* Expiry is fixed at ten seconds — shown as a fact, not a chip you can
-            press and have nothing happen. */}
-        <span className="tnum flex shrink-0 items-center gap-1 px-2 font-mono text-[12px] text-ink-muted">
-          <Timer className="h-3.5 w-3.5" aria-hidden />
-          {FIXED_DURATION_SEC}s
-        </span>
+            Stake
+          </label>
+
+          {/* Expiry is fixed at ten seconds — stated as a fact, not a control
+              you can press and have nothing happen. */}
+          <span className="tnum flex shrink-0 items-center gap-1 font-mono text-[11px] text-ink-faint">
+            <Timer className="h-3 w-3" aria-hidden />
+            {FIXED_DURATION_SEC}s
+          </span>
+
+          <span className="tnum ml-auto font-mono text-[11px] text-ink-faint">
+            Returns{" "}
+            <span className="text-ink-secondary">
+              {formatMoney(potential, { currency: "KSh" })}
+            </span>
+          </span>
+        </div>
+
+        <div
+          className={cn(
+            "flex items-stretch border bg-surface-2 transition-colors",
+            insufficient
+              ? "border-down/40"
+              : "border-line focus-within:border-line-strong",
+          )}
+        >
+          <button
+            onClick={() => adjust(-STAKE_STEP_MINOR)}
+            disabled={stakeMinor <= MIN_STAKE_MINOR}
+            aria-label="Decrease stake"
+            className="grid w-11 shrink-0 place-items-center text-ink-muted active:bg-surface-3 disabled:opacity-30"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+
+          <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5 border-x border-line px-2">
+            <span className="shrink-0 font-mono text-[12px] text-ink-muted">
+              KSh
+            </span>
+            <input
+              id="mobile-stake"
+              inputMode="numeric"
+              value={formatMoney(stakeMinor)}
+              onChange={(event) => {
+                // Digits only, read as minor units, so typing never lands in an
+                // intermediate state like "12." that has to be special-cased.
+                const digits = event.target.value.replace(/\D/g, "");
+                setStakeMinor(digits ? BigInt(digits) : 0n);
+              }}
+              className="tnum w-full bg-transparent py-2.5 text-center font-mono text-[17px] tracking-tight text-ink outline-none"
+              aria-invalid={insufficient}
+            />
+          </div>
+
+          <button
+            onClick={() => adjust(STAKE_STEP_MINOR)}
+            disabled={stakeMinor >= MAX_STAKE_MINOR}
+            aria-label="Increase stake"
+            className="grid w-11 shrink-0 place-items-center text-ink-muted active:bg-surface-3 disabled:opacity-30"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-1.5 grid grid-cols-4 gap-1.5">
+          {QUICK_STAKES_MINOR.map((amount) => (
+            <Chip
+              key={amount.toString()}
+              active={stakeMinor === amount}
+              onClick={() => setStakeMinor(amount)}
+            >
+              {formatMoney(amount, { compact: true })}
+            </Chip>
+          ))}
+        </div>
       </div>
 
       {/* --- Commit --------------------------------------------------------- */}
@@ -135,56 +178,7 @@ export function MobileBar({ spec }: { spec: Instrument }) {
           Sell
         </button>
       </div>
-
-      <Sheet
-        open={marketsOpen}
-        onOpenChange={setMarketsOpen}
-        title="Markets"
-      >
-        <Watchlist
-          active={spec.symbol}
-          onSelect={(symbol) => {
-            setSymbol(symbol);
-            setMarketsOpen(false);
-          }}
-        />
-      </Sheet>
-
-      <Sheet
-        open={positionsOpen}
-        onOpenChange={setPositionsOpen}
-        title="Positions"
-      >
-        <Positions />
-      </Sheet>
     </div>
-  );
-}
-
-function SheetButton({
-  icon,
-  label,
-  badge,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  badge?: number;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="relative flex h-9 items-center gap-1.5 rounded-none border border-line bg-surface-2 px-2.5 text-[12.5px] text-ink-secondary active:bg-surface-3"
-    >
-      {icon}
-      {label}
-      {badge ? (
-        <span className="tnum rounded-none bg-accent/20 px-1 font-mono text-[10px] text-accent">
-          {badge}
-        </span>
-      ) : null}
-    </button>
   );
 }
 
@@ -201,54 +195,13 @@ function Chip({
     <button
       onClick={onClick}
       className={cn(
-        "tnum h-8 shrink-0 rounded-none border px-3 font-mono text-[12px] transition-colors",
+        "tnum h-8 rounded-none border font-mono text-[12px] transition-colors",
         active
           ? "border-line-strong bg-surface-3 text-ink"
-          : "border-line bg-surface-1 text-ink-muted",
+          : "border-line bg-surface-1 text-ink-muted active:bg-surface-2",
       )}
     >
       {children}
     </button>
-  );
-}
-
-/** A bottom sheet. Radix handles focus trapping, scroll lock and Escape. */
-function Sheet({
-  open,
-  onOpenChange,
-  title,
-  children,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="sheet-overlay fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
-        <Dialog.Content
-          className={cn(
-            "sheet-content fixed inset-x-0 bottom-0 z-50 flex h-[78dvh] flex-col",
-            "rounded-none border-t border-line bg-surface-1 shadow-2xl",
-            "focus:outline-none",
-          )}
-        >
-          <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-4">
-            <Dialog.Title className="text-[13px] font-medium text-ink">
-              {title}
-            </Dialog.Title>
-            <Dialog.Close
-              aria-label="Close"
-              className="grid h-8 w-8 place-items-center rounded-none text-ink-muted active:bg-surface-3"
-            >
-              <X className="h-4 w-4" />
-            </Dialog.Close>
-          </div>
-          <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
   );
 }

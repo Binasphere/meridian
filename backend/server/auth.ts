@@ -14,7 +14,7 @@ import { prisma } from "./db";
  * row still exists.
  */
 
-const COOKIE_NAME = "meridian_session";
+const COOKIE_NAME = "venti_session";
 const SESSION_TTL_DAYS = 30;
 
 /** bcrypt cost. 12 is ~250ms on commodity hardware — deliberately slow. */
@@ -58,7 +58,7 @@ export function verifyPassword(
  */
 const DUMMY_HASH = "$2a$12$C6UzMDM.H6dfI/f/IKcEe.ZFQqLKrXRjS0LrMJXAX9k6HGVJZ0FBu";
 export async function burnPasswordTime(): Promise<void> {
-  await bcrypt.compare("meridian-dummy-password", DUMMY_HASH);
+  await bcrypt.compare("venti-dummy-password", DUMMY_HASH);
 }
 
 export async function createSession(
@@ -79,8 +79,8 @@ export async function createSession(
   const token = await new SignJWT({ sub: userId, sid: session.id })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setIssuer("meridian")
-    .setAudience("meridian-web")
+    .setIssuer("venti")
+    .setAudience("venti-web")
     .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
     .sign(secretKey());
 
@@ -104,8 +104,8 @@ export async function resolveToken(
 
   try {
     const { payload } = await jwtVerify(token, secretKey(), {
-      issuer: "meridian",
-      audience: "meridian-web",
+      issuer: "venti",
+      audience: "venti-web",
     });
 
     const sessionId = payload.sid;
@@ -165,8 +165,8 @@ export async function destroySession(): Promise<void> {
   if (token) {
     try {
       const { payload } = await jwtVerify(token, secretKey(), {
-        issuer: "meridian",
-        audience: "meridian-web",
+        issuer: "venti",
+        audience: "venti-web",
       });
       if (typeof payload.sid === "string") {
         await prisma.session.deleteMany({ where: { id: payload.sid } });

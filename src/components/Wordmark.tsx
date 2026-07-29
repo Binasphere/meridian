@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 
 /**
- * The Meridian wordmark.
+ * The Venti wordmark.
  *
- * The glyph is a meridian line crossing a sphere — drawn rather than imported
- * so it inherits `currentColor` and stays crisp at every size. A logo that is a
+ * The glyph is a great circle crossing a sphere — drawn rather than imported so
+ * it inherits `currentColor` and stays crisp at every size. A logo that is a
  * PNG is a logo that is blurry on someone's display.
  */
 export function Wordmark({
@@ -30,7 +30,7 @@ export function Wordmark({
           strokeWidth="1.5"
           opacity="0.35"
         />
-        {/* The meridian: the ellipse that reads as a great circle in projection. */}
+        {/* The ellipse that reads as a great circle in projection. */}
         <ellipse
           cx="12"
           cy="12"
@@ -46,13 +46,13 @@ export function Wordmark({
           strokeWidth="1.5"
           opacity="0.35"
         />
-        {/* The mark's one solid element, sitting on the meridian. */}
+        {/* The mark's one solid element, sitting on the great circle. */}
         <circle cx="12" cy="7.4" r="2.1" fill="currentColor" />
       </svg>
 
       {showText ? (
         <span className="text-[15px] font-semibold tracking-[-0.01em]">
-          Meridian
+          Venti
         </span>
       ) : null}
     </span>

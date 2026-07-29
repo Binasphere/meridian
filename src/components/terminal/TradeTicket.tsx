@@ -11,19 +11,19 @@ import {
   type Instrument,
 } from "@/lib/market/instruments";
 import {
+  clampStake,
   effectivePayoutBps,
+  MAX_STAKE_MINOR,
+  MIN_STAKE_MINOR,
   payoutFromStake,
   profitFromStake,
+  QUICK_STAKES_MINOR,
+  STAKE_STEP_MINOR,
 } from "@/lib/trading";
 import { selectBalance, useStore } from "@/lib/store";
 import { playPlace } from "@/lib/sound";
 import { Button } from "@/components/ui/primitives";
 import { ActivityFeed } from "./ActivityFeed";
-
-const QUICK_STAKES = [10_000n, 25_000n, 50_000n, 100_000n]; // KES 100 / 250 / 500 / 1,000
-const STAKE_STEP = 10_000n; // KES 100
-const MIN_STAKE = 10_000n;
-const MAX_STAKE = 30_000_000n;
 
 /**
  * The trade ticket.
@@ -61,23 +61,20 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
     [stakeMinor, payoutBps],
   );
 
-  const tooLow = stakeMinor < MIN_STAKE;
-  const tooHigh = stakeMinor > MAX_STAKE;
+  const tooLow = stakeMinor < MIN_STAKE_MINOR;
+  const tooHigh = stakeMinor > MAX_STAKE_MINOR;
   const insufficient = stakeMinor > balance;
   const blocked = tooLow || tooHigh || insufficient;
 
   const problem = insufficient
     ? "Stake exceeds your balance"
     : tooLow
-      ? `Minimum stake is ${formatMoney(MIN_STAKE, { currency: "KSh" })}`
+      ? `Minimum stake is ${formatMoney(MIN_STAKE_MINOR, { currency: "KSh" })}`
       : tooHigh
-        ? `Maximum stake is ${formatMoney(MAX_STAKE, { currency: "KSh" })}`
+        ? `Maximum stake is ${formatMoney(MAX_STAKE_MINOR, { currency: "KSh" })}`
         : null;
 
-  const adjust = (delta: bigint) => {
-    const next = stakeMinor + delta;
-    setStakeMinor(next < MIN_STAKE ? MIN_STAKE : next > MAX_STAKE ? MAX_STAKE : next);
-  };
+  const adjust = (delta: bigint) => setStakeMinor(clampStake(stakeMinor + delta));
 
   const submit = (direction: "UP" | "DOWN") => {
     const result = placeTrade(direction);
@@ -116,8 +113,8 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
           )}
         >
           <button
-            onClick={() => adjust(-STAKE_STEP)}
-            disabled={stakeMinor <= MIN_STAKE}
+            onClick={() => adjust(-STAKE_STEP_MINOR)}
+            disabled={stakeMinor <= MIN_STAKE_MINOR}
             aria-label="Decrease stake"
             className="grid w-10 place-items-center text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
           >
@@ -146,8 +143,8 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
           </div>
 
           <button
-            onClick={() => adjust(STAKE_STEP)}
-            disabled={stakeMinor >= MAX_STAKE}
+            onClick={() => adjust(STAKE_STEP_MINOR)}
+            disabled={stakeMinor >= MAX_STAKE_MINOR}
             aria-label="Increase stake"
             className="grid w-10 place-items-center text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
           >
@@ -156,7 +153,7 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
         </div>
 
         <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {QUICK_STAKES.map((amount) => (
+          {QUICK_STAKES_MINOR.map((amount) => (
             <button
               key={amount.toString()}
               onClick={() => setStakeMinor(amount)}

@@ -1,4 +1,4 @@
-# Meridian — Feature TODO
+# Venti — Feature TODO
 
 Tracking the changes requested. Order is roughly dependency-first, but each item
 is self-contained.
@@ -55,7 +55,7 @@ is self-contained.
 
 - [x] **10. Auth on Supabase.** Sign-up and sign-in run against Supabase Auth.
   The Kenyan number is carried as the auth identity via
-  `identityEmail()` in `src/lib/phone.ts` (`254712345678@meridian.invalid`), so
+  `identityEmail()` in `src/lib/phone.ts` (`254712345678@venti.invalid`), so
   the customer still signs in with a number and a password — no SMS provider, no
   one-time code, no UX change. Creation goes through `POST /api/auth/register`,
   which uses the service role to create the user *pre-confirmed*: the project has
@@ -81,7 +81,7 @@ is self-contained.
   replaced by a stated value. Placing a contract raises `TradeCountdown`, a
   non-blocking panel with the clock, entry, live price and ahead/behind, which
   shows the outcome and dismisses itself. Placement toasts were removed — the
-  panel is the confirmation. Session store bumped to `meridian.session.v6`
+  panel is the confirmation. Session store bumped to `venti.session.v6`
   because a persisted v5 blob holds a 60-second expiry.
 
 - [x] **13. Staged deposits.** `CashEvent` gained a `stage`

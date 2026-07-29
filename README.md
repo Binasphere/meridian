@@ -1,4 +1,4 @@
-# Meridian
+# Venti
 
 A fixed-time derivatives trading terminal. Dark, dense, square-edged, and built
 to be defended in a technical conversation rather than only screenshotted.

@@ -1,5 +1,5 @@
 -- ============================================================================
--- Meridian — Supabase schema (scaffold)
+-- Venti — Supabase schema (scaffold)
 -- ============================================================================
 --
 -- Run this in the Supabase SQL editor (or `supabase db push`) once the project

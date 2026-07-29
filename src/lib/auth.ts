@@ -325,7 +325,7 @@ export const useAuth = create<AuthState>()(
       },
     }),
     {
-      name: "meridian.auth.v1",
+      name: "venti.auth.v1",
       storage: createJSONStorage(() => localStorage),
       // The Supabase session is persisted by supabase-js, not here, and
       // `hydrated` describes this run rather than the last one. Persisting the

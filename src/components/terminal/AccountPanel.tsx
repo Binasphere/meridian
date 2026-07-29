@@ -116,7 +116,7 @@ export function AccountPanel({
               </div>
 
               {/* --- Live account tier -------------------------------------
-                  Shown, not offered. The tier is an entitlement Meridian
+                  Shown, not offered. The tier is an entitlement Venti
                   grants: it decides payout terms and whether money can leave
                   the account, so a control that let the holder set it would be
                   a self-service upgrade button. */}

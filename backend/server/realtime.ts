@@ -33,14 +33,14 @@ interface Registry {
 }
 
 const globalForRealtime = globalThis as unknown as {
-  __meridianRealtime: Registry | undefined;
+  __ventiRealtime: Registry | undefined;
 };
 
 function registry(): Registry {
-  if (!globalForRealtime.__meridianRealtime) {
-    globalForRealtime.__meridianRealtime = { connections: new Map() };
+  if (!globalForRealtime.__ventiRealtime) {
+    globalForRealtime.__ventiRealtime = { connections: new Map() };
   }
-  return globalForRealtime.__meridianRealtime;
+  return globalForRealtime.__ventiRealtime;
 }
 
 export function addConnection(connection: Connection): void {

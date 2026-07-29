@@ -49,7 +49,7 @@ export function maskPhone(normalised: string): string {
 
 /**
  * Supabase Auth identifies a user by an email address or a phone number.
- * Meridian's identity is a Kenyan mobile number and a password — and native
+ * Venti's identity is a Kenyan mobile number and a password — and native
  * phone auth means an SMS one-time code, which needs a paid SMS provider and
  * changes the product from "password" to "wait for a text".
  *
@@ -60,6 +60,17 @@ export function maskPhone(normalised: string): string {
  *
  * `.invalid` is the RFC 2606 reserved TLD for exactly this — a domain guaranteed
  * never to resolve, so a stray mail can never reach a real person's inbox.
+ */
+/**
+ * Deliberately still `meridian.invalid` after the rename to Venti.
+ *
+ * This string is not branding — it is half of the primary key every existing
+ * account signs in with. Supabase Auth stores `254…@meridian.invalid` as the
+ * user's email; change the domain here and `signInWithPassword` looks up an
+ * address that exists for nobody, locking every registered customer out of
+ * their own money. Renaming it is a data migration over `auth.users`, not an
+ * edit to this line, and it buys nothing visible — the address is never shown
+ * and never delivered to.
  */
 const IDENTITY_DOMAIN = "meridian.invalid";
 
