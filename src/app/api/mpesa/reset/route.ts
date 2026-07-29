@@ -16,5 +16,12 @@ export function OPTIONS() {
 }
 
 export async function POST() {
-  return railJson(await resetDemoWallet());
+  try {
+    return railJson(await resetDemoWallet());
+  } catch (cause) {
+    return railJson(
+      { error: cause instanceof Error ? cause.message : "Could not reset" },
+      503,
+    );
+  }
 }

@@ -1,24 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
+/**
+ * One typeface for the whole product, numbers included.
+ *
+ * Prices, balances and P&L are read as columns and compared against the value
+ * above them, and a proportional face makes digits shift horizontally as they
+ * tick — which reads as instability. What fixes that is fixed-width digits, not
+ * a second typeface: Inter ships tabular figures, and `globals.css` turns them
+ * on for every numeric surface. So the column holds still and the interface
+ * speaks in one voice.
+ */
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
-  display: "swap",
-});
-
-/**
- * A monospace face for every number on screen.
- *
- * Prices, balances and P&L are read as columns and compared against the value
- * above them. A proportional face makes digits shift horizontally as they tick,
- * which reads as instability; fixed-width digits hold the column still.
- */
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono-face",
   display: "swap",
 });
 
@@ -45,7 +42,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${mono.variable}`}>
+    <html lang="en" className={inter.variable}>
       <body className="min-h-dvh bg-base text-ink antialiased">
         {children}
         <Toaster

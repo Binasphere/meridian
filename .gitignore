@@ -17,5 +17,7 @@ tsconfig.tsbuildinfo
 coverage/
 secrets.local.json
 
-# Demo M-Pesa phone wallet — presentation state, not source.
+# Demo M-Pesa phone wallet — superseded by the Supabase tables in
+# supabase/mpesa-demo.sql. Ignored so an old copy left on a machine that ran an
+# earlier build cannot be mistaken for live state.
 .mpesa-demo.json

@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import { railJson, railPreflight } from "@/lib/server/mpesaRail";
 import {
+  DemoWalletUnavailable,
   InsufficientDemoFunds,
   moveDemoFunds,
 } from "@/lib/server/mpesaWallet";
@@ -68,6 +69,9 @@ export async function POST(request: NextRequest) {
         },
         400,
       );
+    }
+    if (cause instanceof DemoWalletUnavailable) {
+      return railJson({ error: cause.message }, 503);
     }
     return railJson({ error: "Could not complete the withdrawal" }, 500);
   }

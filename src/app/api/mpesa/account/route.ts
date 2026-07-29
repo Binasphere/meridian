@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { railJson, railPreflight } from "@/lib/server/mpesaRail";
-import { readDemoWallet } from "@/lib/server/mpesaWallet";
+import { DemoWalletUnavailable, readDemoWallet } from "@/lib/server/mpesaWallet";
 
 /**
  * GET /api/mpesa/account — everything the demo phone renders.
@@ -52,13 +52,31 @@ function splitName(username: string | null, phone: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const wallet = await readDemoWallet();
   const db = supabaseAdmin();
 
-  // The wallet stands on its own — an unconfigured Supabase costs the phone its
-  // identity, not its balance.
+  // The wallet now lives in Supabase too, so an unconfigured project costs the
+  // phone everything rather than just its identity. Saying so plainly beats a
+  // balance the handset would render as real.
   if (!db) {
-    return railJson({ linked: false, profile: null, ...wallet });
+    return railJson(
+      { error: "Demo rail unavailable — Supabase is not configured." },
+      503,
+    );
+  }
+
+  let wallet;
+  try {
+    wallet = await readDemoWallet();
+  } catch (cause) {
+    return railJson(
+      {
+        error:
+          cause instanceof DemoWalletUnavailable
+            ? cause.message
+            : "Could not read the demo wallet",
+      },
+      503,
+    );
   }
 
   const wanted = request.nextUrl.searchParams.get("phone");

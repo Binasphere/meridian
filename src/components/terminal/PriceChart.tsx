@@ -73,12 +73,14 @@ export function PriceChart({
     const container = containerRef.current;
     if (!container) return;
 
-    // The area series line keeps the measured "up" hue; candles get their own
-    // louder palette (see --color-candle-* in globals.css). The "down" hue is
-    // used only by the position entry lines, in the effect further below.
-    const up = cssVar("--color-up", "#1FD8A4");
-    const candleUp = cssVar("--color-candle-up", "#00E676");
-    const candleDown = cssVar("--color-candle-down", "#FF1744");
+    // One green and one red across the whole product — the area line, the
+    // candle bodies and the chrome all read from the same pair. Wicks are the
+    // one step out: a shade lighter, so they separate from the body.
+    const up = cssVar("--color-up", "#22C55E");
+    const candleUp = cssVar("--color-candle-up", "#22C55E");
+    const candleDown = cssVar("--color-candle-down", "#EF4444");
+    const wickUp = cssVar("--color-wick-up", "#4ADE80");
+    const wickDown = cssVar("--color-wick-down", "#F87171");
     const ink = cssVar("--color-ink-secondary", "#9BA6B7");
     const muted = cssVar("--color-ink-faint", "#4A5364");
 
@@ -156,8 +158,8 @@ export function PriceChart({
               downColor: candleDown,
               borderUpColor: candleUp,
               borderDownColor: candleDown,
-              wickUpColor: candleUp,
-              wickDownColor: candleDown,
+              wickUpColor: wickUp,
+              wickDownColor: wickDown,
               priceFormat,
             }),
           }

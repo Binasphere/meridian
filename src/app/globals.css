@@ -35,35 +35,41 @@
   --color-line: #ffffff12;
   --color-line-strong: #ffffff1f;
 
-  /* --- Directional: the market ------------------------------------------- */
-  --color-up: #1fd8a4;
-  --color-up-soft: #1fd8a41f;
-  --color-up-line: #1fd8a44d;
-  --color-down: #ff4757;
-  --color-down-soft: #ff47571f;
-  --color-down-line: #ff47574d;
+  /* --- Directional: the market -------------------------------------------
+     One green and one red, used everywhere direction is shown: the BUY and
+     SELL commits, candle bodies, P&L, position rows, entry lines, and the
+     brand's green text. Tailwind green-500 and red-500 — the pair the product
+     is designed around, so the chart and the chrome never read as two
+     different greens sitting next to each other.
+     Direction is never carried by hue alone: the ▲/▼ glyphs, the Buy/Sell
+     labels and the candle's own position all say it independently. */
+  --color-up: #22c55e;
+  --color-up-soft: #22c55e1f;
+  --color-up-line: #22c55e4d;
+  --color-down: #ef4444;
+  --color-down-soft: #ef44441f;
+  --color-down-line: #ef44444d;
 
-  /* --- Candle bodies: deliberately louder than the UI directional pair ------
-     The chart is the one place a saturated, unambiguous red/green earns its
-     keep — a candle should read as up or down at a glance from across a room.
-     The measured, colour-blind-tuned --color-up/--color-down still govern every
-     other directional cue (P&L, position rows, entry lines); these two are the
-     chart's own vivid voice. Direction on the chart is also carried by the
-     candle's position and the ▲/▼ entry glyphs, so hue is never the sole
-     channel. */
-  --color-candle-up: #00e676;
-  --color-candle-down: #ff1744;
+  /* --- Candle bodies ------------------------------------------------------
+     The same pair as the UI directional colours, not a louder variant. */
+  --color-candle-up: #22c55e;
+  --color-candle-down: #ef4444;
+
+  /* --- Candle wicks -------------------------------------------------------
+     One step lighter than the bodies (green-400 / red-400) so the wick reads
+     as an extremity of the bar rather than as more body — at 14px bar spacing
+     a same-tone wick blurs into the candle it belongs to. */
+  --color-wick-up: #4ade80;
+  --color-wick-down: #f87171;
 
   /* --- Buy / Sell commit buttons ----------------------------------------
-     The one saturated control pair in the ticket: deep, solid directional
-     fills so the commit reads as substantial rather than as a soft tint. White
-     text clears 3:1 on both at the large button size, and the ▲/▼ glyph plus
-     the Buy/Sell label carry direction independently of hue. Kept equal weight
-     — neither side is styled as the primary action. */
-  --color-buy: #00a35c;
-  --color-buy-hover: #008f4f;
-  --color-sell: #f0313d;
-  --color-sell-hover: #d81f2b;
+     The directional pair at full strength. Hover goes one step darker
+     (green-600 / red-600) rather than lighter, so the press reads as pressure.
+     Kept equal weight — neither side is styled as the primary action. */
+  --color-buy: #22c55e;
+  --color-buy-hover: #16a34a;
+  --color-sell: #ef4444;
+  --color-sell-hover: #dc2626;
 
   /* --- Brand accent: focus, links, active nav. Never directional. -------- */
   --color-accent: #7c8cff;
@@ -138,8 +144,16 @@
   --color-adm-pos: #0a7a4f;
   --color-adm-neg: #b3261e;
 
+  /* Inter, everywhere — including every price, balance and reference.
+     `font-mono` is kept as a token name because half the interface asks for it
+     by that name, but it now resolves to Inter too: one typeface across the
+     product, no second voice for the numbers. What made the mono face worth
+     having was the fixed-width digits, and that is a font *feature* rather
+     than a font — `tabular-nums` below holds the columns just as still in
+     Inter. To go back, re-add a next/font mono in layout.tsx and point
+     --font-mono at its variable. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono-face), ui-monospace, "SF Mono", monospace;
+  --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
   /* Square. Every card, panel and control has hard corners — the interface
      reads as instrument panelling rather than as consumer software. */
@@ -173,7 +187,9 @@
      they tick; tabular figures hold the column still. This is the single
      highest-leverage typographic decision in the whole interface. */
   .tnum,
+  .font-mono,
   input[inputmode="decimal"],
+  input[inputmode="numeric"],
   table {
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";

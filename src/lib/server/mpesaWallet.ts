@@ -1,6 +1,4 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 /**
  * The demo M-Pesa wallet.
@@ -15,9 +13,13 @@ import { randomUUID } from "node:crypto";
  * put on the VIP tier. The Standard path — a real STK push settled by the
  * PayHero callback — is untouched and remains the only way actual cash moves.
  *
- * State lives in a gitignored JSON file next to the project rather than in
- * module memory, because Next's dev server re-evaluates modules on edit and a
- * balance that resets mid-demo is worse than no demo.
+ * State lives in Supabase (`mpesa_demo_wallet`, see `supabase/mpesa-demo.sql`)
+ * rather than in module memory or a file on disk. Memory does not survive
+ * Next's dev server re-evaluating modules on edit; a file does not survive
+ * being deployed anywhere real, because a serverless host hands each
+ * invocation a fresh filesystem and Render wipes its disk on every cold start.
+ * A balance that resets mid-demo is worse than no demo, so it lives where both
+ * the terminal and the payments service can reach the same row.
  */
 
 /** KSh 256,700.00 — where the phone starts before anything is demonstrated. */
@@ -50,56 +52,47 @@ export class InsufficientDemoFunds extends Error {
   }
 }
 
-const FILE = path.join(process.cwd(), ".mpesa-demo.json");
+/** Thrown when Supabase is not configured; routes map it to a 503. */
+export class DemoWalletUnavailable extends Error {
+  constructor() {
+    super("The demo wallet is unavailable — Supabase is not configured.");
+    this.name = "DemoWalletUnavailable";
+  }
+}
 
 /** Newest first, and only as long as any statement screen will show. */
 const MAX_HISTORY = 60;
 
-const EMPTY: MpesaDemoState = {
-  balanceMinor: DEMO_START_BALANCE_MINOR,
-  transactions: [],
-};
-
 // ---------------------------------------------------------------------------
-// Persistence
+// Row mapping
 // ---------------------------------------------------------------------------
 
-async function load(): Promise<MpesaDemoState> {
-  try {
-    const raw = await fs.readFile(FILE, "utf8");
-    const parsed = JSON.parse(raw) as Partial<MpesaDemoState>;
-    return {
-      balanceMinor:
-        typeof parsed.balanceMinor === "number" && Number.isFinite(parsed.balanceMinor)
-          ? Math.round(parsed.balanceMinor)
-          : DEMO_START_BALANCE_MINOR,
-      transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-    };
-  } catch {
-    // No file yet (or it was hand-edited into nonsense): start fresh.
-    return { ...EMPTY };
-  }
+interface TxRow {
+  id: string;
+  kind: MpesaDemoKind;
+  title: string;
+  subtitle: string;
+  amount_minor: number | string;
+  balance_after_minor: number | string;
+  reference: string;
+  created_at: string;
 }
 
-async function save(state: MpesaDemoState): Promise<void> {
-  await fs.writeFile(FILE, JSON.stringify(state, null, 2), "utf8");
+function toTx(row: TxRow): MpesaDemoTx {
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    subtitle: row.subtitle,
+    amountMinor: Number(row.amount_minor),
+    balanceAfterMinor: Number(row.balance_after_minor),
+    reference: row.reference,
+    at: row.created_at,
+  };
 }
 
-/**
- * Serialises every read-modify-write.
- *
- * Two movements landing together — the terminal depositing while the phone
- * polls and withdraws — would otherwise each read the same balance and the
- * second write would erase the first.
- */
-let queue: Promise<unknown> = Promise.resolve();
-
-function exclusive<T>(work: () => Promise<T>): Promise<T> {
-  const run = queue.then(work, work);
-  // Keep the chain alive even when a caller's work rejects.
-  queue = run.catch(() => undefined);
-  return run;
-}
+const TX_COLUMNS =
+  "id, kind, title, subtitle, amount_minor, balance_after_minor, reference, created_at";
 
 // ---------------------------------------------------------------------------
 // Reference codes
@@ -120,8 +113,30 @@ export function demoReference(): string {
 // Public API
 // ---------------------------------------------------------------------------
 
-export function readDemoWallet(): Promise<MpesaDemoState> {
-  return exclusive(load);
+/**
+ * The wallet as it stands, with the recent statement.
+ *
+ * Never throws for a missing row: a project where the migration has not been
+ * run yet reads as the opening balance, which is what the phone would show
+ * anyway, rather than as a broken screen.
+ */
+export async function readDemoWallet(): Promise<MpesaDemoState> {
+  const db = supabaseAdmin();
+  if (!db) throw new DemoWalletUnavailable();
+
+  const [{ data: wallet }, { data: rows }] = await Promise.all([
+    db.from("mpesa_demo_wallet").select("balance_minor").eq("id", true).maybeSingle(),
+    db
+      .from("mpesa_demo_tx")
+      .select(TX_COLUMNS)
+      .order("created_at", { ascending: false })
+      .limit(MAX_HISTORY),
+  ]);
+
+  return {
+    balanceMinor: Number(wallet?.balance_minor ?? DEMO_START_BALANCE_MINOR),
+    transactions: ((rows ?? []) as TxRow[]).map(toTx),
+  };
 }
 
 interface Movement {
@@ -134,48 +149,65 @@ interface Movement {
   reference?: string;
 }
 
-/** Applies one movement and returns the wallet as it stands afterwards. */
-export function moveDemoFunds(
+/**
+ * Applies one movement and returns the wallet as it stands afterwards.
+ *
+ * The balance change and the statement line are one SQL function under a row
+ * lock — see `mpesa_demo_move`. Two movements landing together (the terminal
+ * depositing while the phone withdraws) serialise there rather than racing.
+ */
+export async function moveDemoFunds(
   movement: Movement,
 ): Promise<{ state: MpesaDemoState; tx: MpesaDemoTx }> {
-  return exclusive(async () => {
-    const state = await load();
-    const amount = Math.round(movement.amountMinor);
+  const db = supabaseAdmin();
+  if (!db) throw new DemoWalletUnavailable();
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      throw new Error("BAD_AMOUNT");
-    }
+  const amount = Math.round(movement.amountMinor);
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("BAD_AMOUNT");
 
-    const signed = movement.direction === "OUT" ? -amount : amount;
-    const next = state.balanceMinor + signed;
-    if (next < 0) throw new InsufficientDemoFunds();
-
-    const tx: MpesaDemoTx = {
-      id: randomUUID(),
-      kind: movement.kind,
-      title: movement.title,
-      subtitle: movement.subtitle,
-      amountMinor: signed,
-      balanceAfterMinor: next,
-      reference: movement.reference ?? demoReference(),
-      at: new Date().toISOString(),
-    };
-
-    const updated: MpesaDemoState = {
-      balanceMinor: next,
-      transactions: [tx, ...state.transactions].slice(0, MAX_HISTORY),
-    };
-
-    await save(updated);
-    return { state: updated, tx };
+  const { data, error } = await db.rpc("mpesa_demo_move", {
+    p_kind: movement.kind,
+    p_amount: amount,
+    p_direction: movement.direction,
+    p_title: movement.title,
+    p_subtitle: movement.subtitle,
+    p_reference: movement.reference ?? demoReference(),
   });
+
+  if (error) {
+    if (error.message.includes("INSUFFICIENT_FUNDS")) {
+      throw new InsufficientDemoFunds();
+    }
+    throw new Error(error.message);
+  }
+
+  const result = data as { balanceMinor: number; tx: TxRow };
+  const tx = toTx(result.tx);
+
+  // The statement is re-read rather than appended to locally, so what comes
+  // back reflects anything the phone booked while this movement was in flight.
+  const { data: rows } = await db
+    .from("mpesa_demo_tx")
+    .select(TX_COLUMNS)
+    .order("created_at", { ascending: false })
+    .limit(MAX_HISTORY);
+
+  return {
+    state: {
+      balanceMinor: Number(result.balanceMinor),
+      transactions: ((rows ?? []) as TxRow[]).map(toTx),
+    },
+    tx,
+  };
 }
 
 /** Puts the phone back to its opening balance with an empty statement. */
-export function resetDemoWallet(): Promise<MpesaDemoState> {
-  return exclusive(async () => {
-    const fresh: MpesaDemoState = { ...EMPTY, transactions: [] };
-    await save(fresh);
-    return fresh;
-  });
+export async function resetDemoWallet(): Promise<MpesaDemoState> {
+  const db = supabaseAdmin();
+  if (!db) throw new DemoWalletUnavailable();
+
+  const { data, error } = await db.rpc("mpesa_demo_reset");
+  if (error) throw new Error(error.message);
+
+  return { balanceMinor: Number(data ?? DEMO_START_BALANCE_MINOR), transactions: [] };
 }

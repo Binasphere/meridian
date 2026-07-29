@@ -27,6 +27,7 @@ import {
   startServerDeposit,
   startServerWithdrawal,
 } from "@/lib/wallet";
+import { depositFromPhone, usesMpesaRail, withdrawToPhone } from "@/lib/mpesaRail";
 
 // The KSh 100 minimum leads the list so it is one tap to prefill the smallest
 // allowed deposit. Six chips keep the 3-column grid even.
@@ -95,6 +96,10 @@ export function CashDialog({
   const isDeposit = mode === "deposit";
   const minimum = isDeposit ? MIN_DEPOSIT : MIN_WITHDRAWAL;
 
+  // VIP accounts settle against the companion M-Pesa app: instant both ways,
+  // no STK push out to PayHero and no queue for a withdrawal.
+  const onMpesaRail = serverWalletActive() && usesMpesaRail(account?.liveTier);
+
   // Reset whenever the dialog is reopened, so a previous receipt never greets
   // the next transaction.
   useEffect(() => {
@@ -116,6 +121,44 @@ export function CashDialog({
     if (problem || !account) return;
     setError(null);
     setStage("pending");
+
+    // --- VIP: settled against the M-Pesa app ------------------------------
+    if (onMpesaRail) {
+      try {
+        if (isDeposit) {
+          setServerStage("REQUESTING");
+          const { reference } = await depositFromPhone(amountMinor, setServerStage);
+          setResult({
+            id: reference,
+            kind: "DEPOSIT",
+            amountMinor: amountMinor.toString(),
+            status: "COMPLETED",
+            stage: "SETTLED",
+            phone: account.phone,
+            reference,
+            createdAt: Date.now(),
+            settledAt: Date.now(),
+          });
+          setStage("done");
+          toast.success(
+            `Deposit received · ${formatMoney(amountMinor, { currency: "KSh" })}`,
+            { description: `M-Pesa ref ${reference}` },
+          );
+        } else {
+          const event = await withdrawToPhone(amountMinor);
+          setResult(event);
+          setStage("done");
+          toast.success(
+            `Withdrawal sent · ${formatMoney(amountMinor, { currency: "KSh" })}`,
+            { description: `M-Pesa ref ${event.reference}` },
+          );
+        }
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Something went wrong");
+        setStage("form");
+      }
+      return;
+    }
 
     // --- Real money: Supabase configured, PayHero raises the push ----------
     if (serverWalletActive()) {
@@ -248,8 +291,13 @@ export function CashDialog({
                   <span className="tnum font-mono text-[15px] text-ink">
                     {account ? formatPhone(account.phone) : "—"}
                   </span>
-                  <span className="ml-auto text-[10px] uppercase tracking-wide text-ink-faint">
-                    verified
+                  <span
+                    className={cn(
+                      "ml-auto text-[10px] uppercase tracking-wide",
+                      onMpesaRail ? "text-cash" : "text-ink-faint",
+                    )}
+                  >
+                    {onMpesaRail ? "VIP · instant" : "verified"}
                   </span>
                 </div>
               </div>
@@ -331,8 +379,12 @@ export function CashDialog({
 
               <p className="text-center text-[10.5px] leading-relaxed text-ink-faint">
                 {isDeposit
-                  ? "You'll receive an M-Pesa prompt on your phone to authorise this payment."
-                  : "Requests are reviewed and paid to your verified M-Pesa number."}
+                  ? onMpesaRail
+                    ? "Charged to your M-PESA account and credited to your Live balance straight away."
+                    : "You'll receive an M-Pesa prompt on your phone to authorise this payment."
+                  : onMpesaRail
+                    ? "Paid to your verified M-Pesa number straight away — no review queue."
+                    : "Requests are reviewed and paid to your verified M-Pesa number."}
               </p>
             </div>
           ) : stage === "pending" ? (
