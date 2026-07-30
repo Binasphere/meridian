@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp } from "lucide-react";
+import coinImage from "@/app/assets/coin.png";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { useNow, useAllTicks } from "@/lib/hooks";
@@ -228,6 +230,28 @@ function Dial({
           <span className="tnum font-mono text-[17px] leading-none text-ink">
             {secondsLeft}
           </span>
+        ) : status === "WON" ? (
+          /* The one win, in the one place a win is read.
+             It is deliberately not anywhere else in the product: a coin in the
+             persistent chrome would be decoration, but here it lands for the
+             three seconds the result is up and then leaves with it. The `alt`
+             carries the word the image replaced, so the live region still
+             announces the outcome. */
+          <motion.span
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 420, damping: 18 }}
+            className="block"
+          >
+            <Image
+              src={coinImage}
+              alt="Won"
+              width={30}
+              height={30}
+              className="h-[30px] w-[30px] object-contain drop-shadow-[0_1px_4px_rgba(34,197,94,0.35)]"
+              priority
+            />
+          </motion.span>
         ) : (
           <span
             className={cn(
@@ -237,13 +261,7 @@ function Dial({
               tone === "neutral" && "text-ink-muted",
             )}
           >
-            {status === "WON"
-              ? "Won"
-              : status === "LOST"
-                ? "Lost"
-                : status === "TIE"
-                  ? "Tie"
-                  : "Void"}
+            {status === "LOST" ? "Lost" : status === "TIE" ? "Tie" : "Void"}
           </span>
         )}
       </div>
