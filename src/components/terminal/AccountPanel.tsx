@@ -10,6 +10,7 @@ import {
   ChartNoAxesColumn,
   ChevronRight,
   CircleHelp,
+  ListOrdered,
   LogOut,
   Wallet,
   X,
@@ -18,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { formatPhone, useAuth, useCurrentAccount } from "@/lib/auth";
 import { instrumentOrDefault } from "@/lib/market/instruments";
-import { useHistory, useStore } from "@/lib/store";
+import { useHistory, useOpenTrades, useStore } from "@/lib/store";
 import { CashDialog } from "./CashDialog";
 
 /**
@@ -50,6 +51,7 @@ export function AccountPanel({
   const accountKind = useStore((s) => s.accountKind);
   const symbol = useStore((s) => s.symbol);
   const history = useHistory();
+  const openTrades = useOpenTrades();
   const spec = instrumentOrDefault(symbol);
 
   const close = () => onOpenChange(false);
@@ -141,6 +143,25 @@ export function AccountPanel({
                   value={formatMoney(BigInt(balances[accountKind]), {
                     currency: "KSh",
                   })}
+                  onNavigate={close}
+                />
+                {/* The terminal shows this beside the chart, which a phone has
+                    no room for — so the menu is where a small screen reaches
+                    its open contracts and its history. The count is the point
+                    of the row: it answers "have I got anything running" without
+                    opening it. */}
+                <PanelLink
+                  href="/positions"
+                  icon={ListOrdered}
+                  label="Positions"
+                  hint="Open contracts · trade history"
+                  value={
+                    openTrades.length > 0
+                      ? `${openTrades.length} open`
+                      : history.length > 0
+                        ? `${history.length} settled`
+                        : undefined
+                  }
                   onNavigate={close}
                 />
                 <PanelLink

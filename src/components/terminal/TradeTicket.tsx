@@ -1,7 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
-import { motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Minus, Plus, Timer, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -15,8 +13,6 @@ import {
   effectivePayoutBps,
   MAX_STAKE_MINOR,
   MIN_STAKE_MINOR,
-  payoutFromStake,
-  profitFromStake,
   QUICK_STAKES_MINOR,
   STAKE_STEP_MINOR,
 } from "@/lib/trading";
@@ -49,17 +45,9 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
   const liveTier = useStore((s) => s.liveTier);
 
   // The rate the customer will actually be booked at — instrument base plus the
-  // VIP live-tier bonus, if it applies. Shown in the quote and the badge so what
-  // is displayed matches what `placeTrade` freezes onto the contract.
+  // live-tier bonus, if it applies. Shown on the ticket so what is displayed
+  // matches what `placeTrade` freezes onto the contract.
   const payoutBps = effectivePayoutBps(spec.payoutBps, accountKind, liveTier);
-
-  const quote = useMemo(
-    () => ({
-      profit: profitFromStake(stakeMinor, payoutBps),
-      total: payoutFromStake(stakeMinor, payoutBps),
-    }),
-    [stakeMinor, payoutBps],
-  );
 
   const tooLow = stakeMinor < MIN_STAKE_MINOR;
   const tooHigh = stakeMinor > MAX_STAKE_MINOR;
@@ -184,30 +172,22 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
         </span>
       </div>
 
-      {/* --- Quote ---------------------------------------------------------- */}
-      <div className="rounded-none border border-line bg-surface-1 p-3">
-        <div className="flex items-baseline justify-between">
-          <span className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-            Payout if correct
-          </span>
-          <span className="tnum rounded-none bg-up/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-up">
-            +{payoutBps / 100}%
-          </span>
-        </div>
+      {/* --- Rate ------------------------------------------------------------
+          The figure the payout works out to is no longer shown before the
+          commit — what you win lands with the result, at settlement.
 
-        <motion.div
-          key={quote.total.toString()}
-          initial={{ opacity: 0.55 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.18 }}
-          className="tnum mt-1.5 font-mono text-[26px] leading-none tracking-tight text-ink"
-        >
-          {formatMoney(quote.total, { currency: "KSh" })}
-        </motion.div>
-
-        <div className="tnum mt-1.5 font-mono text-[11.5px] text-ink-muted">
-          {formatMoney(stakeMinor)} stake + {formatMoney(quote.profit)} profit
-        </div>
+          The *rate* stays. It is the price of the contract, not a projection:
+          it is what `placeTrade` freezes onto the position, and someone about
+          to stake money is entitled to the terms they are agreeing to before
+          they agree to them. Removing the amount makes the win a reveal;
+          removing the rate as well would make it a bet on undisclosed odds. */}
+      <div className="flex items-center justify-between border border-line bg-surface-1 px-3 py-2.5">
+        <span className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+          Payout rate
+        </span>
+        <span className="tnum rounded-none bg-up/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-up">
+          +{payoutBps / 100}%
+        </span>
       </div>
 
       {problem ? (

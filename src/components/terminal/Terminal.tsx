@@ -128,7 +128,7 @@ export function Terminal() {
       </div>
 
       {/* --- Phones --------------------------------------------------------- */}
-      <MobileBar spec={spec} />
+      <MobileBar />
     </div>
   );
 }

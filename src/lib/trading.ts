@@ -111,7 +111,7 @@ export function payoutFromStake(stakeMinor: bigint, payoutBps: number): bigint {
  * desktop refuses would be a different product on a smaller screen.
  */
 export const MIN_STAKE_MINOR = 10_000n; // KSh 100
-export const MAX_STAKE_MINOR = 30_000_000n; // KSh 300,000
+export const MAX_STAKE_MINOR = 20_000_000n; // KSh 200,000
 export const STAKE_STEP_MINOR = 10_000n; // KSh 100
 
 /** The one-tap amounts, in minor units: KSh 100 / 250 / 500 / 1,000. */

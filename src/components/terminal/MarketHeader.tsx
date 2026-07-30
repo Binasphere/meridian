@@ -51,7 +51,9 @@ export function MarketHeader({
   const [marketsOpen, setMarketsOpen] = useState(false);
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line px-3 sm:gap-4 sm:px-4">
+    /* Shorter on a phone: the header is chrome around the chart, and every
+       pixel it keeps is one the candles do not get. */
+    <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-3 sm:h-14 sm:gap-4 sm:px-4">
       {/* The desktop has the markets rail beside it, so there the name is a
           heading and nothing more. */}
       <button

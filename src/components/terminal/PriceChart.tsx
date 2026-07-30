@@ -148,7 +148,12 @@ export function PriceChart({
       },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.07)",
-        scaleMargins: { top: 0.12, bottom: 0.12 },
+        // Tighter than the old 12/12. Those margins are dead bands at the top
+        // and bottom of the card — a quarter of the height reserved for nothing
+        // — which left the candles as a thin ribbon floating in the middle of a
+        // tall panel. At 5% the series uses the card it was given and the same
+        // price move draws with roughly a third more height to read it by.
+        scaleMargins: { top: 0.05, bottom: 0.05 },
         entireTextOnly: true,
       },
       timeScale: {

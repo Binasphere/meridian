@@ -24,6 +24,7 @@ import { formatPhone, useCurrentAccount } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Empty, Segmented } from "@/components/ui/primitives";
 import { StatsPanel } from "@/components/terminal/StatsPanel";
+import { Positions } from "@/components/terminal/Positions";
 import { CashDialog, CashRow } from "@/components/terminal/CashDialog";
 import { Column, Columns, Section } from "./AccountShell";
 
@@ -352,6 +353,35 @@ export function StatementSection() {
 // ===========================================================================
 // Performance — results and the market they came from
 // ===========================================================================
+
+/**
+ * Positions, as a destination.
+ *
+ * The terminal keeps this list in a panel beside the chart, which a phone has
+ * no room for — so on a small screen it lives here, reached from the account
+ * menu, and the same component renders it. One implementation of "what are my
+ * contracts doing", not a second one written for mobile that drifts.
+ *
+ * `fill` gives the panel the page's height, so the list scrolls inside its own
+ * frame exactly as it does on the desktop.
+ */
+export function PositionsPage() {
+  return (
+    <Columns>
+      <Column>
+        <Section
+          title="Your contracts"
+          description="Running now, and everything that has settled this session."
+          fill
+        >
+          <div className="min-h-[60vh] lg:h-full lg:min-h-0">
+            <Positions />
+          </div>
+        </Section>
+      </Column>
+    </Columns>
+  );
+}
 
 export function PerformancePage() {
   const symbol = useStore((s) => s.symbol);
