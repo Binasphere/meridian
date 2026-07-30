@@ -2,6 +2,7 @@
 
 import { toast } from "sonner";
 import { BACKEND_ORIGIN } from "./backend";
+import { instrumentOrDefault } from "./market/instruments";
 import { supabase } from "./supabase/client";
 import {
   registerLiveSync,
@@ -265,14 +266,45 @@ function openLive(trade: Trade): void {
   if (!db) return;
 
   const booking = (async (): Promise<string | null> => {
-    const { data, error } = await db.rpc("live_trade_open", {
-      p_symbol: trade.symbol,
-      p_direction: trade.direction,
-      p_stake: Number(BigInt(trade.stakeMinor)),
-      p_payout_bps: trade.payoutBps,
-      p_open_price: trade.openPrice,
-      p_duration: trade.durationSec,
-    });
+    const book = (payoutBps: number) =>
+      db.rpc("live_trade_open", {
+        p_symbol: trade.symbol,
+        p_direction: trade.direction,
+        p_stake: Number(BigInt(trade.stakeMinor)),
+        p_payout_bps: payoutBps,
+        p_open_price: trade.openPrice,
+        p_duration: trade.durationSec,
+      });
+
+    let { data, error } = await book(trade.payoutBps);
+
+    // --- The payout-ceiling fallback ---------------------------------------
+    //
+    // `live_trade_open` refuses any rate above its own ceiling, and that
+    // ceiling lives in the database rather than in this build. A deploy that
+    // raises the tier bonus before the migration is applied would otherwise
+    // have every VIP contract refused and refunded — the customer watching
+    // contracts vanish as they place them.
+    //
+    // So a BAD_PAYOUT is treated as "this database is older than this build"
+    // rather than as a failure: the contract is re-booked at the instrument's
+    // own rate, which no ceiling this schema has ever had would reject. The
+    // customer trades. Once the migration lands, the first call succeeds and
+    // this branch stops being reached — no redeploy, no edit.
+    if (error && /BAD_PAYOUT/.test(error.message)) {
+      const base = instrumentOrDefault(trade.symbol).payoutBps;
+      console.warn(
+        `[wallet] server refused ${trade.payoutBps} bps; the payout ceiling in ` +
+          `live_trade_open is behind this build. Re-booking at ${base} bps. ` +
+          `Run the go-live migration to restore the full rate.`,
+      );
+      ({ data, error } = await book(base));
+
+      // The mirror must promise what was actually booked. The server credits
+      // from its own row at settlement, so a local trade still claiming the
+      // higher rate would show a win larger than the balance it produced.
+      if (!error) useStore.getState().setTradePayoutBps(trade.id, base);
+    }
 
     if (error || typeof data !== "string") {
       // The server refused the stake, so the local trade must not stand.

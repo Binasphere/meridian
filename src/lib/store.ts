@@ -211,6 +211,12 @@ interface State {
   syncServerWallet: (liveBalanceMinor: string, events: CashEvent[]) => void;
   /** Records the server row a LIVE contract was booked as. */
   setTradeServerId: (tradeId: string, serverId: string) => void;
+  /**
+   * Corrects a contract's payout to the rate the server actually accepted.
+   * The server's ledger is the one that pays, so the mirror follows it rather
+   * than promising a rate the booking did not get.
+   */
+  setTradePayoutBps: (tradeId: string, payoutBps: number) => void;
   /** Voids a still-open trade whose server booking was refused; refunds the stake. */
   voidTradeLocal: (tradeId: string) => void;
 }
@@ -618,6 +624,13 @@ export const useStore = create<State>()(
         set((state) => ({
           trades: state.trades.map((t) =>
             t.id === tradeId ? { ...t, serverId } : t,
+          ),
+        })),
+
+      setTradePayoutBps: (tradeId, payoutBps) =>
+        set((state) => ({
+          trades: state.trades.map((t) =>
+            t.id === tradeId ? { ...t, payoutBps } : t,
           ),
         })),
 
