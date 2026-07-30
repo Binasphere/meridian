@@ -150,8 +150,12 @@ export function Watchlist({
                           live
                         </span>
                       </div>
+                      {/* The instrument's full name, where its payout rate
+                          used to sit. The row keeps its second line, and what
+                          fills it now tells you which market you are looking
+                          at rather than what it pays. */}
                       <div className="truncate text-[10.5px] text-ink-faint">
-                        {spec.payoutBps / 100}% payout
+                        {spec.displayName}
                       </div>
                     </div>
 

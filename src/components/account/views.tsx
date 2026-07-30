@@ -416,12 +416,6 @@ export function PerformancePage() {
               mono
             />
             <DetailRow
-              label="Payout"
-              value={`${spec.payoutBps / 100}%`}
-              mono
-              tone="up"
-            />
-            <DetailRow
               label="Break-even win rate"
               value={`${breakEven.toFixed(1)}%`}
               mono
@@ -435,7 +429,8 @@ export function PerformancePage() {
               {`${spec.displayName} is quoted live and streams continuously. Settlement uses the price at the exact expiry instant, which is recorded on the contract so any result can be checked.`}
             </p>
             <p className="max-w-[62ch] text-[12.5px] leading-relaxed text-ink-secondary">
-              At a {spec.payoutBps / 100}% payout you need to be right{" "}
+              A win returns less in profit than a loss costs you, so you need to
+              be right{" "}
               <span className="tnum font-mono text-warning">
                 {breakEven.toFixed(1)}%
               </span>{" "}
@@ -699,7 +694,7 @@ export function HelpPage() {
     },
     {
       q: "What is the break-even win rate?",
-      a: "Because a win pays back less than 100% of your stake as profit, being right half the time loses money over any meaningful number of contracts. At an 85% payout you need to be right 54.1% of the time simply to stay level. Each instrument's exact figure is on the Performance page.",
+      a: "Because a win pays back less than 100% of your stake as profit, being right half the time loses money over any meaningful number of contracts. You need to be right somewhat more than half the time simply to stay level. The exact figure for the market on your chart is on the Performance page.",
     },
     {
       q: "How long do deposits and withdrawals take?",

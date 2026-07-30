@@ -129,7 +129,7 @@ export function Terminal() {
           flat
           className="hidden min-h-0 overflow-y-auto border-0 lg:block"
         >
-          <TradeTicket spec={spec} />
+          <TradeTicket />
         </Panel>
       </div>
 

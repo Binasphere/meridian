@@ -46,7 +46,7 @@ const LIVE_STARTING_BALANCE = 0n;
  * between the form and the rail behind it are a form that accepts amounts the
  * rail then refuses.
  */
-export const MIN_WITHDRAWAL_MINOR = 50_000n; // KSh 500
+export const MIN_WITHDRAWAL_MINOR = 10_000n; // KSh 100
 export const MAX_WITHDRAWAL_MINOR = 15_000_000n; // KSh 150,000 per request
 
 export type ChartStyle = "candles" | "area";
@@ -555,7 +555,7 @@ export const useStore = create<State>()(
         // The same bounds `withdrawal_request` enforces on the server, so the
         // unconfigured simulation refuses exactly what the real rail refuses.
         if (amountMinor < MIN_WITHDRAWAL_MINOR) {
-          return { ok: false as const, reason: "Minimum withdrawal is KSh 500" };
+          return { ok: false as const, reason: "Minimum withdrawal is KSh 100" };
         }
         if (amountMinor > MAX_WITHDRAWAL_MINOR) {
           return {

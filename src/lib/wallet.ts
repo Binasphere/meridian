@@ -217,7 +217,7 @@ export async function startServerWithdrawal(
       throw new Error("Maximum withdrawal is KSh 150,000 per request");
     }
     if (message.includes("BAD_AMOUNT")) {
-      throw new Error("Minimum withdrawal is KSh 500");
+      throw new Error("Minimum withdrawal is KSh 100");
     }
     if (message.includes("NOT_SIGNED_IN")) {
       throw new Error("Sign in to withdraw");

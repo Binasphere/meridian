@@ -4,13 +4,9 @@ import { ArrowDown, ArrowUp, Minus, Plus, Timer, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import {
-  FIXED_DURATION_SEC,
-  type Instrument,
-} from "@/lib/market/instruments";
+import { FIXED_DURATION_SEC } from "@/lib/market/instruments";
 import {
   clampStake,
-  effectivePayoutBps,
   MAX_STAKE_MINOR,
   MIN_STAKE_MINOR,
   QUICK_STAKES_MINOR,
@@ -26,28 +22,24 @@ import { ActivityFeed } from "./ActivityFeed";
  *
  * Two decisions drive the layout:
  *
- * 1. **The return is shown before the commit, not after.** The single most
- *    important number to a customer is what they get back if they are right,
- *    and it is rendered at full size directly above the buttons rather than
- *    buried in a tooltip.
+ * 1. **The ticket states the stake and the expiry, and nothing else.** Neither
+ *    the payout rate nor the amount a win would return appears before the
+ *    commit; both land with the result.
  *
  * 2. **UP and DOWN are equally weighted.** Neither is styled as the primary
  *    action. An interface that makes one direction more inviting than the other
  *    is nudging a bet, and a 50/50 instrument that visually suggests "up" is a
  *    dark pattern regardless of intent.
  */
-export function TradeTicket({ spec }: { spec: Instrument }) {
+// No instrument prop: with the rate gone, nothing on the ticket varies by
+// market. The stake, the expiry and the two buttons are the same contract
+// whichever symbol is on the chart.
+export function TradeTicket() {
   const stakeMinor = useStore((s) => BigInt(s.stakeMinor));
   const setStakeMinor = useStore((s) => s.setStakeMinor);
   const placeTrade = useStore((s) => s.placeTrade);
   const balance = useStore(selectBalance);
   const accountKind = useStore((s) => s.accountKind);
-  const liveTier = useStore((s) => s.liveTier);
-
-  // The rate the customer will actually be booked at — instrument base plus the
-  // live-tier bonus, if it applies. Shown on the ticket so what is displayed
-  // matches what `placeTrade` freezes onto the contract.
-  const payoutBps = effectivePayoutBps(spec.payoutBps, accountKind, liveTier);
 
   const tooLow = stakeMinor < MIN_STAKE_MINOR;
   const tooHigh = stakeMinor > MAX_STAKE_MINOR;
@@ -173,22 +165,10 @@ export function TradeTicket({ spec }: { spec: Instrument }) {
       </div>
 
       {/* --- Rate ------------------------------------------------------------
-          The figure the payout works out to is no longer shown before the
-          commit — what you win lands with the result, at settlement.
-
-          The *rate* stays. It is the price of the contract, not a projection:
-          it is what `placeTrade` freezes onto the position, and someone about
-          to stake money is entitled to the terms they are agreeing to before
-          they agree to them. Removing the amount makes the win a reveal;
-          removing the rate as well would make it a bet on undisclosed odds. */}
-      <div className="flex items-center justify-between border border-line bg-surface-1 px-3 py-2.5">
-        <span className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-          Payout rate
-        </span>
-        <span className="tnum rounded-none bg-up/10 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-up">
-          +{payoutBps / 100}%
-        </span>
-      </div>
+          Neither the payout amount nor the rate is shown before the commit.
+          The rate is still what `placeTrade` freezes onto the position and
+          what settlement pays against — it is simply not surfaced here. What
+          a contract returned lands with the result. */}
 
       {problem ? (
         <div

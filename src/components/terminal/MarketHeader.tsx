@@ -22,10 +22,10 @@ const RESOLUTION_OPTIONS: ReadonlyArray<{ value: Resolution; label: string }> = 
  * The chart header.
  *
  * Reduced to what you need while a contract is live: which market, what price,
- * and the chart controls. Payout rate, instrument class, trailing change and
- * feed provenance all moved to the account panel — they are things you check
- * once when choosing a market, not things you read while a countdown is
- * running, and every one of them was competing with the price for attention.
+ * and the chart controls. Instrument class, trailing change and feed
+ * provenance all moved to the account panel — they are things you check once
+ * when choosing a market, not things you read while a countdown is running,
+ * and every one of them was competing with the price for attention.
  *
  * On a phone the instrument name is also the way to a different one. There is
  * no markets rail on a small screen, and the name of the market you are on is

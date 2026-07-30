@@ -106,10 +106,9 @@ export function AccountPanel({
                   holder is told about. It used to be named here twice — a badge
                   beside the number and a "Live account tier" row — which turned
                   an operational flag into a rank, and a rank into a thing to ask
-                  about. It still governs payout terms; the rate it produces is
-                  shown on the ticket, where it is a number the customer can act
-                  on rather than a label they can only be told. Only the admin
-                  console names the tier now. */}
+                  about. It still governs the terms a contract is booked at,
+                  which are applied at settlement rather than displayed. Only
+                  the admin console names the tier now. */}
 
               {/* --- Money, immediately ------------------------------------- */}
               <div className="grid grid-cols-2 gap-px border-b border-line bg-line">
