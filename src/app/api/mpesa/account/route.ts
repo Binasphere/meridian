@@ -87,9 +87,11 @@ export async function GET(request: NextRequest) {
 
   return railJson({
     linked: true,
+    // No tier in the payload. The handset has no use for it, and a field that
+    // names the customer's classification is one devtools away from being seen
+    // by the customer.
     profile: {
       phone: localPhone(profile.phone),
-      liveTier: profile.live_tier,
       ...splitName(profile.username, profile.phone),
     },
     tradingBalanceMinor: Number(profile.live_balance ?? 0),

@@ -11,7 +11,6 @@ import {
   ChevronRight,
   CircleHelp,
   LogOut,
-  ShieldCheck,
   Wallet,
   X,
 } from "lucide-react";
@@ -19,7 +18,6 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { formatPhone, useAuth, useCurrentAccount } from "@/lib/auth";
 import { instrumentOrDefault } from "@/lib/market/instruments";
-import { VIP_PAYOUT_BONUS_BPS } from "@/lib/trading";
 import { useHistory, useStore } from "@/lib/store";
 import { CashDialog } from "./CashDialog";
 
@@ -50,7 +48,6 @@ export function AccountPanel({
 
   const balances = useStore((s) => s.balances);
   const accountKind = useStore((s) => s.accountKind);
-  const liveTier = useStore((s) => s.liveTier);
   const symbol = useStore((s) => s.symbol);
   const history = useHistory();
   const spec = instrumentOrDefault(symbol);
@@ -101,45 +98,16 @@ export function AccountPanel({
                     {account ? formatPhone(account.phone) : "—"}
                   </div>
                 </div>
-                {account ? (
-                  <span
-                    className={cn(
-                      "shrink-0 border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide",
-                      liveTier === "VIP"
-                        ? "border-accent/40 bg-accent-soft text-accent"
-                        : "border-line bg-surface-3 text-ink-muted",
-                    )}
-                  >
-                    {liveTier === "VIP" ? "VIP" : "Standard"}
-                  </span>
-                ) : null}
               </div>
 
-              {/* --- Live account tier -------------------------------------
-                  Shown, not offered. The tier is an entitlement Venti
-                  grants: it decides payout terms and whether money can leave
-                  the account, so a control that let the holder set it would be
-                  a self-service upgrade button. */}
-              <div className="border-b border-line p-3.5">
-                <div className="mb-2 text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-                  Live account tier
-                </div>
-                <div className="flex items-center gap-3 border border-line bg-surface-2 px-3 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-medium text-ink">
-                      {liveTier === "VIP" ? "VIP" : "Standard"}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-ink-muted">
-                      {liveTier === "VIP"
-                        ? `+${VIP_PAYOUT_BONUS_BPS / 100}% payout`
-                        : "Base payout"}
-                    </div>
-                  </div>
-                  {liveTier === "VIP" ? (
-                    <ShieldCheck className="h-4 w-4 shrink-0 text-accent" aria-hidden />
-                  ) : null}
-                </div>
-              </div>
+              {/* The tier is an internal classification, not a status the
+                  holder is told about. It used to be named here twice — a badge
+                  beside the number and a "Live account tier" row — which turned
+                  an operational flag into a rank, and a rank into a thing to ask
+                  about. It still governs payout terms; the rate it produces is
+                  shown on the ticket, where it is a number the customer can act
+                  on rather than a label they can only be told. Only the admin
+                  console names the tier now. */}
 
               {/* --- Money, immediately ------------------------------------- */}
               <div className="grid grid-cols-2 gap-px border-b border-line bg-line">
@@ -192,7 +160,6 @@ export function AccountPanel({
                   icon={BadgeCheck}
                   label="Account"
                   hint="Profile · verification · settings"
-                  value={liveTier === "VIP" ? "VIP" : "Standard"}
                   onNavigate={close}
                 />
                 <PanelLink

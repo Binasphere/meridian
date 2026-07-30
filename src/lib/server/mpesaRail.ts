@@ -83,9 +83,12 @@ export async function requireVipCaller(
     return { response: railJson({ error: "No profile for this account" }, 400) };
   }
   if (profile.live_tier !== "VIP") {
+    // Neutral on purpose: the tier is an internal classification and the
+    // customer is never told which one they are on, so the refusal must not be
+    // the thing that tells them.
     return {
       response: railJson(
-        { error: "The M-Pesa demo rail is available to VIP accounts only." },
+        { error: "This payment method is not available on your account." },
         403,
       ),
     };
