@@ -20,7 +20,7 @@ import {
   instrumentOrDefault,
   KIND_LABEL,
 } from "@/lib/market/instruments";
-import { formatPhone, useCurrentAccount } from "@/lib/auth";
+import { formatPhoneMasked, useCurrentAccount } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Empty, Segmented } from "@/components/ui/primitives";
 import { StatsPanel } from "@/components/terminal/StatsPanel";
@@ -170,7 +170,7 @@ function MovementsBlock({
             Registered number
           </div>
           <div className="tnum mt-0.5 truncate font-mono text-[14px] text-ink">
-            {account ? formatPhone(account.phone) : "—"}
+            {account ? formatPhoneMasked(account.phone) : "—"}
           </div>
         </div>
         <div className="flex gap-2">
@@ -482,7 +482,7 @@ export function AccountPage() {
           <dl className="divide-y divide-line">
             <DetailRow
               label="M-Pesa number"
-              value={account ? formatPhone(account.phone) : "—"}
+              value={account ? formatPhoneMasked(account.phone) : "—"}
               mono
             />
             <DetailRow

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
-import { formatPhone, useAuth, useCurrentAccount } from "@/lib/auth";
+import { formatPhoneMasked, useAuth, useCurrentAccount } from "@/lib/auth";
 import { instrumentOrDefault } from "@/lib/market/instruments";
 import { useHistory, useOpenTrades, useStore } from "@/lib/store";
 import { CashDialog } from "./CashDialog";
@@ -93,11 +93,11 @@ export function AccountPanel({
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13.5px] font-medium text-ink">
                     {account
-                      ? (account.username ?? formatPhone(account.phone))
+                      ? (account.username ?? formatPhoneMasked(account.phone))
                       : "Not signed in"}
                   </div>
                   <div className="tnum truncate font-mono text-[11px] text-ink-muted">
-                    {account ? formatPhone(account.phone) : "—"}
+                    {account ? formatPhoneMasked(account.phone) : "—"}
                   </div>
                 </div>
               </div>

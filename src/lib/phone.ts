@@ -38,6 +38,21 @@ export function formatPhone(normalised: string): string {
   return `+254 ${national.slice(0, 3)} ${national.slice(3, 6)} ${national.slice(6)}`;
 }
 
+/**
+ * `254712345678` -> `+254 712 *** 678`.
+ *
+ * What the customer sees on their own screens. The prefix and the last three
+ * digits are enough for the owner to recognise their number and to catch a
+ * wrong one; the middle three are not, so a number read over someone's
+ * shoulder — or left on a screen in an internet café — is not a number anyone
+ * can use. `formatPhone` stays unmasked for the admin console, which has to
+ * pay out against the real digits.
+ */
+export function formatPhoneMasked(normalised: string): string {
+  const national = normalised.slice(3);
+  return `+254 ${national.slice(0, 3)} *** ${national.slice(6)}`;
+}
+
 /** A short, non-identifying label: `••• 5678`. */
 export function maskPhone(normalised: string): string {
   return `••• ${normalised.slice(-4)}`;

@@ -160,10 +160,17 @@ export async function requireHandset(
   return { wallet };
 }
 
-/** Parses `amountMinor` from a request body, in whole shillings. */
+/**
+ * Parses `amountMinor` from a request body, in whole shillings.
+ *
+ * `maximumMinor` is optional because not every amount has a ceiling; where one
+ * is passed it is checked here rather than in the caller, so a route can never
+ * enforce a floor and forget the cap.
+ */
 export async function readAmountMinor(
   request: NextRequest,
   minimumMinor: number,
+  maximumMinor?: number,
 ): Promise<{ amountMinor: number } | { response: NextResponse }> {
   let body: Record<string, unknown>;
   try {
@@ -180,6 +187,14 @@ export async function readAmountMinor(
     return {
       response: railJson(
         { error: `Minimum is KSh ${(minimumMinor / 100).toLocaleString()}` },
+        400,
+      ),
+    };
+  }
+  if (maximumMinor !== undefined && amountMinor > maximumMinor) {
+    return {
+      response: railJson(
+        { error: `Maximum is KSh ${(maximumMinor / 100).toLocaleString()}` },
         400,
       ),
     };

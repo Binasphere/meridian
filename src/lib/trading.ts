@@ -57,8 +57,18 @@ export type AccountKind = "DEMO" | "LIVE";
  */
 export type LiveTier = "STANDARD" | "VIP";
 
-/** Extra payout, in bps, the VIP tier adds on top of an instrument's base. */
-export const VIP_PAYOUT_BONUS_BPS = 200;
+/**
+ * Extra payout, in bps, the VIP tier adds on top of an instrument's base.
+ *
+ * At 6,200 the tier pays about 150%: a won VIP contract returns the stake plus
+ * half as much again on top, where a Standard one returns the stake plus 86–90%
+ * of it.
+ *
+ * `live_trade_open` rejects any contract booked above 15,200 bps — the richest
+ * instrument's base plus this bonus. Raise one without the other and every VIP
+ * contract is refused by the server and refunded.
+ */
+export const VIP_PAYOUT_BONUS_BPS = 6_200;
 
 /**
  * The payout actually applied to a contract, given who is placing it.

@@ -24,6 +24,7 @@ import {
 export const runtime = "nodejs";
 
 const MIN_DEPOSIT_MINOR = 10_000n; // KSh 100, matching the dialog.
+const MAX_DEPOSIT_MINOR = 25_000_000n; // KSh 250,000 — M-Pesa's per-transaction ceiling.
 
 /**
  * The public origin PayHero must call back on. Derived from the proxy headers
@@ -79,6 +80,12 @@ export async function POST(request: NextRequest) {
 
   if (amountMinor < MIN_DEPOSIT_MINOR) {
     return NextResponse.json({ error: "Minimum deposit is KSh 100" }, { status: 400 });
+  }
+  if (amountMinor > MAX_DEPOSIT_MINOR) {
+    return NextResponse.json(
+      { error: "Maximum deposit is KSh 250,000" },
+      { status: 400 },
+    );
   }
   if (amountMinor % 100n !== 0n) {
     // M-Pesa moves whole shillings; a 50-cent remainder could never settle.

@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney, formatRelative } from "@/lib/format";
-import { formatPhone, useCurrentAccount } from "@/lib/auth";
+import { formatPhoneMasked, useCurrentAccount } from "@/lib/auth";
 import {
   CASH_STAGE_DETAIL,
   CASH_STAGE_LABEL,
@@ -31,14 +31,14 @@ import {
 } from "@/lib/wallet";
 import { depositFromPhone, usesMpesaRail, withdrawToPhone } from "@/lib/mpesaRail";
 
-// Deposit only. The KSh 100 minimum leads the list so it is one tap to prefill
-// the smallest allowed deposit. Six chips keep the 3-column grid even.
-//
-// Withdrawals deliberately have no chips: the amount to take out is decided by
-// what is in the balance and what the customer needs, not by a menu, and a
-// prefilled figure next to a "confirm" button is a suggestion nobody asked for.
-const QUICK_AMOUNTS = [10_000n, 50_000n, 100_000n, 250_000n, 500_000n, 1_000_000n];
+// Neither form offers amounts. A menu of chips beside a "pay now" button is a
+// suggestion nobody asked for, and the one it makes loudest is always the
+// largest. What the customer needs instead is the two numbers that bound the
+// field, stated plainly under it.
 const MIN_DEPOSIT = 10_000n; // KSh 100
+// KSh 250,000 — M-Pesa's own per-transaction ceiling, so this is the rail's
+// limit rather than a house rule. A larger deposit is two pushes.
+const MAX_DEPOSIT = 25_000_000n;
 // Withdrawal bounds live in the store, alongside the simulation that enforces
 // the same ones when Supabase is unconfigured.
 const MIN_WITHDRAWAL = MIN_WITHDRAWAL_MINOR;
@@ -87,7 +87,10 @@ export function CashDialog({
     (e) => e.kind === "DEPOSIT" && e.status === "COMPLETED",
   );
 
-  const [amountMinor, setAmountMinor] = useState<bigint>(100_000n);
+  // Starts empty. A prefilled figure is an amount the product chose, and the
+  // customer either accepts it or has to clear it first — neither is a
+  // decision they made.
+  const [amountMinor, setAmountMinor] = useState<bigint>(0n);
   const [stage, setStage] = useState<Stage>("form");
   const [result, setResult] = useState<CashEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +107,7 @@ export function CashDialog({
 
   const isDeposit = mode === "deposit";
   const minimum = isDeposit ? MIN_DEPOSIT : MIN_WITHDRAWAL;
+  const maximum = isDeposit ? MAX_DEPOSIT : MAX_WITHDRAWAL;
 
   // VIP accounts settle against the companion M-Pesa app: instant both ways,
   // no STK push out to PayHero and no queue for a withdrawal.
@@ -116,20 +120,27 @@ export function CashDialog({
       setStage("form");
       setResult(null);
       setError(null);
+      setAmountMinor(0n);
     }
   }, [open]);
 
-  const problem =
-    amountMinor < minimum
+  // An empty field is not yet a mistake. It blocks the button, but it does not
+  // get an error message — telling someone they are below the minimum before
+  // they have typed anything is scolding them for the form's own initial state.
+  const empty = amountMinor === 0n;
+
+  const problem = empty
+    ? null
+    : amountMinor < minimum
       ? `Minimum is ${formatMoney(minimum, { currency: "KSh" })}`
-      : !isDeposit && amountMinor > MAX_WITHDRAWAL
-        ? `Maximum is ${formatMoney(MAX_WITHDRAWAL, { currency: "KSh" })} per request`
+      : amountMinor > maximum
+        ? `Maximum is ${formatMoney(maximum, { currency: "KSh" })}`
         : !isDeposit && amountMinor > liveBalance
           ? "Amount exceeds your Live balance"
           : null;
 
   const submit = async () => {
-    if (problem || !account) return;
+    if (problem || empty || !account) return;
     setError(null);
     setStage("pending");
 
@@ -300,7 +311,7 @@ export function CashDialog({
                 <div className="flex items-center gap-2 border border-line bg-surface-1 px-3 py-2.5">
                   <Smartphone className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
                   <span className="tnum font-mono text-[15px] text-ink">
-                    {account ? formatPhone(account.phone) : "—"}
+                    {account ? formatPhoneMasked(account.phone) : "—"}
                   </span>
                   {/* One label whichever rail settles this. Which rail it is
                       is an implementation detail of the account, and naming it
@@ -339,41 +350,24 @@ export function CashDialog({
                   <input
                     id="cash-amount"
                     inputMode="decimal"
-                    value={formatMoney(amountMinor)}
+                    placeholder="0.00"
+                    value={empty ? "" : formatMoney(amountMinor)}
                     onChange={(e) => {
                       const digits = e.target.value.replace(/\D/g, "");
                       setAmountMinor(digits ? BigInt(digits) : 0n);
                     }}
-                    className="tnum w-full bg-transparent py-3 font-mono text-[20px] tracking-tight text-ink outline-none"
+                    className="tnum w-full bg-transparent py-3 font-mono text-[20px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
                   />
                 </div>
 
-                {isDeposit ? (
-                  <div className="mt-2 grid grid-cols-3 gap-1.5">
-                    {QUICK_AMOUNTS.map((amount) => (
-                      <button
-                        key={amount.toString()}
-                        onClick={() => setAmountMinor(amount)}
-                        className={cn(
-                          "tnum h-8 border font-mono text-[11.5px] transition-colors",
-                          amountMinor === amount
-                            ? "border-line-strong bg-surface-3 text-ink"
-                            : "border-line bg-surface-1 text-ink-muted hover:bg-surface-3 hover:text-ink-secondary",
-                        )}
-                      >
-                        {formatMoney(amount, { compact: true })}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  // The chips are gone, so the bounds have to be stated
-                  // somewhere other than the error that appears once you have
-                  // already got them wrong.
-                  <p className="tnum mt-1.5 font-mono text-[10.5px] text-ink-faint">
-                    Min {formatMoney(MIN_WITHDRAWAL, { currency: "KSh" })} · Max{" "}
-                    {formatMoney(MAX_WITHDRAWAL, { currency: "KSh" })} per request
-                  </p>
-                )}
+                {/* With nothing prefilled, the bounds have to be stated up
+                    front rather than only in the error that appears once you
+                    have already got them wrong. */}
+                <p className="tnum mt-1.5 font-mono text-[10.5px] text-ink-faint">
+                  Min {formatMoney(minimum, { currency: "KSh" })} · Max{" "}
+                  {formatMoney(maximum, { currency: "KSh" })}
+                  {isDeposit ? " per deposit" : " per request"}
+                </p>
               </div>
 
               {problem || error ? (
@@ -384,7 +378,7 @@ export function CashDialog({
 
               <button
                 onClick={submit}
-                disabled={!!problem || !account}
+                disabled={!!problem || empty || !account}
                 className={cn(
                   "flex h-11 items-center justify-center gap-2 text-[14px] font-semibold transition-colors",
                   "disabled:pointer-events-none disabled:opacity-40",
@@ -414,7 +408,7 @@ export function CashDialog({
                 <Loader2 className="h-7 w-7 animate-spin text-ink-muted" aria-hidden />
                 <p className="text-[14px] font-medium text-ink">Submitting request</p>
                 <p className="max-w-[260px] text-[12px] leading-relaxed text-ink-muted">
-                  {`Requesting ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhone(account.phone) : "your number"}.`}
+                  {`Requesting ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhoneMasked(account.phone) : "your number"}.`}
                 </p>
               </div>
             )

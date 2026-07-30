@@ -58,8 +58,13 @@ as $$
 declare
   v_id uuid;
 begin
-  if p_amount is null or p_amount <= 0 then
+  -- KSh 100 minimum, KSh 250,000 maximum — the latter is M-Pesa's own
+  -- per-transaction ceiling, so a larger push could not settle anyway.
+  if p_amount is null or p_amount < 10000 then
     raise exception 'BAD_AMOUNT';
+  end if;
+  if p_amount > 25000000 then
+    raise exception 'AMOUNT_TOO_LARGE';
   end if;
 
   insert into public.cash_events (user_id, kind, amount_minor, status, phone)
@@ -276,7 +281,12 @@ begin
   if p_stake is null or p_stake <= 0 then
     raise exception 'BAD_AMOUNT';
   end if;
-  if p_payout_bps is null or p_payout_bps < 0 or p_payout_bps > 9200 then
+  -- The ceiling is the highest rate any contract can legitimately be booked
+  -- at: the richest instrument's base (9000) plus the VIP bonus (6200). It
+  -- exists so a tampered client cannot claim its own payout; keep it in step
+  -- with VIP_PAYOUT_BONUS_BPS in `trading.ts` or every VIP contract is
+  -- refused and refunded.
+  if p_payout_bps is null or p_payout_bps < 0 or p_payout_bps > 15200 then
     raise exception 'BAD_PAYOUT';
   end if;
   if p_duration is null or p_duration <= 0 or p_duration > 120 then

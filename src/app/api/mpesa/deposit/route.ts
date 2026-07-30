@@ -29,6 +29,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MIN_DEPOSIT_MINOR = 10_000; // KSh 100, matching the dialog.
+const MAX_DEPOSIT_MINOR = 25_000_000; // KSh 250,000 — M-Pesa's per-transaction ceiling.
 
 export function OPTIONS() {
   return railPreflight();
@@ -39,7 +40,11 @@ export async function POST(request: NextRequest) {
   if ("response" in gate) return gate.response;
   const { db, userId, phone } = gate.caller;
 
-  const parsed = await readAmountMinor(request, MIN_DEPOSIT_MINOR);
+  const parsed = await readAmountMinor(
+    request,
+    MIN_DEPOSIT_MINOR,
+    MAX_DEPOSIT_MINOR,
+  );
   if ("response" in parsed) return parsed.response;
   const { amountMinor } = parsed;
 

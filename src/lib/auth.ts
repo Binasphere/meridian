@@ -37,6 +37,7 @@ import type { LiveTier } from "./trading";
 export {
   normalisePhone,
   formatPhone,
+  formatPhoneMasked,
   maskPhone,
   identityEmail,
   MIN_PASSWORD_LENGTH,
