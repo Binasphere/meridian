@@ -168,8 +168,14 @@ begin
   if v_user is null then
     raise exception 'NOT_SIGNED_IN';
   end if;
-  if p_amount is null or p_amount < 10000 then  -- KSh 100 minimum
+  -- KSh 500 minimum, KSh 150,000 maximum per request. Enforced here rather
+  -- than only in the dialog, because the dialog is the one place a customer
+  -- can trivially route around.
+  if p_amount is null or p_amount < 50000 then
     raise exception 'BAD_AMOUNT';
+  end if;
+  if p_amount > 15000000 then
+    raise exception 'AMOUNT_TOO_LARGE';
   end if;
 
   update public.profiles

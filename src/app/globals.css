@@ -144,16 +144,16 @@
   --color-adm-pos: #0a7a4f;
   --color-adm-neg: #b3261e;
 
-  /* Inter, everywhere — including every price, balance and reference.
-     `font-mono` is kept as a token name because half the interface asks for it
-     by that name, but it now resolves to Inter too: one typeface across the
-     product, no second voice for the numbers. What made the mono face worth
-     having was the fixed-width digits, and that is a font *feature* rather
-     than a font — `tabular-nums` below holds the columns just as still in
-     Inter. To go back, re-add a next/font mono in layout.tsx and point
-     --font-mono at its variable. */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* IBM Plex: Sans for the interface, Mono for every price, balance, countdown
+     and reference. Two members of one family rather than two typefaces — they
+     share a skeleton, so the numbers get their own register without the
+     product growing a second personality.
+
+     `font-mono` therefore means what its name says again. Every surface already
+     asking for it — the price header, the stake field, the ladder, the receipt
+     — picks up Plex Mono with no markup change. */
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
 
   /* Square. Every card, panel and control has hard corners — the interface
      reads as instrument panelling rather than as consumer software. */
@@ -176,7 +176,9 @@
     background: var(--color-base);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* No character-variant overrides: `cv02`/`cv03`/`cv04`/`cv11` were Inter's
+       alternate letterforms and mean nothing to Plex, whose defaults are
+       already the shapes those variants were selecting for. */
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     overscroll-behavior: none;

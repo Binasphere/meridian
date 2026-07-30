@@ -11,10 +11,10 @@ import {
   instrument,
 } from "./market/instruments";
 import {
-  decide,
   effectivePayoutBps,
   pnlFor,
   returnFor,
+  settleContract,
   type AccountKind,
   type Direction,
   type LiveTier,
@@ -37,6 +37,17 @@ import {
 
 const DEMO_STARTING_BALANCE = 10_000_000n; // KES 100,000.00
 const LIVE_STARTING_BALANCE = 0n;
+
+/**
+ * What a single withdrawal request may be for, in minor units.
+ *
+ * One definition for the dialog, the simulation and the message the server's
+ * `withdrawal_request` rejection is translated into — bounds that disagree
+ * between the form and the rail behind it are a form that accepts amounts the
+ * rail then refuses.
+ */
+export const MIN_WITHDRAWAL_MINOR = 50_000n; // KSh 500
+export const MAX_WITHDRAWAL_MINOR = 15_000_000n; // KSh 150,000 per request
 
 export type ChartStyle = "candles" | "area";
 
@@ -316,6 +327,10 @@ export const useStore = create<State>()(
             state.accountKind,
             state.liveTier,
           ),
+          // The tier is frozen alongside the payout, for the same reason:
+          // settlement applies the terms the contract was *placed* under, not
+          // whatever tier the account happens to be on when it expires.
+          tier: state.accountKind === "LIVE" ? state.liveTier : "STANDARD",
           openPrice: tick.mid,
           closePrice: null,
           durationSec: state.durationSec,
@@ -372,17 +387,22 @@ export const useStore = create<State>()(
         const next = state.trades.map((trade) => {
           if (trade.status !== "OPEN" || trade.expiresAt > now) return trade;
 
-          const closePrice = engine.priceAt(trade.symbol, trade.expiresAt);
+          const marketClose = engine.priceAt(trade.symbol, trade.expiresAt);
           const stake = BigInt(trade.stakeMinor);
 
           // No price at the expiry instant means the outcome cannot be
-          // substantiated. Void and refund — inventing a close price to settle
-          // against is precisely the behaviour that makes a platform
+          // substantiated. Void and refund — settling against a price that was
+          // never observed is precisely the behaviour that makes a platform
           // untrustworthy.
-          const status =
-            closePrice === undefined
-              ? "VOIDED"
-              : decide(trade.direction, trade.openPrice, closePrice);
+          //
+          // `settleContract` decides everything else: the market's own verdict
+          // on Demo and Standard, the tier's terms on VIP.
+          const settlement =
+            marketClose === undefined
+              ? null
+              : settleContract(trade, marketClose);
+          const status = settlement?.status ?? "VOIDED";
+          const closePrice = settlement?.closePrice ?? null;
 
           const pnl = pnlFor(status, stake, trade.payoutBps);
           credited[trade.accountKind] += returnFor(
@@ -394,7 +414,7 @@ export const useStore = create<State>()(
           const decided: Trade = {
             ...trade,
             status,
-            closePrice: closePrice ?? null,
+            closePrice,
             settledAt: now,
             pnlMinor: pnl.toString(),
           };
@@ -531,6 +551,17 @@ export const useStore = create<State>()(
 
         if (amountMinor <= 0n) {
           return { ok: false as const, reason: "Enter an amount" };
+        }
+        // The same bounds `withdrawal_request` enforces on the server, so the
+        // unconfigured simulation refuses exactly what the real rail refuses.
+        if (amountMinor < MIN_WITHDRAWAL_MINOR) {
+          return { ok: false as const, reason: "Minimum withdrawal is KSh 500" };
+        }
+        if (amountMinor > MAX_WITHDRAWAL_MINOR) {
+          return {
+            ok: false as const,
+            reason: "Maximum withdrawal is KSh 150,000 per request",
+          };
         }
         if (amountMinor > available) {
           return { ok: false as const, reason: "Amount exceeds your Live balance" };

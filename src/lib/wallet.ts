@@ -213,8 +213,11 @@ export async function startServerWithdrawal(
     if (message.includes("INSUFFICIENT_FUNDS")) {
       throw new Error("Amount exceeds your Live balance");
     }
+    if (message.includes("AMOUNT_TOO_LARGE")) {
+      throw new Error("Maximum withdrawal is KSh 150,000 per request");
+    }
     if (message.includes("BAD_AMOUNT")) {
-      throw new Error("Minimum withdrawal is KSh 100");
+      throw new Error("Minimum withdrawal is KSh 500");
     }
     if (message.includes("NOT_SIGNED_IN")) {
       throw new Error("Sign in to withdraw");

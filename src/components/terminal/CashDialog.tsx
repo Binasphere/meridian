@@ -18,6 +18,8 @@ import { formatPhone, useCurrentAccount } from "@/lib/auth";
 import {
   CASH_STAGE_DETAIL,
   CASH_STAGE_LABEL,
+  MAX_WITHDRAWAL_MINOR,
+  MIN_WITHDRAWAL_MINOR,
   useStore,
   type CashEvent,
   type CashStage,
@@ -29,11 +31,18 @@ import {
 } from "@/lib/wallet";
 import { depositFromPhone, usesMpesaRail, withdrawToPhone } from "@/lib/mpesaRail";
 
-// The KSh 100 minimum leads the list so it is one tap to prefill the smallest
-// allowed deposit. Six chips keep the 3-column grid even.
+// Deposit only. The KSh 100 minimum leads the list so it is one tap to prefill
+// the smallest allowed deposit. Six chips keep the 3-column grid even.
+//
+// Withdrawals deliberately have no chips: the amount to take out is decided by
+// what is in the balance and what the customer needs, not by a menu, and a
+// prefilled figure next to a "confirm" button is a suggestion nobody asked for.
 const QUICK_AMOUNTS = [10_000n, 50_000n, 100_000n, 250_000n, 500_000n, 1_000_000n];
 const MIN_DEPOSIT = 10_000n; // KSh 100
-const MIN_WITHDRAWAL = 10_000n; // KSh 100
+// Withdrawal bounds live in the store, alongside the simulation that enforces
+// the same ones when Supabase is unconfigured.
+const MIN_WITHDRAWAL = MIN_WITHDRAWAL_MINOR;
+const MAX_WITHDRAWAL = MAX_WITHDRAWAL_MINOR;
 
 /**
  * First-deposit bonus, shown as a promo only.
@@ -113,9 +122,11 @@ export function CashDialog({
   const problem =
     amountMinor < minimum
       ? `Minimum is ${formatMoney(minimum, { currency: "KSh" })}`
-      : !isDeposit && amountMinor > liveBalance
-        ? "Amount exceeds your Live balance"
-        : null;
+      : !isDeposit && amountMinor > MAX_WITHDRAWAL
+        ? `Maximum is ${formatMoney(MAX_WITHDRAWAL, { currency: "KSh" })} per request`
+        : !isDeposit && amountMinor > liveBalance
+          ? "Amount exceeds your Live balance"
+          : null;
 
   const submit = async () => {
     if (problem || !account) return;
@@ -337,22 +348,32 @@ export function CashDialog({
                   />
                 </div>
 
-                <div className="mt-2 grid grid-cols-3 gap-1.5">
-                  {QUICK_AMOUNTS.map((amount) => (
-                    <button
-                      key={amount.toString()}
-                      onClick={() => setAmountMinor(amount)}
-                      className={cn(
-                        "tnum h-8 border font-mono text-[11.5px] transition-colors",
-                        amountMinor === amount
-                          ? "border-line-strong bg-surface-3 text-ink"
-                          : "border-line bg-surface-1 text-ink-muted hover:bg-surface-3 hover:text-ink-secondary",
-                      )}
-                    >
-                      {formatMoney(amount, { compact: true })}
-                    </button>
-                  ))}
-                </div>
+                {isDeposit ? (
+                  <div className="mt-2 grid grid-cols-3 gap-1.5">
+                    {QUICK_AMOUNTS.map((amount) => (
+                      <button
+                        key={amount.toString()}
+                        onClick={() => setAmountMinor(amount)}
+                        className={cn(
+                          "tnum h-8 border font-mono text-[11.5px] transition-colors",
+                          amountMinor === amount
+                            ? "border-line-strong bg-surface-3 text-ink"
+                            : "border-line bg-surface-1 text-ink-muted hover:bg-surface-3 hover:text-ink-secondary",
+                        )}
+                      >
+                        {formatMoney(amount, { compact: true })}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  // The chips are gone, so the bounds have to be stated
+                  // somewhere other than the error that appears once you have
+                  // already got them wrong.
+                  <p className="tnum mt-1.5 font-mono text-[10.5px] text-ink-faint">
+                    Min {formatMoney(MIN_WITHDRAWAL, { currency: "KSh" })} · Max{" "}
+                    {formatMoney(MAX_WITHDRAWAL, { currency: "KSh" })} per request
+                  </p>
+                )}
               </div>
 
               {problem || error ? (

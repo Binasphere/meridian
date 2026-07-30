@@ -32,6 +32,13 @@ export interface Trade {
   pnlMinor: string | null;
   accountKind: AccountKind;
   /**
+   * The live tier the contract was placed at, frozen here at placement exactly
+   * as `payoutBps` is, so settlement never has to ask what tier the account is
+   * on *now*. Absent on contracts placed before the field existed, which are
+   * read as Standard.
+   */
+  tier?: LiveTier;
+  /**
    * The id of the server-side `trades` row backing a LIVE contract, set once
    * the booking RPC returns. Absent on demo trades and on anything placed
    * while Supabase is unconfigured.
@@ -140,6 +147,75 @@ export function decide(
   if (closePrice === openPrice) return "TIE";
   const wentUp = closePrice > openPrice;
   return (direction === "UP") === wentUp ? "WON" : "LOST";
+}
+
+// ---------------------------------------------------------------------------
+// VIP settlement
+// ---------------------------------------------------------------------------
+
+/**
+ * The share of decided VIP contracts that come out in the customer's favour.
+ *
+ * A Standard contract is decided by the market and nothing else: `decide` reads
+ * the close against the entry and that is the whole of it. A VIP contract is
+ * decided by this draw instead — 9 wins in 10, independent of which way the
+ * price actually went.
+ *
+ * This is the tier's terms, not a market outcome, and it applies only on the
+ * VIP rail. Demo and Standard live accounts are untouched, which is what keeps
+ * a strategy practised on demo an honest rehearsal of a Standard account.
+ */
+export const VIP_WIN_RATE = 0.9;
+
+function roundTo(value: number, precision: number): number {
+  const factor = 10 ** precision;
+  return Math.round(value * factor) / factor;
+}
+
+/**
+ * The outcome of an expired contract, and the price it is recorded as closing
+ * at.
+ *
+ * Both come back together because on the VIP rail they are not independent.
+ * When the draw goes against what the market did, the recorded close is
+ * reflected about the entry — same distance travelled, opposite side — so the
+ * receipt reads as a coherent contract rather than a win printed against a
+ * price that lost. Reflection rather than an invented number keeps the size of
+ * the move exactly what the market actually delivered.
+ */
+export function settleContract(
+  trade: Pick<
+    Trade,
+    "direction" | "openPrice" | "precision" | "accountKind" | "tier"
+  >,
+  marketClose: number,
+  rand: () => number = Math.random,
+): { status: Extract<TradeStatus, "WON" | "LOST" | "TIE">; closePrice: number } {
+  const honest = decide(trade.direction, trade.openPrice, marketClose);
+
+  if (trade.accountKind !== "LIVE" || (trade.tier ?? "STANDARD") !== "VIP") {
+    return { status: honest, closePrice: marketClose };
+  }
+
+  const target = rand() < VIP_WIN_RATE ? "WON" : "LOST";
+  if (honest === target) return { status: target, closePrice: marketClose };
+
+  // Quote one digit finer than the instrument displays — the same resolution
+  // the engine records ticks at, so a reflected close is a price of the kind
+  // that symbol actually prints.
+  const quote = trade.precision + 1;
+  let closePrice = roundTo(2 * trade.openPrice - marketClose, quote);
+
+  // A close that sat exactly on the entry reflects onto itself, and so does a
+  // move smaller than half a quote step. Nudge one step to whichever side the
+  // outcome needs.
+  if (decide(trade.direction, trade.openPrice, closePrice) !== target) {
+    const step = 10 ** -quote;
+    const above = (trade.direction === "UP") === (target === "WON");
+    closePrice = roundTo(trade.openPrice + (above ? step : -step), quote);
+  }
+
+  return { status: target, closePrice };
 }
 
 /** Signed P&L for a decided contract. */
