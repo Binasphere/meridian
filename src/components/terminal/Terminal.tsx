@@ -79,7 +79,13 @@ export function Terminal() {
       <SettlementDriver />
       <TradeCountdown />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line lg:grid-cols-[236px_minmax(0,1fr)_300px]">
+      {/* On a phone the chart takes a fixed slice of the viewport rather than
+          everything the trading bar does not want. It used to run to about 70%
+          of the screen, which pushed the controls into the bottom strip; at 52%
+          the two halves are closer to even and the bar below has room to
+          breathe. On `lg` it goes back to filling, because there the ticket and
+          the lists are beside it rather than under it. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line max-lg:h-[52dvh] max-lg:flex-none lg:grid-cols-[236px_minmax(0,1fr)_300px]">
         {/* --- Markets ------------------------------------------------------ */}
         <Panel
           flat

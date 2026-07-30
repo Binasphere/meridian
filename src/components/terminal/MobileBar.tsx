@@ -60,7 +60,11 @@ export function MobileBar() {
   };
 
   return (
-    <div className="shrink-0 border-t border-line bg-surface-1 lg:hidden">
+    /* Fills whatever the chart left, and distributes it rather than pooling it
+       into one dead band: the commits sit directly under the chart and the
+       stake sits at the bottom, in easy thumb reach. `min-h-0` so a short
+       viewport shrinks this instead of overflowing the page. */
+    <div className="flex min-h-0 flex-1 flex-col justify-between overflow-y-auto border-t border-line bg-surface-1 lg:hidden">
       {/* --- Commit ---------------------------------------------------------
           Direction first, amount under it: the thumb rests at the bottom of a
           phone, and the two full-width targets are what the hand reaches for
