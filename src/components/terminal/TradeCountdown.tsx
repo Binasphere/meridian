@@ -91,8 +91,10 @@ function Panel({ trade, onDismiss }: { trade: Trade; onDismiss: () => void }) {
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
         "pointer-events-auto fixed inset-x-0 bottom-0 z-40 mx-auto mb-3 w-[calc(100%-1.5rem)] max-w-[420px]",
-        // Clear of the mobile action bar, which owns the very bottom edge.
-        "sm:mb-4 max-sm:bottom-[68px]",
+        // Clear of the mobile bar's rail, which owns the very bottom edge
+        // everywhere the bar is shown — that is up to `lg`, not just `sm`. A
+        // large phone was covering the rail with this card.
+        "sm:mb-4 max-lg:bottom-[68px]",
       )}
       role="status"
       aria-live="polite"

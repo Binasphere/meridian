@@ -1,6 +1,16 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Minus, Plus, Timer } from "lucide-react";
+import Link from "next/link";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChartNoAxesColumn,
+  ListOrdered,
+  Minus,
+  Plus,
+  Timer,
+  Wallet,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
@@ -12,7 +22,7 @@ import {
   QUICK_STAKES_MINOR,
   STAKE_STEP_MINOR,
 } from "@/lib/trading";
-import { selectBalance, useStore } from "@/lib/store";
+import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
 import { playPlace } from "@/lib/sound";
 
 /**
@@ -39,6 +49,10 @@ export function MobileBar() {
   const setStakeMinor = useStore((s) => s.setStakeMinor);
   const placeTrade = useStore((s) => s.placeTrade);
   const balance = useStore(selectBalance);
+  const accountKind = useStore((s) => s.accountKind);
+  // Held until localStorage has been read, so a signed-in balance never flashes
+  // through its signed-out value on reload.
+  const hydrated = useStoreHydrated();
 
   // The same three refusals the desktop ticket applies, so a stake accepted on
   // one screen size is accepted on the other.
@@ -60,11 +74,12 @@ export function MobileBar() {
   };
 
   return (
-    /* Fills whatever the chart left, and distributes it rather than pooling it
-       into one dead band: the commits sit directly under the chart and the
-       stake sits at the bottom, in easy thumb reach. `min-h-0` so a short
-       viewport shrinks this instead of overflowing the page. */
-    <div className="flex min-h-0 flex-1 flex-col justify-between overflow-y-auto border-t border-line bg-surface-1 lg:hidden">
+    /* Fills whatever the chart left. Two groups, not two floating blocks: the
+       trading controls sit together at the top and the rail sits on the bottom
+       edge, so the space between them is margin bounded by content rather than
+       a hole at the end of the screen. `min-h-0` so a short viewport shrinks
+       this instead of overflowing the page. */
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-surface-1 lg:hidden">
       {/* --- Commit ---------------------------------------------------------
           Direction first, amount under it: the thumb rests at the bottom of a
           phone, and the two full-width targets are what the hand reaches for
@@ -74,7 +89,7 @@ export function MobileBar() {
         <button
           onClick={() => submit("UP")}
           disabled={insufficient}
-          className="flex h-12 items-center justify-center gap-1.5 rounded-none border border-buy bg-buy text-[15px] font-semibold text-white transition-colors active:bg-buy-hover disabled:opacity-40"
+          className="flex h-[52px] items-center justify-center gap-1.5 rounded-none border border-buy bg-buy text-[15px] font-semibold text-white transition-colors active:bg-buy-hover disabled:opacity-40"
         >
           <ArrowUp className="h-4 w-4" aria-hidden />
           Buy
@@ -82,7 +97,7 @@ export function MobileBar() {
         <button
           onClick={() => submit("DOWN")}
           disabled={insufficient}
-          className="flex h-12 items-center justify-center gap-1.5 rounded-none border border-sell bg-sell text-[15px] font-semibold text-white transition-colors active:bg-sell-hover disabled:opacity-40"
+          className="flex h-[52px] items-center justify-center gap-1.5 rounded-none border border-sell bg-sell text-[15px] font-semibold text-white transition-colors active:bg-sell-hover disabled:opacity-40"
         >
           <ArrowDown className="h-4 w-4" aria-hidden />
           Sell
@@ -90,10 +105,7 @@ export function MobileBar() {
       </div>
 
       {/* --- Stake ---------------------------------------------------------- */}
-      <div
-        className="px-3 pb-3"
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-      >
+      <div className="px-3 pb-3">
         <div className="mb-1.5 flex items-baseline gap-3">
           <label
             htmlFor="mobile-stake"
@@ -168,7 +180,70 @@ export function MobileBar() {
           ))}
         </div>
       </div>
+
+      {/* --- Balance ---------------------------------------------------------
+          The top bar drops the balance below `sm` for want of room, so on a
+          phone the number you are staking against was nowhere on screen. It
+          belongs here: between the amount and the rail, sized to be read at a
+          glance and not to compete with the commits.
+
+          It also does the layout work. `flex-1` hands this block whatever the
+          chart and the controls did not take, and the content centres inside
+          it — so the leftover height becomes a margin around a real element
+          rather than a hole above the rail, on every viewport size. */}
+      <div className="grid flex-1 place-content-center px-3 py-2 text-center">
+        <div className="text-[9.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+          {accountKind === "DEMO" ? "Practice balance" : "Live balance"}
+        </div>
+        <div className="tnum mt-1 font-mono text-[22px] leading-none tracking-tight text-ink">
+          {hydrated ? formatMoney(balance, { currency: "KSh" }) : "—"}
+        </div>
+      </div>
+
+      {/* --- Rail -----------------------------------------------------------
+          The three places a phone needs to reach that are not on this screen.
+          `mt-auto` puts it on the bottom edge whatever the viewport, which is
+          what turns the leftover height into spacing between two anchored
+          groups instead of a gap trailing off the end of the layout.
+
+          Deliberately quiet: hairline dividers, small caps, muted until
+          pressed. These are destinations you leave the terminal for, and they
+          must not compete with the two buttons that commit money. */}
+      <nav
+        className="mt-auto grid grid-cols-3 gap-px border-t border-line bg-line"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        aria-label="More"
+      >
+        <RailLink href="/positions" icon={ListOrdered} label="History" />
+        <RailLink href="/wallet" icon={Wallet} label="Wallet" />
+        <RailLink href="/performance" icon={ChartNoAxesColumn} label="Stats" />
+      </nav>
     </div>
+  );
+}
+
+function RailLink({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: typeof Wallet;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex flex-col items-center justify-center gap-1 bg-surface-1 py-3",
+        "text-ink-muted transition-colors active:bg-surface-2 active:text-ink",
+      )}
+    >
+      <Icon className="h-[18px] w-[18px]" aria-hidden />
+      <span className="text-[10px] font-medium uppercase tracking-[0.08em]">
+        {label}
+      </span>
+    </Link>
   );
 }
 
