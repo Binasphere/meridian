@@ -15,9 +15,14 @@ export function toMinor(value: string | bigint): bigint {
 
 export function formatMoney(
   value: string | bigint,
-  opts: { currency?: string; withSign?: boolean; compact?: boolean } = {},
+  opts: {
+    currency?: string;
+    withSign?: boolean;
+    compact?: boolean;
+    whole?: boolean;
+  } = {},
 ): string {
-  const { currency, withSign = false, compact = false } = opts;
+  const { currency, withSign = false, compact = false, whole = false } = opts;
   const minor = toMinor(value);
   const negative = minor < 0n;
   const abs = negative ? -minor : minor;
@@ -32,15 +37,38 @@ export function formatMoney(
         ? `${(major / 1_000_000).toFixed(1)}M`
         : `${(major / 1_000).toFixed(1)}K`;
   } else {
-    const major = abs / MINOR;
-    const cents = abs % MINOR;
-    body = `${major.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${cents
+    const grouped = (abs / MINOR)
       .toString()
-      .padStart(2, "0")}`;
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    body = whole
+      ? grouped
+      : `${grouped}.${(abs % MINOR).toString().padStart(2, "0")}`;
   }
 
   const sign = negative ? "−" : withSign ? "+" : "";
   return currency ? `${sign}${currency} ${body}` : `${sign}${body}`;
+}
+
+/**
+ * Reads what someone typed into a cash field as **whole shillings**.
+ *
+ * Every amount box in the product — stake, deposit, withdrawal, the admin
+ * handset balance — is typed and read in whole shillings, and this is the one
+ * function that turns those keystrokes into ledger minor units.
+ *
+ * The alternative, reading the digits as minor units directly, is the trap it
+ * replaces: someone typing `1000` meaning a thousand shillings got ten, and
+ * the field agreed with them right up until it rendered `10.00`. Nobody stakes
+ * a fraction of a shilling here, so the cents are the ledger's business and
+ * never the keyboard's.
+ *
+ * Digits only, so typing never lands in an intermediate state like `"12."`
+ * that has to be special-cased. Length is capped because a pasted wall of
+ * digits would otherwise become a bigint no field can render.
+ */
+export function wholeToMinor(text: string): bigint {
+  const digits = text.replace(/\D/g, "").slice(0, 12);
+  return digits ? BigInt(digits) * MINOR : 0n;
 }
 
 /** Splits a price so the last digits can be rendered larger — a terminal idiom. */

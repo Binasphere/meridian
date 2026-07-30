@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatMoney, formatRelative } from "@/lib/format";
+import { formatMoney, formatRelative, wholeToMinor } from "@/lib/format";
 import { formatPhoneMasked, useCurrentAccount } from "@/lib/auth";
 import {
   CASH_STAGE_DETAIL,
@@ -349,13 +349,12 @@ export function CashDialog({
                   </span>
                   <input
                     id="cash-amount"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={empty ? "" : formatMoney(amountMinor)}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, "");
-                      setAmountMinor(digits ? BigInt(digits) : 0n);
-                    }}
+                    inputMode="numeric"
+                    placeholder="0"
+                    // Whole shillings, in and out. Nobody deposits a fraction
+                    // of one, and a field that read `1000` as ten was a trap.
+                    value={empty ? "" : formatMoney(amountMinor, { whole: true })}
+                    onChange={(e) => setAmountMinor(wholeToMinor(e.target.value))}
                     className="tnum w-full bg-transparent py-3 font-mono text-[20px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
                   />
                 </div>
@@ -364,8 +363,8 @@ export function CashDialog({
                     front rather than only in the error that appears once you
                     have already got them wrong. */}
                 <p className="tnum mt-1.5 font-mono text-[10.5px] text-ink-faint">
-                  Min {formatMoney(minimum, { currency: "KSh" })} · Max{" "}
-                  {formatMoney(maximum, { currency: "KSh" })}
+                  Min {formatMoney(minimum, { currency: "KSh", whole: true })} ·
+                  Max {formatMoney(maximum, { currency: "KSh", whole: true })}
                   {isDeposit ? " per deposit" : " per request"}
                 </p>
               </div>

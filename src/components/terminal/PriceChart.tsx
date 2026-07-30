@@ -148,7 +148,10 @@ export function PriceChart({
       },
       rightPriceScale: {
         borderColor: "rgba(255,255,255,0.07)",
-        scaleMargins: { top: 0.12, bottom: 0.12 },
+        // Tight margins. The autoscale fits the visible high–low into whatever
+        // is left between them, so every percent given away here is a percent
+        // shorter that every candle draws.
+        scaleMargins: { top: 0.06, bottom: 0.06 },
         entireTextOnly: true,
       },
       timeScale: {
@@ -157,14 +160,26 @@ export function PriceChart({
         // Sub-minute intervals need the seconds field; at 1m and above every
         // label would just read ":00".
         secondsVisible: resolution < 60,
-        rightOffset: 8,
-        // Wide bars, held wide regardless of interval. At 8px the bodies were
-        // hairlines and the wicks were indistinguishable from the grid; 14px
-        // gives a candle an actual body to read an open/close off, which is the
-        // entire point of the form. Shortening the interval must not quietly
-        // shrink them again — `minBarSpacing` is the floor that prevents it.
-        barSpacing: 14,
-        minBarSpacing: 8,
+        rightOffset: 3,
+        /**
+         * Bar width — which is also, and less obviously, bar *height*.
+         *
+         * The price scale autoscales to the high–low of the bars currently in
+         * view, so how tall a candle draws is set by how many of them share the
+         * pane: on a random walk the range over N bars grows like √N while one
+         * bar's own range does not, so a candle occupies roughly 1/√N of the
+         * height. At 14px a phone fitted ~50 bars and every candle was a
+         * seventh of what it could be — a chart of true prices that read as a
+         * flat green smear.
+         *
+         * At 32px the same phone shows a dozen bars and each one has a body you
+         * can read an open and a close off, which is the entire point of the
+         * form. Shortening the interval must not quietly shrink them again —
+         * `minBarSpacing` is the floor that prevents it, and it is raised in
+         * step so a pinch-zoom-out cannot undo this either.
+         */
+        barSpacing: 32,
+        minBarSpacing: 18,
         tickMarkFormatter: (time: Time, type: TickMarkType) =>
           tickMarkLabel(time, type),
       },

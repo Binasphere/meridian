@@ -131,8 +131,11 @@ export const MIN_STAKE_MINOR = 10_000n; // KSh 100
 export const MAX_STAKE_MINOR = 20_000_000n; // KSh 200,000
 export const STAKE_STEP_MINOR = 10_000n; // KSh 100
 
-/** The one-tap amounts, in minor units: KSh 100 / 250 / 500 / 1,000. */
-export const QUICK_STAKES_MINOR = [10_000n, 25_000n, 50_000n, 100_000n];
+// There are no one-tap stake amounts. The row of them was removed rather than
+// restyled: a chip that fills the field is the product proposing a number, and
+// the only number that belongs in a stake box is the one its owner typed. The
+// bounds are stated under the field instead, which is the part they actually
+// need before committing.
 
 /** Clamps a stake into the permitted range. */
 export function clampStake(stakeMinor: bigint): bigint {

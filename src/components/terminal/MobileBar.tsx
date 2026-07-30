@@ -13,13 +13,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, wholeToMinor } from "@/lib/format";
 import { FIXED_DURATION_SEC } from "@/lib/market/instruments";
 import {
   clampStake,
   MAX_STAKE_MINOR,
   MIN_STAKE_MINOR,
-  QUICK_STAKES_MINOR,
   STAKE_STEP_MINOR,
 } from "@/lib/trading";
 import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
@@ -60,6 +59,12 @@ export function MobileBar() {
     stakeMinor > balance ||
     stakeMinor < MIN_STAKE_MINOR ||
     stakeMinor > MAX_STAKE_MINOR;
+
+  // An empty field blocks the commit without being marked wrong for it —
+  // outlining a box someone has not finished filling in is scolding them for
+  // the form's own state.
+  const empty = stakeMinor === 0n;
+  const wrong = insufficient && !empty;
 
   const adjust = (delta: bigint) => setStakeMinor(clampStake(stakeMinor + delta));
 
@@ -125,7 +130,7 @@ export function MobileBar() {
         <div
           className={cn(
             "flex items-stretch border bg-surface-2 transition-colors",
-            insufficient
+            wrong
               ? "border-down/40"
               : "border-line focus-within:border-line-strong",
           )}
@@ -146,15 +151,14 @@ export function MobileBar() {
             <input
               id="mobile-stake"
               inputMode="numeric"
-              value={formatMoney(stakeMinor)}
-              onChange={(event) => {
-                // Digits only, read as minor units, so typing never lands in an
-                // intermediate state like "12." that has to be special-cased.
-                const digits = event.target.value.replace(/\D/g, "");
-                setStakeMinor(digits ? BigInt(digits) : 0n);
-              }}
-              className="tnum w-full bg-transparent py-2.5 text-center font-mono text-[17px] tracking-tight text-ink outline-none"
-              aria-invalid={insufficient}
+              placeholder="0"
+              // Whole shillings, in and out — the same contract the desktop
+              // ticket types under. See wholeToMinor.
+              value={empty ? "" : formatMoney(stakeMinor, { whole: true })}
+              onChange={(event) => setStakeMinor(wholeToMinor(event.target.value))}
+              className="tnum w-full bg-transparent py-2.5 text-center font-mono text-[17px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
+              aria-describedby="mobile-stake-bounds"
+              aria-invalid={wrong}
             />
           </div>
 
@@ -168,17 +172,16 @@ export function MobileBar() {
           </button>
         </div>
 
-        <div className="mt-1.5 grid grid-cols-4 gap-1.5">
-          {QUICK_STAKES_MINOR.map((amount) => (
-            <Chip
-              key={amount.toString()}
-              active={stakeMinor === amount}
-              onClick={() => setStakeMinor(amount)}
-            >
-              {formatMoney(amount, { compact: true })}
-            </Chip>
-          ))}
-        </div>
+        {/* The bounds where the one-tap amounts used to be. Same reasoning as
+            the desktop ticket: the amount comes from the person typing it, and
+            what a phone needs here is to know the range before it is refused. */}
+        <p
+          id="mobile-stake-bounds"
+          className="tnum mt-1.5 text-center font-mono text-[10.5px] text-ink-faint"
+        >
+          Min {formatMoney(MIN_STAKE_MINOR, { currency: "KSh", whole: true })} ·
+          Max {formatMoney(MAX_STAKE_MINOR, { currency: "KSh", whole: true })}
+        </p>
       </div>
 
       {/* --- Balance ---------------------------------------------------------
@@ -244,29 +247,5 @@ function RailLink({
         {label}
       </span>
     </Link>
-  );
-}
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "tnum h-8 rounded-none border font-mono text-[12px] transition-colors",
-        active
-          ? "border-line-strong bg-surface-3 text-ink"
-          : "border-line bg-surface-1 text-ink-muted active:bg-surface-2",
-      )}
-    >
-      {children}
-    </button>
   );
 }

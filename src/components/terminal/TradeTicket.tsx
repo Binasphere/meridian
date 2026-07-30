@@ -3,13 +3,12 @@
 import { ArrowDown, ArrowUp, Minus, Plus, Timer, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, wholeToMinor } from "@/lib/format";
 import { FIXED_DURATION_SEC } from "@/lib/market/instruments";
 import {
   clampStake,
   MAX_STAKE_MINOR,
   MIN_STAKE_MINOR,
-  QUICK_STAKES_MINOR,
   STAKE_STEP_MINOR,
 } from "@/lib/trading";
 import { selectBalance, useStore } from "@/lib/store";
@@ -46,13 +45,19 @@ export function TradeTicket() {
   const insufficient = stakeMinor > balance;
   const blocked = tooLow || tooHigh || insufficient;
 
+  // An empty field is not yet a mistake — it blocks the commit without being
+  // told off for it. The bounds are stated under the field either way.
+  const empty = stakeMinor === 0n;
+
   const problem = insufficient
     ? "Stake exceeds your balance"
-    : tooLow
-      ? `Minimum stake is ${formatMoney(MIN_STAKE_MINOR, { currency: "KSh" })}`
-      : tooHigh
-        ? `Maximum stake is ${formatMoney(MAX_STAKE_MINOR, { currency: "KSh" })}`
-        : null;
+    : empty
+      ? null
+      : tooLow
+        ? `Minimum stake is ${formatMoney(MIN_STAKE_MINOR, { currency: "KSh", whole: true })}`
+        : tooHigh
+          ? `Maximum stake is ${formatMoney(MAX_STAKE_MINOR, { currency: "KSh", whole: true })}`
+          : null;
 
   const adjust = (delta: bigint) => setStakeMinor(clampStake(stakeMinor + delta));
 
@@ -89,7 +94,9 @@ export function TradeTicket() {
         <div
           className={cn(
             "flex items-stretch overflow-hidden rounded-none border bg-surface-1 transition-colors",
-            blocked ? "border-down/40" : "border-line focus-within:border-line-strong",
+            // `problem`, not `blocked`: an empty field blocks the commit but is
+            // not yet a mistake, and outlining it in red says it is.
+            problem ? "border-down/40" : "border-line focus-within:border-line-strong",
           )}
         >
           <button
@@ -107,18 +114,15 @@ export function TradeTicket() {
             </span>
             <input
               id="stake"
-              inputMode="decimal"
-              value={formatMoney(stakeMinor)}
-              onChange={(event) => {
-                // Read digits only and treat them as minor units, so typing
-                // never lands in an intermediate state like "12." that has to
-                // be special-cased.
-                const digits = event.target.value.replace(/\D/g, "");
-                setStakeMinor(digits ? BigInt(digits) : 0n);
-              }}
-              className="tnum w-full bg-transparent py-2.5 text-center font-mono text-[17px] tracking-tight text-ink outline-none"
-              aria-describedby={problem ? "stake-problem" : undefined}
-              aria-invalid={blocked}
+              inputMode="numeric"
+              placeholder="0"
+              // Whole shillings, in and out. Typing 1000 means a thousand
+              // shillings and reads back as one immediately — see wholeToMinor.
+              value={empty ? "" : formatMoney(stakeMinor, { whole: true })}
+              onChange={(event) => setStakeMinor(wholeToMinor(event.target.value))}
+              className="tnum w-full bg-transparent py-2.5 text-center font-mono text-[17px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
+              aria-describedby="stake-bounds"
+              aria-invalid={!!problem}
             />
           </div>
 
@@ -132,22 +136,18 @@ export function TradeTicket() {
           </button>
         </div>
 
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
-          {QUICK_STAKES_MINOR.map((amount) => (
-            <button
-              key={amount.toString()}
-              onClick={() => setStakeMinor(amount)}
-              className={cn(
-                "tnum h-7 rounded-none border font-mono text-[11.5px] transition-colors",
-                stakeMinor === amount
-                  ? "border-line-strong bg-surface-3 text-ink"
-                  : "border-line bg-surface-1 text-ink-muted hover:bg-surface-2 hover:text-ink-secondary",
-              )}
-            >
-              {formatMoney(amount, { compact: true })}
-            </button>
-          ))}
-        </div>
+        {/* The bounds, stated up front rather than only in the error that
+            appears once you have already got them wrong. This replaced the row
+            of one-tap amounts: a quick-stake chip is the interface suggesting a
+            number, and on a product that takes money the amount should come
+            from the person typing it and nowhere else. */}
+        <p
+          id="stake-bounds"
+          className="tnum mt-2 font-mono text-[10.5px] text-ink-faint"
+        >
+          Min {formatMoney(MIN_STAKE_MINOR, { currency: "KSh", whole: true })} ·
+          Max {formatMoney(MAX_STAKE_MINOR, { currency: "KSh", whole: true })}
+        </p>
       </div>
 
       {/* --- Expiry ----------------------------------------------------------

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatMoney, formatRelative } from "@/lib/format";
+import { formatMoney, formatRelative, wholeToMinor } from "@/lib/format";
 import {
   FIXED_DURATION_SEC,
   instrumentOrDefault,
@@ -606,13 +606,14 @@ function SettingsSection() {
           <div className="flex max-w-[220px] items-center gap-2 border border-line bg-surface-2 px-3">
             <span className="font-mono text-[12px] text-ink-muted">KSh</span>
             <input
-              inputMode="decimal"
-              value={formatMoney(stakeMinor)}
-              onChange={(e) => {
-                const digits = e.target.value.replace(/\D/g, "");
-                setStakeMinor(digits ? BigInt(digits) : 0n);
-              }}
-              className="tnum w-full bg-transparent py-2.5 font-mono text-[15px] text-ink outline-none"
+              inputMode="numeric"
+              placeholder="0"
+              // Whole shillings, as everywhere else an amount is typed.
+              value={
+                stakeMinor === 0n ? "" : formatMoney(stakeMinor, { whole: true })
+              }
+              onChange={(e) => setStakeMinor(wholeToMinor(e.target.value))}
+              className="tnum w-full bg-transparent py-2.5 font-mono text-[15px] text-ink outline-none placeholder:text-ink-faint"
             />
           </div>
         </Field>

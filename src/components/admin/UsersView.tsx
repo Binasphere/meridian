@@ -10,7 +10,7 @@ import {
   Smartphone,
   UserX,
 } from "lucide-react";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, wholeToMinor } from "@/lib/format";
 import { formatPhone, normalisePhone } from "@/lib/auth";
 import type { AdminUser } from "@/lib/admin/types";
 import type { LiveTier } from "@/lib/trading";
@@ -311,8 +311,14 @@ function MpesaWalletControl({
   const notify = useNotify();
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState(user.mpesaPin ?? "");
+  // Whole shillings, the way an admin reading a balance out to a customer says
+  // it. The field used to be typed in cents, which meant the number an admin
+  // entered and the number the handset showed differed by a factor of a hundred
+  // in a place where nothing on screen said so.
   const [amount, setAmount] = useState(
-    user.mpesaBalanceMinor ? formatMoney(user.mpesaBalanceMinor) : "",
+    user.mpesaBalanceMinor
+      ? formatMoney(user.mpesaBalanceMinor, { whole: true })
+      : "",
   );
   const [saving, setSaving] = useState(false);
 
@@ -330,12 +336,12 @@ function MpesaWalletControl({
     }
 
     setSaving(true);
-    const digits = amount.replace(/\D/g, "");
+    const typed = amount.replace(/\D/g, "");
     const result = await onSubmit({
       pin,
       // Blank means "leave the balance as it is" rather than "set it to zero" —
       // an admin changing only a PIN must not silently empty the handset.
-      ...(digits === "" ? {} : { balanceMinor: digits }),
+      ...(typed === "" ? {} : { balanceMinor: wholeToMinor(typed).toString() }),
     });
     setSaving(false);
 
@@ -422,9 +428,14 @@ function MpesaWalletControl({
           <span className="sr-only">Opening balance</span>
           <input
             value={amount}
-            onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))}
+            onChange={(event) => {
+              const digits = event.target.value.replace(/\D/g, "");
+              setAmount(
+                digits ? formatMoney(wholeToMinor(digits), { whole: true }) : "",
+              );
+            }}
             inputMode="numeric"
-            placeholder="Balance (cents)"
+            placeholder="Balance (KSh)"
             className={cn(
               "tnum h-8 w-full rounded-none border border-adm-line-strong bg-adm-raise px-2",
               "font-mono text-[13px] text-adm-ink outline-none",
@@ -437,7 +448,7 @@ function MpesaWalletControl({
 
       <p className="mt-1.5 text-[10.5px] leading-relaxed text-adm-ink-3">
         {amount
-          ? `Opens at ${formatMoney(amount.replace(/\D/g, "") || "0", { currency: "KSh" })}.`
+          ? `Opens at ${formatMoney(wholeToMinor(amount), { currency: "KSh" })}.`
           : "Leave the balance blank to keep the current one."}
       </p>
 
