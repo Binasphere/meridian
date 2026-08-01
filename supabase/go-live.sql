@@ -250,7 +250,7 @@ $$;
 
 -- Opens a live contract: debits the stake and books the trade in one
 -- transaction. The payout is clamped to the best rate the product actually
--- offers (90% base + 2% VIP), so a tampered client cannot book itself a
+-- offers (the flat 300% VIP rate), so a tampered client cannot book itself a
 -- richer contract than the terminal can.
 --
 -- KNOWN LIMIT, stated plainly: settlement below trusts the *client's* verdict
@@ -282,11 +282,11 @@ begin
     raise exception 'BAD_AMOUNT';
   end if;
   -- The ceiling is the highest rate any contract can legitimately be booked
-  -- at: the richest instrument's base (9000) plus the VIP bonus (6200). It
-  -- exists so a tampered client cannot claim its own payout; keep it in step
-  -- with VIP_PAYOUT_BONUS_BPS in `trading.ts` or every VIP contract is
-  -- refused and refunded.
-  if p_payout_bps is null or p_payout_bps < 0 or p_payout_bps > 15200 then
+  -- at: the flat VIP rate (30000), which is richer than any instrument's base.
+  -- It exists so a tampered client cannot claim its own payout; keep it in step
+  -- with VIP_PAYOUT_BPS in `trading.ts` or every VIP contract is refused and
+  -- falls back to the instrument's base rate.
+  if p_payout_bps is null or p_payout_bps < 0 or p_payout_bps > 30000 then
     raise exception 'BAD_PAYOUT';
   end if;
   if p_duration is null or p_duration <= 0 or p_duration > 120 then

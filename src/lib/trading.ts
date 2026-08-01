@@ -58,22 +58,26 @@ export type AccountKind = "DEMO" | "LIVE";
 export type LiveTier = "STANDARD" | "VIP";
 
 /**
- * Extra payout, in bps, the VIP tier adds on top of an instrument's base.
+ * The payout, in bps, every VIP contract is booked at.
  *
- * At 6,200 the tier pays about 150%: a won VIP contract returns the stake plus
- * half as much again on top, where a Standard one returns the stake plus 86–90%
- * of it.
+ * A flat rate, not a bonus added to the instrument's base. At 30,000 a won VIP
+ * contract returns four times the stake — the stake back plus three times as
+ * much profit — so KSh 500 wins back KSh 2,000 and KSh 100 wins back KSh 400.
+ * The multiple is the same on every symbol, which is the point: VIP is a set of
+ * terms the customer is on, not a reason to shop between instruments whose base
+ * rates happen to differ by two points.
  *
- * `live_trade_open` rejects any contract booked above 15,200 bps — the richest
- * instrument's base plus this bonus. Raise one without the other and every VIP
- * contract is refused by the server and refunded.
+ * `live_trade_open` rejects any contract booked above 30,000 bps. Raise one
+ * without the other and every VIP contract is refused by the server, then
+ * silently re-booked at the instrument's base rate by the fallback in
+ * `wallet.ts` — the customer trades, but at Standard terms.
  */
-export const VIP_PAYOUT_BONUS_BPS = 6_200;
+export const VIP_PAYOUT_BPS = 30_000;
 
 /**
  * The payout actually applied to a contract, given who is placing it.
  *
- * The instrument sets the base rate; VIP adds a fixed bonus on top. The bonus
+ * The instrument sets the base rate, and VIP replaces it outright. The VIP rate
  * is a live-account perk only — the demo account always trades at the base rate,
  * so a strategy practised on demo matches a Standard live account rather than
  * flattering itself with VIP terms.
@@ -83,9 +87,7 @@ export function effectivePayoutBps(
   kind: AccountKind,
   tier: LiveTier,
 ): number {
-  return kind === "LIVE" && tier === "VIP"
-    ? basePayoutBps + VIP_PAYOUT_BONUS_BPS
-    : basePayoutBps;
+  return kind === "LIVE" && tier === "VIP" ? VIP_PAYOUT_BPS : basePayoutBps;
 }
 
 // ---------------------------------------------------------------------------

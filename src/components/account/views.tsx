@@ -20,6 +20,7 @@ import {
   instrumentOrDefault,
   KIND_LABEL,
 } from "@/lib/market/instruments";
+import { effectivePayoutBps } from "@/lib/trading";
 import { formatPhoneMasked, useCurrentAccount } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { Empty, Segmented } from "@/components/ui/primitives";
@@ -385,8 +386,17 @@ export function PositionsPage() {
 
 export function PerformancePage() {
   const symbol = useStore((s) => s.symbol);
+  const accountKind = useStore((s) => s.accountKind);
+  const liveTier = useStore((s) => s.liveTier);
   const spec = instrumentOrDefault(symbol);
-  const breakEven = (1 / (1 + spec.payoutBps / 10_000)) * 100;
+  // The break-even is read off the rate this account actually trades at, not
+  // the instrument's headline base. A VIP reading their own strike rate against
+  // a Standard break-even is being told to clear a bar they do not have.
+  const payoutBps = effectivePayoutBps(spec.payoutBps, accountKind, liveTier);
+  const breakEven = (1 / (1 + payoutBps / 10_000)) * 100;
+  // Above 10,000 bps a win pays more than a loss costs, which inverts the
+  // sentence under the figure rather than just changing the number in it.
+  const winPaysMore = payoutBps > 10_000;
 
   return (
     <Columns count={2}>
@@ -429,8 +439,9 @@ export function PerformancePage() {
               {`${spec.displayName} is quoted live and streams continuously. Settlement uses the price at the exact expiry instant, which is recorded on the contract so any result can be checked.`}
             </p>
             <p className="max-w-[62ch] text-[12.5px] leading-relaxed text-ink-secondary">
-              A win returns less in profit than a loss costs you, so you need to
-              be right{" "}
+              {winPaysMore
+                ? "A win returns more in profit than a loss costs you, so you need to be right "
+                : "A win returns less in profit than a loss costs you, so you need to be right "}
               <span className="tnum font-mono text-warning">
                 {breakEven.toFixed(1)}%
               </span>{" "}

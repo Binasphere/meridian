@@ -95,9 +95,9 @@ export function OverviewView({ users }: { users: AdminUser[] | null }) {
           <div className="p-5">
             <TierMeter standard={summary.standard} vip={summary.vip} />
             <p className="mt-4 border-t border-adm-line pt-4 text-[12.5px] leading-relaxed text-adm-ink-3">
-              VIP adds a payout bonus that is frozen onto each contract when it is
-              opened, so a change of tier applies to the next trade and never
-              revalues a settled one.
+              VIP books every contract at a flat 4× payout, frozen onto the
+              contract when it is opened, so a change of tier applies to the next
+              trade and never revalues a settled one.
             </p>
           </div>
         </Card>

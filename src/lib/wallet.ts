@@ -282,7 +282,7 @@ function openLive(trade: Trade): void {
     //
     // `live_trade_open` refuses any rate above its own ceiling, and that
     // ceiling lives in the database rather than in this build. A deploy that
-    // raises the tier bonus before the migration is applied would otherwise
+    // raises the VIP rate before the migration is applied would otherwise
     // have every VIP contract refused and refunded — the customer watching
     // contracts vanish as they place them.
     //
