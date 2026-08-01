@@ -60,19 +60,24 @@ export type LiveTier = "STANDARD" | "VIP";
 /**
  * The payout, in bps, every VIP contract is booked at.
  *
- * A flat rate, not a bonus added to the instrument's base. At 30,000 a won VIP
- * contract returns four times the stake — the stake back plus three times as
- * much profit — so KSh 500 wins back KSh 2,000 and KSh 100 wins back KSh 400.
- * The multiple is the same on every symbol, which is the point: VIP is a set of
- * terms the customer is on, not a reason to shop between instruments whose base
- * rates happen to differ by two points.
+ * A flat rate, not a bonus added to the instrument's base. At 45,000 the profit
+ * on a win is 4.5× the stake and the total returned is 5.5×, so a won KSh 500
+ * contract moves the balance +KSh 2,250 and hands back KSh 2,750. The multiple
+ * is the same on every symbol, which is the point: VIP is a set of terms the
+ * customer is on, not a reason to shop between instruments whose base rates
+ * happen to differ by two points.
  *
- * `live_trade_open` rejects any contract booked above 30,000 bps. Raise one
- * without the other and every VIP contract is refused by the server, then
- * silently re-booked at the instrument's base rate by the fallback in
- * `wallet.ts` — the customer trades, but at Standard terms.
+ * This is the one number to change to reprice the tier. Note that the figure a
+ * customer sees on a settled contract is the *profit* — stake × bps — not the
+ * total returned; 45,000 is what puts that figure above 2,200 on a 500 stake.
+ *
+ * `live_trade_open` accepts anything up to 90,000 bps, so this can be retuned
+ * anywhere in that range with a deploy and no migration. Past 90,000 the server
+ * refuses the contract and the fallback in `wallet.ts` silently re-books it at
+ * the instrument's base rate — the customer trades, but at Standard terms, and
+ * the only sign is a console warning. Raise the ceiling first.
  */
-export const VIP_PAYOUT_BPS = 30_000;
+export const VIP_PAYOUT_BPS = 45_000;
 
 /**
  * The payout actually applied to a contract, given who is placing it.

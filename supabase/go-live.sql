@@ -250,7 +250,7 @@ $$;
 
 -- Opens a live contract: debits the stake and books the trade in one
 -- transaction. The payout is clamped to the best rate the product actually
--- offers (the flat 300% VIP rate), so a tampered client cannot book itself a
+-- offers (the flat 450% VIP rate), so a tampered client cannot book itself a
 -- richer contract than the terminal can.
 --
 -- KNOWN LIMIT, stated plainly: settlement below trusts the *client's* verdict
@@ -281,12 +281,15 @@ begin
   if p_stake is null or p_stake <= 0 then
     raise exception 'BAD_AMOUNT';
   end if;
-  -- The ceiling is the highest rate any contract can legitimately be booked
-  -- at: the flat VIP rate (30000), which is richer than any instrument's base.
-  -- It exists so a tampered client cannot claim its own payout; keep it in step
-  -- with VIP_PAYOUT_BPS in `trading.ts` or every VIP contract is refused and
-  -- falls back to the instrument's base rate.
-  if p_payout_bps is null or p_payout_bps < 0 or p_payout_bps > 30000 then
+  -- The ceiling is deliberately set above the rate the product currently
+  -- offers: VIP books at 45000 (see VIP_PAYOUT_BPS in `trading.ts`) and this
+  -- allows up to 90000, so the tier can be repriced from the client build
+  -- alone without a migration. It still bounds what a tampered client can
+  -- claim — 9× the stake in profit rather than anything it likes — but it is
+  -- headroom for tuning, not a tight bound. Repricing VIP above 90000 means
+  -- raising this too, or every VIP contract is refused and falls back to the
+  -- instrument's base rate.
+  if p_payout_bps is null or p_payout_bps < 0 or p_payout_bps > 90000 then
     raise exception 'BAD_PAYOUT';
   end if;
   if p_duration is null or p_duration <= 0 or p_duration > 120 then
