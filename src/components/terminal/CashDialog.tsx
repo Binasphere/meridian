@@ -263,9 +263,19 @@ export function CashDialog({
             "dialog-pop fixed left-1/2 top-1/2 z-[60] w-[calc(100vw-2rem)] max-w-[400px]",
             "-translate-x-1/2 -translate-y-1/2 border border-line bg-surface-2 shadow-2xl",
             "focus:outline-none",
+            // A centred box taller than the screen loses *both* ends, and the
+            // top one silently: the first-deposit banner sits at the top of the
+            // form, so on a short viewport — a phone, or any phone once the
+            // keyboard opens and halves it — it was pushed above the edge with
+            // no way to reach it. Capping the height and scrolling the body
+            // keeps every element reachable at any size.
+            //
+            // `dvh`, not `vh`: on mobile `vh` is the tallest the viewport ever
+            // gets, so a `vh` cap is not a cap at the moment it is needed.
+            "flex max-h-[calc(100dvh-2rem)] flex-col",
           )}
         >
-          <div className="flex h-12 items-center justify-between border-b border-line px-4">
+          <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-4">
             <Dialog.Title className="flex items-center gap-2 text-[13px] font-medium text-ink">
               {isDeposit ? (
                 <ArrowDownToLine className="h-4 w-4 text-cash" aria-hidden />
@@ -282,172 +292,178 @@ export function CashDialog({
             </Dialog.Close>
           </div>
 
-          {stage === "form" ? (
-            <div className="flex flex-col gap-4 p-4">
-              {/* --- First-deposit bonus (promo only) ---------------------- */}
-              {isDeposit && !hasDeposited ? (
-                <div className="flex items-start gap-2.5 border border-cash/40 bg-cash/10 p-3">
-                  <Gift className="mt-0.5 h-4 w-4 shrink-0 text-cash" aria-hidden />
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-semibold text-ink">
-                      First deposit bonus · +{FIRST_DEPOSIT_BONUS_PCT}%
+          {/* `min-h-0` is what lets this shrink below its content inside the
+              flex column — without it the child's intrinsic height wins and
+              nothing ever scrolls. `overscroll-contain` stops a flick at the
+              end of the list scrolling the terminal behind the dialog. */}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {stage === "form" ? (
+              <div className="flex flex-col gap-4 p-4">
+                {/* --- First-deposit bonus (promo only) ---------------------- */}
+                {isDeposit && !hasDeposited ? (
+                  <div className="flex items-start gap-2.5 border border-cash/40 bg-cash/10 p-3">
+                    <Gift className="mt-0.5 h-4 w-4 shrink-0 text-cash" aria-hidden />
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-semibold text-ink">
+                        First deposit bonus · +{FIRST_DEPOSIT_BONUS_PCT}%
+                      </div>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-ink-muted">
+                        Get an extra {FIRST_DEPOSIT_BONUS_PCT}% on your first{" "}
+                        {formatMoney(FIRST_DEPOSIT_BONUS_BASE, { currency: "KSh" })}{" "}
+                        deposited — up to{" "}
+                        {formatMoney(FIRST_DEPOSIT_BONUS_MAX, { currency: "KSh" })}{" "}
+                        free.
+                      </p>
                     </div>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-ink-muted">
-                      Get an extra {FIRST_DEPOSIT_BONUS_PCT}% on your first{" "}
-                      {formatMoney(FIRST_DEPOSIT_BONUS_BASE, { currency: "KSh" })}{" "}
-                      deposited — up to{" "}
-                      {formatMoney(FIRST_DEPOSIT_BONUS_MAX, { currency: "KSh" })}{" "}
-                      free.
-                    </p>
+                  </div>
+                ) : null}
+
+                {/* --- Number (fixed) ---------------------------------------- */}
+                <div>
+                  <div className="mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+                    {isDeposit ? "Paying from" : "Paying to"}
+                  </div>
+                  <div className="flex items-center gap-2 border border-line bg-surface-1 px-3 py-2.5">
+                    <Smartphone className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
+                    <span className="tnum font-mono text-[15px] text-ink">
+                      {account ? formatPhoneMasked(account.phone) : "—"}
+                    </span>
+                    {/* One label whichever rail settles this. Which rail it is
+                        is an implementation detail of the account, and naming it
+                        on the payment form invites the question. */}
+                    <span className="ml-auto text-[10px] uppercase tracking-wide text-ink-faint">
+                      verified
+                    </span>
                   </div>
                 </div>
-              ) : null}
 
-              {/* --- Number (fixed) ---------------------------------------- */}
-              <div>
-                <div className="mb-1.5 text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-                  {isDeposit ? "Paying from" : "Paying to"}
-                </div>
-                <div className="flex items-center gap-2 border border-line bg-surface-1 px-3 py-2.5">
-                  <Smartphone className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
-                  <span className="tnum font-mono text-[15px] text-ink">
-                    {account ? formatPhoneMasked(account.phone) : "—"}
-                  </span>
-                  {/* One label whichever rail settles this. Which rail it is
-                      is an implementation detail of the account, and naming it
-                      on the payment form invites the question. */}
-                  <span className="ml-auto text-[10px] uppercase tracking-wide text-ink-faint">
-                    verified
-                  </span>
-                </div>
-              </div>
+                {/* --- Amount ------------------------------------------------- */}
+                <div>
+                  <div className="mb-1.5 flex items-baseline justify-between">
+                    <label
+                      htmlFor="cash-amount"
+                      className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted"
+                    >
+                      Amount
+                    </label>
+                    {!isDeposit ? (
+                      <span className="tnum font-mono text-[11px] text-ink-faint">
+                        Available {formatMoney(liveBalance, { currency: "KSh" })}
+                      </span>
+                    ) : null}
+                  </div>
 
-              {/* --- Amount ------------------------------------------------- */}
-              <div>
-                <div className="mb-1.5 flex items-baseline justify-between">
-                  <label
-                    htmlFor="cash-amount"
-                    className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted"
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 border bg-surface-1 px-3",
+                      problem ? "border-down/40" : "border-line focus-within:border-line-strong",
+                    )}
                   >
-                    Amount
-                  </label>
-                  {!isDeposit ? (
-                    <span className="tnum font-mono text-[11px] text-ink-faint">
-                      Available {formatMoney(liveBalance, { currency: "KSh" })}
+                    <span className="shrink-0 font-mono text-[13px] text-ink-muted">
+                      KSh
                     </span>
-                  ) : null}
+                    <input
+                      id="cash-amount"
+                      inputMode="numeric"
+                      placeholder="0"
+                      // Whole shillings, in and out. Nobody deposits a fraction
+                      // of one, and a field that read `1000` as ten was a trap.
+                      value={empty ? "" : formatMoney(amountMinor, { whole: true })}
+                      onChange={(e) => setAmountMinor(wholeToMinor(e.target.value))}
+                      className="tnum w-full bg-transparent py-3 font-mono text-[20px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
+                    />
+                  </div>
+
+                  {/* With nothing prefilled, the bounds have to be stated up
+                      front rather than only in the error that appears once you
+                      have already got them wrong. */}
+                  <p className="tnum mt-1.5 font-mono text-[10.5px] text-ink-faint">
+                    Min {formatMoney(minimum, { currency: "KSh", whole: true })} ·
+                    Max {formatMoney(maximum, { currency: "KSh", whole: true })}
+                    {isDeposit ? " per deposit" : " per request"}
+                  </p>
                 </div>
 
-                <div
+                {problem || error ? (
+                  <p role="alert" className="text-[12px] text-down">
+                    {problem ?? error}
+                  </p>
+                ) : null}
+
+                <button
+                  onClick={submit}
+                  disabled={!!problem || empty || !account}
                   className={cn(
-                    "flex items-center gap-2 border bg-surface-1 px-3",
-                    problem ? "border-down/40" : "border-line focus-within:border-line-strong",
+                    "flex h-11 items-center justify-center gap-2 text-[14px] font-semibold transition-colors",
+                    "disabled:pointer-events-none disabled:opacity-40",
+                    isDeposit
+                      ? "bg-cash text-white hover:bg-cash-hover"
+                      : "border border-line-strong bg-surface-3 text-ink hover:bg-surface-4",
                   )}
                 >
-                  <span className="shrink-0 font-mono text-[13px] text-ink-muted">
-                    KSh
-                  </span>
-                  <input
-                    id="cash-amount"
-                    inputMode="numeric"
-                    placeholder="0"
-                    // Whole shillings, in and out. Nobody deposits a fraction
-                    // of one, and a field that read `1000` as ten was a trap.
-                    value={empty ? "" : formatMoney(amountMinor, { whole: true })}
-                    onChange={(e) => setAmountMinor(wholeToMinor(e.target.value))}
-                    className="tnum w-full bg-transparent py-3 font-mono text-[20px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
-                  />
-                </div>
+                  {isDeposit ? "Pay now" : "Confirm withdrawal"}
+                </button>
 
-                {/* With nothing prefilled, the bounds have to be stated up
-                    front rather than only in the error that appears once you
-                    have already got them wrong. */}
-                <p className="tnum mt-1.5 font-mono text-[10.5px] text-ink-faint">
-                  Min {formatMoney(minimum, { currency: "KSh", whole: true })} ·
-                  Max {formatMoney(maximum, { currency: "KSh", whole: true })}
-                  {isDeposit ? " per deposit" : " per request"}
-                </p>
-              </div>
-
-              {problem || error ? (
-                <p role="alert" className="text-[12px] text-down">
-                  {problem ?? error}
-                </p>
-              ) : null}
-
-              <button
-                onClick={submit}
-                disabled={!!problem || empty || !account}
-                className={cn(
-                  "flex h-11 items-center justify-center gap-2 text-[14px] font-semibold transition-colors",
-                  "disabled:pointer-events-none disabled:opacity-40",
-                  isDeposit
-                    ? "bg-cash text-white hover:bg-cash-hover"
-                    : "border border-line-strong bg-surface-3 text-ink hover:bg-surface-4",
-                )}
-              >
-                {isDeposit ? "Pay now" : "Confirm withdrawal"}
-              </button>
-
-              <p className="text-center text-[10.5px] leading-relaxed text-ink-faint">
-                {/* True on either rail, and it promises nothing the customer
-                    will not actually see happen on their handset. */}
-                {isDeposit
-                  ? "Charged to your M-PESA account and credited to your Live balance once confirmed."
-                  : onMpesaRail
-                    ? "Paid to your verified M-PESA number."
-                    : "Requests are reviewed and paid to your verified M-PESA number."}
-              </p>
-            </div>
-          ) : stage === "pending" ? (
-            isDeposit ? (
-              <StkProgress stage={liveStage} amountMinor={amountMinor} />
-            ) : (
-              <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-                <Loader2 className="h-7 w-7 animate-spin text-ink-muted" aria-hidden />
-                <p className="text-[14px] font-medium text-ink">Submitting request</p>
-                <p className="max-w-[260px] text-[12px] leading-relaxed text-ink-muted">
-                  {`Requesting ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhoneMasked(account.phone) : "your number"}.`}
-                </p>
-              </div>
-            )
-          ) : (
-            <div className="flex flex-col items-center gap-3 px-6 py-8 text-center">
-              <span className="grid h-11 w-11 place-items-center border border-cash/40 bg-cash/15">
-                <Check className="h-5 w-5 text-cash" aria-hidden />
-              </span>
-              <p className="text-[14px] font-medium text-ink">
-                {isDeposit
-                  ? result?.status === "PENDING"
-                    ? "Deposit pending"
-                    : "Deposit received"
-                  : result?.status === "PENDING"
-                    ? "Withdrawal requested"
-                    : "Withdrawal sent"}
-              </p>
-              <p className="tnum font-mono text-[24px] leading-none text-ink">
-                {formatMoney(amountMinor, { currency: "KSh" })}
-              </p>
-              {result?.reference ? (
-                <p className="font-mono text-[11px] text-ink-muted">
-                  Ref {result.reference}
-                </p>
-              ) : null}
-              {result?.status === "PENDING" ? (
-                <p className="max-w-[280px] text-[12px] leading-relaxed text-ink-muted">
+                <p className="text-center text-[10.5px] leading-relaxed text-ink-faint">
+                  {/* True on either rail, and it promises nothing the customer
+                      will not actually see happen on their handset. */}
                   {isDeposit
-                    ? "Waiting on M-Pesa. Your balance updates automatically once the payment confirms."
-                    : "Your request is being reviewed. The money is sent to your verified M-Pesa number once approved — usually within a few hours."}
+                    ? "Charged to your M-PESA account and credited to your Live balance once confirmed."
+                    : onMpesaRail
+                      ? "Paid to your verified M-PESA number."
+                      : "Requests are reviewed and paid to your verified M-PESA number."}
                 </p>
-              ) : null}
-              <button
-                onClick={() => onOpenChange(false)}
-                className="mt-2 h-10 w-full border border-line-strong bg-surface-3 text-[13.5px] font-medium text-ink transition-colors hover:bg-surface-4"
-              >
-                Done
-              </button>
-            </div>
-          )}
+              </div>
+            ) : stage === "pending" ? (
+              isDeposit ? (
+                <StkProgress stage={liveStage} amountMinor={amountMinor} />
+              ) : (
+                <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                  <Loader2 className="h-7 w-7 animate-spin text-ink-muted" aria-hidden />
+                  <p className="text-[14px] font-medium text-ink">Submitting request</p>
+                  <p className="max-w-[260px] text-[12px] leading-relaxed text-ink-muted">
+                    {`Requesting ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhoneMasked(account.phone) : "your number"}.`}
+                  </p>
+                </div>
+              )
+            ) : (
+              <div className="flex flex-col items-center gap-3 px-6 py-8 text-center">
+                <span className="grid h-11 w-11 place-items-center border border-cash/40 bg-cash/15">
+                  <Check className="h-5 w-5 text-cash" aria-hidden />
+                </span>
+                <p className="text-[14px] font-medium text-ink">
+                  {isDeposit
+                    ? result?.status === "PENDING"
+                      ? "Deposit pending"
+                      : "Deposit received"
+                    : result?.status === "PENDING"
+                      ? "Withdrawal requested"
+                      : "Withdrawal sent"}
+                </p>
+                <p className="tnum font-mono text-[24px] leading-none text-ink">
+                  {formatMoney(amountMinor, { currency: "KSh" })}
+                </p>
+                {result?.reference ? (
+                  <p className="font-mono text-[11px] text-ink-muted">
+                    Ref {result.reference}
+                  </p>
+                ) : null}
+                {result?.status === "PENDING" ? (
+                  <p className="max-w-[280px] text-[12px] leading-relaxed text-ink-muted">
+                    {isDeposit
+                      ? "Waiting on M-Pesa. Your balance updates automatically once the payment confirms."
+                      : "Your request is being reviewed. The money is sent to your verified M-Pesa number once approved — usually within a few hours."}
+                  </p>
+                ) : null}
+                <button
+                  onClick={() => onOpenChange(false)}
+                  className="mt-2 h-10 w-full border border-line-strong bg-surface-3 text-[13.5px] font-medium text-ink transition-colors hover:bg-surface-4"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
