@@ -6,6 +6,7 @@ import {
   Banknote,
   LayoutGrid,
   LogOut,
+  Radio,
   Users,
   Wallet,
   X,
@@ -29,7 +30,7 @@ import { cn } from "@/lib/utils";
  * being one lonely link.
  */
 
-export type AdminView = "overview" | "users" | "withdrawals";
+export type AdminView = "overview" | "users" | "withdrawals" | "sessions";
 
 interface NavItem {
   id: AdminView;
@@ -52,6 +53,12 @@ const NAV: readonly NavItem[] = [
     icon: Banknote,
     description: "Review requests and record payouts",
   },
+  {
+    id: "sessions",
+    label: "Sessions",
+    icon: Radio,
+    description: "TikTok lives, and what each one brought in",
+  },
 ];
 
 const UPCOMING: ReadonlyArray<{ label: string; icon: LucideIcon }> = [
@@ -64,6 +71,7 @@ export function AdminSidebar({
   onNavigate,
   userCount,
   pendingWithdrawals,
+  liveNow,
   projectRef,
   onSignOut,
   onClose,
@@ -73,6 +81,8 @@ export function AdminSidebar({
   userCount: number | null;
   /** Requests awaiting payment — the number an admin signs in to deal with. */
   pendingWithdrawals: number | null;
+  /** True while a host is broadcasting. Worth a marker anywhere in the console. */
+  liveNow: boolean;
   projectRef: string | null;
   onSignOut: () => void;
   /** Present only when rendered as the mobile drawer. */
@@ -153,6 +163,15 @@ export function AdminSidebar({
                     // the one number in this nav that is work waiting.
                     <span className="tnum rounded-none bg-adm-accent-tint px-1.5 py-0.5 text-[11px] font-semibold text-adm-accent-deep">
                       {pendingWithdrawals}
+                    </span>
+                  ) : null}
+                  {item.id === "sessions" && liveNow ? (
+                    // A live broadcast is time-bounded in a way nothing else in
+                    // this console is: whatever the admin came here for, it is
+                    // worth knowing that one is running right now.
+                    <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-adm-neg">
+                      <span aria-hidden className="h-1.5 w-1.5 animate-pulse bg-adm-neg" />
+                      Live
                     </span>
                   ) : null}
                 </button>

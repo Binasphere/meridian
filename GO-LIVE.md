@@ -16,6 +16,19 @@ atomic wallet functions, the withdrawal queue functions, and the live-contract
 booking/settlement RPCs — including the first-deposit bonus (+20% capped at
 KSh 100), now credited for real, server-side, once per account.
 
+The migrations must be applied **in this order**, and `sessions.sql` must be
+last:
+
+1. `schema.sql` — tables, RLS, the profile bootstrap trigger
+2. `go-live.sql` — real money movement
+3. `mpesa-demo.sql` — the VIP demo handsets (skip if you do not use them)
+4. `sessions.sql` — the promo live desk
+
+`sessions.sql` redefines `deposit_start` so that a deposit records which
+broadcast was live when it was raised. Re-running `go-live.sql` afterwards
+restores the version without that line and every session's takings quietly read
+zero — so if you ever re-run it, re-run `sessions.sql` after it.
+
 ## 2. Secrets — and the honest answer on "no env"
 
 Everything *public* is already baked into the code (Supabase URL + anon key in
@@ -29,7 +42,7 @@ minutes. So they cannot be baked in. They can come from either of two places
 | --- | --- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → Settings → API. Powers the admin panel, deposit routes, callback. |
 | `ADMIN_PASSCODE` | Your choice. The `/admin` door; unset = admin panel off. |
-| `AUTH_SECRET` | Your choice (any long random string). Signs admin cookies and PayHero callback URLs. Optional but recommended. |
+| `AUTH_SECRET` | Your choice (any long random string). Signs admin sessions, promo-host sessions and PayHero callback URLs. Unset = the live desk at `/sessions` is off. |
 | `PAYHERO_USERNAME` | PayHero dashboard → API Keys → API Username. |
 | `PAYHERO_PASSWORD` | PayHero dashboard → API Keys → API Password. |
 | `PAYHERO_CHANNEL_ID` | PayHero dashboard → Payment Channels → My Payment Channels (numeric id of your till/paybill). |
@@ -69,6 +82,33 @@ file in the repo; the repo stays clean either way).
    appears in `/admin` → Withdrawals.
 4. Send the payout from your M-Pesa, enter the reference, Mark paid. Then do
    one more request and Reject it — the hold must come back.
+
+## 5. The live desk (`/sessions`)
+
+Staff who market the app on TikTok run their broadcasts from `/sessions`. They
+enrol themselves with their full name, mobile number and a password, sign in,
+and press Start — entering what they paid to promote the live first, because
+that figure is the denominator of everything the broadcast is judged by and a
+cost entered afterwards is a cost entered knowing the answer.
+
+While a session is open, every deposit raised is stamped with its id. The host
+watches the clock and the takings live; the admin sees all of it at `/admin` →
+Sessions and can force-end a broadcast whose host went offline.
+
+To check it works: open `/sessions` in one browser, create a host, start a
+session with a spend of KSh 100. In another, deposit as a customer. The host's
+Collected figure should move within a poll (about 12 seconds), and the customer
+should count as one depositor and one new customer.
+
+Two things worth knowing before you use it in anger:
+
+- **Registration is open.** Anyone who finds the URL can create a host account.
+  The controls are Suspend in the console, the fact that only one broadcast runs
+  at a time, and the admin's ability to end any of them. If the URL leaks, that
+  may not be enough — say so and it becomes an admin-issued invite instead.
+- **Demo-handset deposits are excluded** from a session's takings. An account
+  wired to the M-Pesa clone settles against a prop wallet, so counting it would
+  inflate a host's record with money nobody collected.
 
 ## Known limits (read before scale)
 

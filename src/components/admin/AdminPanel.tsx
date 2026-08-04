@@ -7,9 +7,11 @@ import { adminFetch, setAdminToken } from "@/lib/admin/client";
 import { AdminSidebar, type AdminView } from "./AdminSidebar";
 import { OverviewView } from "./OverviewView";
 import { PasscodeGate } from "./PasscodeGate";
+import { SessionsView } from "./SessionsView";
 import { UsersView } from "./UsersView";
 import { WithdrawalsView } from "./WithdrawalsView";
 import { Button, ToastHost } from "./ui";
+import { useSessions } from "./useSessions";
 import { useUsers } from "./useUsers";
 import { useWithdrawals } from "./useWithdrawals";
 
@@ -41,6 +43,11 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
     title: "Withdrawals",
     description:
       "Requests with funds already held. Pay via M-Pesa, confirm with the reference — or reject to refund.",
+  },
+  sessions: {
+    title: "Sessions",
+    description:
+      "Every TikTok live, how long it ran, and what it collected against what it cost to promote.",
   },
 };
 
@@ -144,10 +151,15 @@ function Console({
   const handleUnauthorised = useCallback(() => onSignedOut(), [onSignedOut]);
   const state = useUsers(handleUnauthorised);
   const withdrawalsState = useWithdrawals(handleUnauthorised);
+  const sessionsState = useSessions(handleUnauthorised);
 
   const pendingWithdrawals =
     withdrawalsState.withdrawals?.filter((w) => w.status === "PENDING").length ??
     null;
+
+  const liveNow = Boolean(
+    sessionsState.sessions?.some((session) => session.endedAt === null),
+  );
 
   async function signOut() {
     await adminFetch("/api/admin/session", { method: "DELETE" }).catch(() => {});
@@ -172,6 +184,7 @@ function Console({
           onNavigate={navigate}
           userCount={state.users?.length ?? null}
           pendingWithdrawals={pendingWithdrawals}
+          liveNow={liveNow}
           projectRef={projectRef}
           onSignOut={() => void signOut()}
         />
@@ -190,6 +203,7 @@ function Console({
               onNavigate={navigate}
               userCount={state.users?.length ?? null}
               pendingWithdrawals={pendingWithdrawals}
+              liveNow={liveNow}
               projectRef={projectRef}
               onSignOut={() => void signOut()}
               onClose={() => setMenuOpen(false)}
@@ -230,6 +244,7 @@ function Console({
             onClick={() => {
               void state.reload();
               void withdrawalsState.reload();
+              void sessionsState.reload();
             }}
             disabled={state.loading || withdrawalsState.loading}
             title="Reload from Supabase"
@@ -251,8 +266,10 @@ function Console({
             <OverviewView users={state.users} />
           ) : view === "users" ? (
             <UsersView state={state} />
-          ) : (
+          ) : view === "withdrawals" ? (
             <WithdrawalsView state={withdrawalsState} />
+          ) : (
+            <SessionsView state={sessionsState} />
           )}
         </main>
       </div>

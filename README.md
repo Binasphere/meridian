@@ -211,8 +211,13 @@ src/
                            Watchlist, TradeTicket, Positions, StatsPanel,
                            MobileBar, SettlementDriver
     ui/primitives.tsx      Panel, Button, Badge, Segmented, Stat, Empty
+    admin/                 The back office — Overview, Users, Withdrawals,
+                           Sessions, and its own light-surface primitives
+    sessions/              The promo live desk at /sessions
   app/
-    page.tsx               The terminal (the only route)
+    page.tsx               The terminal
+    admin/page.tsx         The admin console (passcode)
+    sessions/page.tsx      The live desk (host account)
     globals.css            The design system
 ```
 

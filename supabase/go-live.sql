@@ -4,6 +4,11 @@
 --
 -- Run AFTER schema.sql, in the Supabase SQL editor. Idempotent: safe to re-run.
 --
+-- If you re-run this file after sessions.sql, run sessions.sql again afterwards.
+-- It redefines `deposit_start` to stamp the live promo session onto the deposit,
+-- and the version below — which is otherwise identical — would quietly drop that
+-- line, leaving every broadcast's takings reading zero.
+--
 -- What this adds:
 --   1. Payment-provider columns on cash_events (PayHero checkout id, failure
 --      reason).
