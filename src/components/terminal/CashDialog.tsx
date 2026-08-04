@@ -370,6 +370,8 @@ export function CashDialog({
                       // of one, and a field that read `1000` as ten was a trap.
                       value={empty ? "" : formatMoney(amountMinor, { whole: true })}
                       onChange={(e) => setAmountMinor(wholeToMinor(e.target.value))}
+                      // Already ≥16px, so the touch floor in globals.css would only shrink it.
+                      data-keep-size
                       className="tnum w-full bg-transparent py-3 font-mono text-[20px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
                     />
                   </div>

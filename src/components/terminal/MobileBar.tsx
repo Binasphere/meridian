@@ -156,6 +156,8 @@ export function MobileBar() {
               // ticket types under. See wholeToMinor.
               value={empty ? "" : formatMoney(stakeMinor, { whole: true })}
               onChange={(event) => setStakeMinor(wholeToMinor(event.target.value))}
+              // Already ≥16px, so the touch floor in globals.css would only shrink it.
+              data-keep-size
               className="tnum w-full bg-transparent py-2.5 text-center font-mono text-[17px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
               aria-describedby="mobile-stake-bounds"
               aria-invalid={wrong}

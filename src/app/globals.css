@@ -400,6 +400,34 @@
   }
 }
 
+/* Pinch-zoom is on (see `viewport` in layout.tsx), and this is what makes that
+   affordable.
+
+   iOS Safari zooms the page in whenever a focused form control renders below
+   16px, and it does not zoom back out afterwards — so a 13px search box would
+   leave the whole terminal magnified after one tap. The usual "fix" for that is
+   `maximum-scale=1`, which buys it by taking zoom away from everybody. Flooring
+   the controls instead costs nothing: 16px is the right size for a touch target
+   anyway, and `pointer: coarse` keeps the designed sizes exactly as they are on
+   every mouse-driven screen.
+
+   Deliberately unlayered. Tailwind's utilities live in `@layer utilities`, and
+   an unlayered rule outranks every layer — which is the only way this beats the
+   `text-[13px]` sitting on the element itself.
+
+   That same precedence is why the floor needs an opt-out rather than a `max()`:
+   CSS cannot read an element's own font-size, so a blanket 16px would *shrink*
+   the three fields deliberately drawn larger (the stake box, the deposit
+   amount). Those carry `data-keep-size` — they are already above the threshold,
+   so the floor has nothing to do for them anyway. */
+@media (pointer: coarse) {
+  input:not([data-keep-size]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* Motion is decoration here, never information — nothing is communicated only
    by an animation, so removing all of it costs the user nothing. */
 @media (prefers-reduced-motion: reduce) {

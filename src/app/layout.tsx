@@ -47,12 +47,30 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * `maximumScale` and `userScalable` are stated rather than left to the default,
+ * because the value that used to be here — `maximumScale: 1` — is the one thing
+ * in this file that silently breaks the product for people who need it most.
+ *
+ * It reads as a way to stop iOS zooming when a field is focused. What it
+ * actually does is disable pinch-zoom for the entire document, permanently, for
+ * everyone. On a terminal whose smallest text is 10.5px, that is not a
+ * preference — it fails WCAG 1.4.4, and it means anyone who cannot read a price
+ * at arm's length simply cannot use the site. (The chart kept zooming only
+ * because lightweight-charts implements pinch in JavaScript and never asks the
+ * browser.)
+ *
+ * The focus-zoom it was guarding against is dealt with where it belongs, in
+ * `globals.css`: form controls are floored at 16px on touch devices, which is
+ * the threshold iOS uses to decide whether to zoom at all.
+ */
 export const viewport: Viewport = {
   themeColor: "#08090d",
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({
