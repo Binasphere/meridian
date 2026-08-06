@@ -1,17 +1,22 @@
 "use client";
 
 import { formatMoney } from "@/lib/format";
-import { netMinor, type PromoSession } from "@/lib/sessions/types";
+import { type PromoSession } from "@/lib/sessions/types";
 import { cn } from "@/lib/utils";
 import { StatTile } from "@/components/admin/ui";
 
 /**
- * What a broadcast is worth, as six figures.
+ * What a broadcast is worth, as five figures.
  *
  * The order is the order the questions get asked: how much came in, from how
- * many *new* people, how many signed up, what is still in the air, what it
- * cost, and whether it was worth it. Net comes last because it is the only one
- * that depends on all the others.
+ * many *new* people, how many signed up, what is still in the air, and what it
+ * cost to run.
+ *
+ * Net — takings less promotion — is deliberately absent. It is the figure the
+ * business is judged on rather than the one the host is, and it belongs to the
+ * admin console (`admin/SessionsView`), which is the only surface that shows
+ * it. The host gets what they can act on while live: is money coming in, from
+ * new people, and is anything stuck.
  *
  * Pending money is shown apart from the takings and never added to them. A
  * push that M-Pesa has not confirmed is not a shilling anybody has, and a
@@ -20,7 +25,6 @@ import { StatTile } from "@/components/admin/ui";
  */
 export function Scoreboard({ session }: { session: PromoSession }) {
   const { stats } = session;
-  const net = netMinor(session);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -71,21 +75,6 @@ export function Scoreboard({ session }: { session: PromoSession }) {
         label="Promotion cost"
         value={formatMoney(session.spendMinor, { currency: "KSh" })}
         hint="Entered before you went live"
-      />
-
-      <StatTile
-        label="Net"
-        value={
-          <span
-            className={cn(
-              net > 0n && "text-adm-pos",
-              net < 0n && "text-adm-neg",
-            )}
-          >
-            {formatMoney(net, { currency: "KSh", withSign: net > 0n })}
-          </span>
-        }
-        hint="Collected, less the promotion"
       />
     </div>
   );

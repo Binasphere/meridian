@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { SessionsPortal } from "@/components/sessions/SessionsPortal";
+import { NO_INDEX } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Live desk",
   // Staff surface on a public host. It should never turn up in a search result
   // for the product it markets.
-  robots: { index: false, follow: false },
+  robots: NO_INDEX,
 };
 
 /**

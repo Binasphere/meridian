@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { supabaseProjectRef } from "@/lib/supabase/config";
+import { NO_INDEX } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Admin console" };
+// Staff surface on a public host, same as /sessions: it should never turn up
+// in a search result for the product it administers.
+export const metadata: Metadata = { title: "Admin console", robots: NO_INDEX };
 
 /**
  * /admin

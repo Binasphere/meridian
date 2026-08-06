@@ -82,10 +82,15 @@ export interface SessionsReport {
 // ---------------------------------------------------------------------------
 
 /**
- * Takings less what the live cost to promote — the number the whole page
- * exists to produce. Pending deposits are excluded on purpose: counting money
- * M-Pesa has not confirmed would make a broadcast look profitable minutes
- * before it turns out not to be.
+ * Takings less what the live cost to promote.
+ *
+ * An **admin figure**: it is rendered only by the admin console. The host
+ * portal shows takings and promotion cost but never the difference, so keep
+ * this out of anything under `components/sessions`.
+ *
+ * Pending deposits are excluded on purpose: counting money M-Pesa has not
+ * confirmed would make a broadcast look profitable minutes before it turns out
+ * not to be.
  */
 export function netMinor(session: PromoSession): bigint {
   return toMinor(session.stats.depositMinor) - toMinor(session.spendMinor);

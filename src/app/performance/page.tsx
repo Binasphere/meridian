@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { AccountShell } from "@/components/account/AccountShell";
 import { PerformancePage } from "@/components/account/views";
+import { NO_INDEX } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Performance" };
+// One person's running P&L.
+export const metadata: Metadata = { title: "Performance", robots: NO_INDEX };
 
 export default function Page() {
   return (

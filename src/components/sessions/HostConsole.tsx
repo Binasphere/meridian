@@ -15,10 +15,8 @@ import {
   elapsedMs,
   formatElapsed,
   formatSpan,
-  netMinor,
   type PromoSession,
 } from "@/lib/sessions/types";
-import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardHeader, Skeleton, useNotify } from "@/components/admin/ui";
 import { LiveDot, Scoreboard } from "./Scoreboard";
 import { useNow } from "@/lib/sessions/useNow";
@@ -375,8 +373,13 @@ function HistoryCard({ sessions }: { sessions: PromoSession[] }) {
   );
 }
 
+/**
+ * One past broadcast.
+ *
+ * Net is absent here for the same reason it is absent from `Scoreboard`: it is
+ * an admin figure, shown only in the admin console.
+ */
 function HistoryRow({ session }: { session: PromoSession }) {
-  const net = netMinor(session);
   const ran = elapsedMs(session, Date.now());
 
   return (
@@ -403,11 +406,6 @@ function HistoryRow({ session }: { session: PromoSession }) {
       <Figure label="Deposits" value={String(session.stats.depositCount)} />
       <Figure label="New" value={String(session.stats.newDepositors)} />
       <Figure label="Spent" value={formatMoney(session.spendMinor, { currency: "KSh" })} />
-      <Figure
-        label="Net"
-        value={formatMoney(net, { currency: "KSh", withSign: net > 0n })}
-        className={cn(net > 0n && "text-adm-pos", net < 0n && "text-adm-neg")}
-      />
     </li>
   );
 }
@@ -419,21 +417,11 @@ function HistoryRow({ session }: { session: PromoSession }) {
  * stacks below `lg`, and a bare number with its heading three screens up is a
  * number nobody can read.
  */
-function Figure({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
+function Figure({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3 lg:w-[112px] lg:flex-col lg:items-end lg:justify-start lg:gap-0.5">
       <span className="adm-eyebrow">{label}</span>
-      <span className={cn("tnum text-[13px] font-medium text-adm-ink", className)}>
-        {value}
-      </span>
+      <span className="tnum text-[13px] font-medium text-adm-ink">{value}</span>
     </div>
   );
 }

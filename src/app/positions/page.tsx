@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { AccountShell } from "@/components/account/AccountShell";
 import { PositionsPage } from "@/components/account/views";
+import { NO_INDEX } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Positions" };
+// One person's open and settled contracts.
+export const metadata: Metadata = { title: "Positions", robots: NO_INDEX };
 
 export default function Page() {
   return (

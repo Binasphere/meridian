@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { Terminal } from "@/components/terminal/Terminal";
+
+// Canonical is set per indexable page rather than in the layout, which would
+// inherit it everywhere — see the note in `layout.tsx`.
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 /**
  * The root route is the terminal.

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Toaster } from "sonner";
+import { SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 /**
@@ -36,7 +37,32 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+/**
+ * `robots` is deliberately *not* set here.
+ *
+ * It used to say `{ index: false, follow: false }`, which is correct for a site
+ * nobody is meant to find and fatal for one that is: inherited by every route,
+ * it makes the sitemap a list of pages Google is under orders to ignore, and
+ * the failure is silent — Search Console reports the URLs as discovered and
+ * excluded rather than as an error.
+ *
+ * So the default is now "indexable", and the pages that must stay out carry
+ * their own `robots: { index: false, follow: false }`: `/account`, `/wallet`,
+ * `/positions` and `/performance` because they render one person's money, and
+ * `/admin` and `/sessions` because they are staff surfaces. `lib/site.ts` holds
+ * the list and the reasoning; `robots.ts` repeats it for crawl budget.
+ *
+ * `metadataBase` resolves canonical and Open Graph URLs. Without it Next warns
+ * at build and falls back to `localhost` in any context that needs an absolute
+ * URL — which is the sort of thing that ships.
+ *
+ * `alternates.canonical` is likewise absent, and must stay absent: metadata is
+ * merged down the tree, so a canonical set here would be inherited by every
+ * page and declare the entire site a duplicate of the home page. It is set on
+ * the two indexable pages individually.
+ */
 export const metadata: Metadata = {
+  metadataBase: SITE_URL,
   title: {
     default: "Venti — Fixed-time derivatives",
     template: "%s · Venti",
@@ -44,7 +70,6 @@ export const metadata: Metadata = {
   description:
     "A fixed-time derivatives terminal. Transparent payouts, server-priced settlement, and a practice account that behaves exactly like the live one.",
   applicationName: "Venti",
-  robots: { index: false, follow: false },
 };
 
 /**
