@@ -30,6 +30,28 @@ export function absoluteUrl(path: string): string {
 }
 
 /**
+ * What the product calls itself in a browser tab and a link preview.
+ *
+ * Deliberately *not* the brand. The app is served on more than one domain, and
+ * a title carrying one domain's name is wrong on every other one — a visitor
+ * who opens the second domain and sees the first domain's name in the tab has
+ * been told, at a glance, that they are somewhere other than where they typed.
+ * A descriptive name is true on all of them, which is the only property a
+ * shared title can have.
+ *
+ * The env var exists for the day the domains stop being mirrors. One Vercel
+ * project serving both means one value for both, so setting it changes every
+ * domain at once; splitting into a project per domain is what makes it a
+ * per-domain name, and that split then needs no code change. The default is
+ * generic rather than a real name because a default is what ships when nobody
+ * remembers to configure it, and a wrong name is worse than a plain one.
+ *
+ * The brand still appears where it is unambiguously correct: the `Wordmark`
+ * component, which renders inside the app the visitor is already looking at.
+ */
+export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || "Trading Terminal";
+
+/**
  * Spread into the `metadata` of any page that must stay out of search.
  *
  * A constant rather than an inline literal at each call site so that the six

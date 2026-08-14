@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Toaster } from "sonner";
-import { SITE_URL } from "@/lib/site";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 /**
@@ -60,16 +60,21 @@ const plexMono = IBM_Plex_Mono({
  * merged down the tree, so a canonical set here would be inherited by every
  * page and declare the entire site a duplicate of the home page. It is set on
  * the two indexable pages individually.
+ *
+ * The titles read from `SITE_NAME` rather than naming the brand, because this
+ * build is served on more than one domain and these three strings are the only
+ * ones a visitor sees before the page paints — in the tab, in a link preview,
+ * in a bookmark. `lib/site.ts` holds the reasoning.
  */
 export const metadata: Metadata = {
   metadataBase: SITE_URL,
   title: {
-    default: "Venti — Fixed-time derivatives",
-    template: "%s · Venti",
+    default: `${SITE_NAME} — Fixed-time derivatives`,
+    template: `%s · ${SITE_NAME}`,
   },
   description:
     "A fixed-time derivatives terminal. Transparent payouts, server-priced settlement, and a practice account that behaves exactly like the live one.",
-  applicationName: "Venti",
+  applicationName: SITE_NAME,
 };
 
 /**
