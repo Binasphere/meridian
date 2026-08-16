@@ -104,11 +104,16 @@ export function HostGate({ onSignedIn }: { onSignedIn: () => void }) {
           >
             <Radio size={16} />
           </span>
+          {/* No product name. One build serves this page on every domain, so a
+              hardcoded one is wrong on all but the first — and unlike the
+              customer's terminal there is nothing here a host needs branding to
+              recognise. The desk they reach is decided by the address they
+              opened, not by a word on the page. */}
           <div className="leading-tight">
             <div className="text-[14px] font-semibold tracking-[-0.01em] text-adm-ink">
-              Venti
+              Live desk
             </div>
-            <div className="text-[12px] text-adm-ink-3">Live desk</div>
+            <div className="text-[12px] text-adm-ink-3">Host sign-in</div>
           </div>
         </div>
 

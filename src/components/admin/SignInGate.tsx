@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Loader2, Lock, ShieldPlus } from "lucide-react";
+import { ArrowRight, Loader2, Lock, ShieldCheck, ShieldPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminFetch, setAdminToken } from "@/lib/admin/client";
 import { MIN_ADMIN_PASSWORD_LENGTH } from "@/lib/admin/types";
@@ -39,18 +39,21 @@ export function SignInGate({
   return (
     <div className="adm-root flex min-h-dvh items-center justify-center px-5 py-10">
       <div className="w-full max-w-[380px]">
+        {/* Unbranded, matching the sidebar: the console spans every domain, so
+            naming it after one product is wrong before you have even signed
+            in. See `AdminSidebar`. */}
         <div className="mb-6 flex items-center gap-2.5">
           <span
             aria-hidden
-            className="grid h-9 w-9 place-items-center rounded-none bg-adm-ink text-[14px] font-semibold text-white"
+            className="grid h-9 w-9 place-items-center rounded-none bg-adm-ink text-white"
           >
-            M
+            <ShieldCheck size={16} />
           </span>
           <div className="leading-tight">
             <div className="text-[14px] font-semibold tracking-[-0.01em] text-adm-ink">
-              Venti
+              Admin console
             </div>
-            <div className="text-[12px] text-adm-ink-3">Admin console</div>
+            <div className="text-[12px] text-adm-ink-3">All domains</div>
           </div>
         </div>
 

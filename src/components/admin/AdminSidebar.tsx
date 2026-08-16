@@ -140,20 +140,26 @@ export function AdminSidebar({
 }) {
   return (
     <div className="flex h-full flex-col border-r border-adm-line bg-adm-raise">
-      {/* --- Identity ------------------------------------------------------ */}
+      {/* --- Identity ------------------------------------------------------
+          Deliberately unbranded. This console administers every domain on the
+          platform, so naming it after one of the products was wrong the moment
+          there were two — it read as "the Venti console" to someone who had
+          just filtered the page to Candix. What it is, is the admin console;
+          which product you are looking at is the filter in the header, and
+          that is the only place a product name belongs here. */}
       <div className="flex h-16 shrink-0 items-center justify-between gap-2 px-5">
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
-            className="grid h-8 w-8 place-items-center rounded-none bg-adm-ink text-[13px] font-semibold text-white"
+            className="grid h-8 w-8 place-items-center rounded-none bg-adm-ink text-white"
           >
-            M
+            <ShieldCheck size={15} />
           </span>
           <div className="leading-tight">
             <div className="text-[13.5px] font-semibold tracking-[-0.01em] text-adm-ink">
-              Venti
+              Admin console
             </div>
-            <div className="text-[11px] text-adm-ink-3">Admin console</div>
+            <div className="text-[11px] text-adm-ink-3">All domains</div>
           </div>
         </div>
 
