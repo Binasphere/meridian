@@ -23,6 +23,7 @@ import {
 import { useNow } from "@/lib/sessions/useNow";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardHeader, Skeleton, StatTile, avatarTint, useNotify } from "./ui";
+import { LineChart, TableView } from "./charts";
 import type { SessionsState } from "./useSessions";
 
 /**
@@ -231,6 +232,11 @@ export function SessionsView({ state }: { state: SessionsState }) {
           ))}
         </div>
       )}
+
+      {/* --- Collected per day --------------------------------------------- */}
+      {money && sessions && sessions.length > 0 ? (
+        <DailyTakings sessions={sessions} />
+      ) : null}
 
       {/* --- Every session -------------------------------------------------- */}
       <Card className="overflow-hidden">
@@ -758,6 +764,97 @@ function Kpi({
 }
 
 
+
+// ---------------------------------------------------------------------------
+// Collected per day
+// ---------------------------------------------------------------------------
+
+/**
+ * What the desk took, by day.
+ *
+ * A line, and a line about *days* rather than about broadcasts. The bars this
+ * replaced put one row per session, which meant a column of repeated host names
+ * and a chart that answered "which live was biggest" — a question the table
+ * below already answers better, with the dates attached.
+ *
+ * Days are the unit that shows a trend. Two broadcasts on one evening are one
+ * night's takings, and reading them as two separate results was hiding exactly
+ * the pattern a promo desk is run against.
+ *
+ * Derived from the sessions already loaded rather than from a new endpoint:
+ * these are session takings specifically, not platform deposits, so summing the
+ * rows on screen is both cheaper and guaranteed to agree with the table under
+ * it. Gaps are filled with zeroes — a line that skips a quiet day draws a
+ * straight segment across it and reads as steady trade.
+ */
+function DailyTakings({ sessions }: { sessions: AdminPromoSession[] }) {
+  const series = useMemo(() => {
+    const byDay = new Map<string, bigint>();
+
+    for (const session of sessions) {
+      const day = new Date(session.startedAt).toISOString().slice(0, 10);
+      byDay.set(
+        day,
+        (byDay.get(day) ?? 0n) + toMinor(session.stats.depositMinor ?? "0"),
+      );
+    }
+
+    const days = [...byDay.keys()].sort();
+    if (days.length === 0) return null;
+
+    // Every calendar day between the first and the last, so a quiet Tuesday is
+    // a zero rather than a missing point.
+    const filled: string[] = [];
+    const cursor = new Date(`${days[0]}T00:00:00Z`);
+    const last = new Date(`${days[days.length - 1]}T00:00:00Z`);
+    while (cursor <= last && filled.length < 180) {
+      filled.push(cursor.toISOString().slice(0, 10));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    return {
+      days: filled,
+      values: filled.map((day) => Number((byDay.get(day) ?? 0n) / 100n)),
+    };
+  }, [sessions]);
+
+  if (!series) return null;
+
+  return (
+    <Card>
+      <CardHeader
+        title="Collected per day"
+        subtitle="Deposits confirmed while a broadcast was open, by day."
+      />
+      <div className="px-5 py-4">
+        <LineChart
+          series={[{ id: "takings", label: "Collected", values: series.values }]}
+          labels={series.days.map((day) =>
+            new Date(`${day}T00:00:00`).toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "short",
+            }),
+          )}
+          format={(value) =>
+            value >= 1000 ? `${Math.round(value / 1000)}k` : String(Math.round(value))
+          }
+          height={190}
+          emptyMessage="No confirmed deposits during a broadcast yet."
+        />
+        <TableView
+          columns={["Day", "Collected"]}
+          rows={series.days.map((day, index) => [
+            day,
+            formatMoney(BigInt(Math.round(series.values[index] ?? 0)) * 100n, {
+              currency: "KSh",
+              whole: true,
+            }),
+          ])}
+        />
+      </div>
+    </Card>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // The table

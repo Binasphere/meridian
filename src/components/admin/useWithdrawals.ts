@@ -28,6 +28,18 @@ export interface WithdrawalsState {
     id: string,
     verdict: WithdrawalVerdict,
   ) => Promise<{ ok: true } | { ok: false; reason: string }>;
+  /**
+   * Marks several requests paid under one reference.
+   *
+   * Sequential rather than parallel, and it **keeps going after a failure**:
+   * each request is a separate movement of real money, so a batch that aborted
+   * halfway would leave the queue in a state nobody can read — some paid, some
+   * not, and no record of which. The caller is told exactly how many succeeded.
+   */
+  decideMany: (
+    ids: string[],
+    reference: string,
+  ) => Promise<{ done: number; failed: { id: string; reason: string }[] }>;
 }
 
 /** `enabled` is false for a role without the `finance` capability — see `useUsers`. */
@@ -118,5 +130,21 @@ export function useWithdrawals(
     [reload],
   );
 
-  return { withdrawals, loading, error, pending, reload, decide };
+  const decideMany = useCallback<WithdrawalsState["decideMany"]>(
+    async (ids, reference) => {
+      const failed: { id: string; reason: string }[] = [];
+      let done = 0;
+
+      for (const id of ids) {
+        const result = await decide(id, { action: "PAID", reference });
+        if (result.ok) done += 1;
+        else failed.push({ id, reason: result.reason });
+      }
+
+      return { done, failed };
+    },
+    [decide],
+  );
+
+  return { withdrawals, loading, error, pending, reload, decide, decideMany };
 }

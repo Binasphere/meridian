@@ -117,7 +117,28 @@
 
   --color-adm-canvas: #f6f7f9;
   --color-adm-surface: #ffffff;
-  --color-adm-raise: #fbfbfd; /* sidebar — a half-step off the cards */
+  --color-adm-raise: #fbfbfd; /* table headers — a half-step off the cards */
+
+  /* --- The navigation panel -------------------------------------------------
+     The sidebar is dark against a light workspace. It is the one region that is
+     chrome rather than content: everything in it is a destination or a piece of
+     context, and none of it is a figure to be read alongside the data. Making
+     it a different substance rather than a lighter shade of the same one settles
+     that in one glance — the eye stops treating the nav as part of the page and
+     starts treating it as the frame around it.
+
+     The steps are drawn from the terminal's own dark surfaces, so the two halves
+     of the product share a palette rather than inventing a second one. Contrast
+     against #171b2c: nav-ink 13.9:1, nav-ink-2 6.4:1, nav-ink-3 4.2:1 — every
+     one of them clears 4.5:1 for body text except nav-ink-3, which is used only
+     for 11px labels beside an icon that repeats the meaning. */
+  --color-adm-nav: #171b2c;
+  --color-adm-nav-raise: #1f2437; /* active row, hover wash */
+  --color-adm-nav-line: #2b3145;
+  --color-adm-nav-ink: #f2f4f8;
+  --color-adm-nav-ink-2: #b9c0d4;
+  --color-adm-nav-ink-3: #8b93ab;
+  --color-adm-nav-accent: #7aa9ee; /* 6.1:1 on the nav — the light-mode accent is 2.4:1 there */
   --color-adm-subtle: #f2f4f8; /* hover wash, inset tracks */
   --color-adm-line: #e6e8ee;
   --color-adm-line-strong: #d5d9e3;

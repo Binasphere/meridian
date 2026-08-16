@@ -139,7 +139,7 @@ export function AdminSidebar({
   onClose?: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col border-r border-adm-line bg-adm-raise">
+    <div className="flex h-full flex-col border-r border-adm-nav-line bg-adm-nav">
       {/* --- Identity ------------------------------------------------------
           Deliberately unbranded. This console administers every domain on the
           platform, so naming it after one of the products was wrong the moment
@@ -151,15 +151,15 @@ export function AdminSidebar({
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
-            className="grid h-8 w-8 place-items-center rounded-none bg-adm-ink text-white"
+            className="grid h-8 w-8 place-items-center rounded-none bg-adm-nav-raise text-adm-nav-ink"
           >
             <ShieldCheck size={15} />
           </span>
           <div className="leading-tight">
-            <div className="text-[13.5px] font-semibold tracking-[-0.01em] text-adm-ink">
+            <div className="text-[13.5px] font-semibold tracking-[-0.01em] text-adm-nav-ink">
               Admin console
             </div>
-            <div className="text-[11px] text-adm-ink-3">All domains</div>
+            <div className="text-[11px] text-adm-nav-ink-3">All domains</div>
           </div>
         </div>
 
@@ -167,7 +167,7 @@ export function AdminSidebar({
           <button
             onClick={onClose}
             aria-label="Close menu"
-            className="rounded-none p-1.5 text-adm-ink-3 transition-colors hover:bg-adm-subtle hover:text-adm-ink lg:hidden"
+            className="rounded-none p-1.5 text-adm-nav-ink-3 transition-colors hover:bg-adm-nav-raise hover:text-adm-nav-ink lg:hidden"
           >
             <X size={16} />
           </button>
@@ -176,7 +176,7 @@ export function AdminSidebar({
 
       {/* --- Navigation ---------------------------------------------------- */}
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
-        <p className="adm-eyebrow px-2 pb-2 pt-3">Manage</p>
+        <p className="adm-eyebrow px-2 pb-2 pt-3 text-adm-nav-ink-3">Manage</p>
         <ul className="space-y-0.5">
           {NAV.filter(
             // Not greyed out like the "Not yet live" group below: those are
@@ -197,13 +197,13 @@ export function AdminSidebar({
                     "group flex w-full items-center gap-2.5 rounded-none px-2.5 py-2 text-[13.5px] font-medium",
                     "transition-colors duration-150",
                     active
-                      ? "bg-adm-accent-tint text-adm-accent-deep"
-                      : "text-adm-ink-2 hover:bg-adm-subtle hover:text-adm-ink",
+                      ? "bg-adm-nav-raise text-adm-nav-ink"
+                      : "text-adm-nav-ink-2 hover:bg-adm-nav-raise hover:text-adm-nav-ink",
                   )}
                 >
                   <Icon
                     size={16}
-                    className={active ? "text-adm-accent" : "text-adm-ink-4"}
+                    className={active ? "text-adm-nav-accent" : "text-adm-nav-ink-3"}
                   />
                   <span className="flex-1 text-left">{item.label}</span>
                   {item.id === "users" && userCount !== null ? (
@@ -211,8 +211,8 @@ export function AdminSidebar({
                       className={cn(
                         "tnum rounded-none px-1.5 py-0.5 text-[11px] font-semibold",
                         active
-                          ? "bg-white/70 text-adm-accent-deep"
-                          : "bg-adm-subtle text-adm-ink-3",
+                          ? "bg-adm-nav-accent/20 text-adm-nav-ink"
+                          : "bg-white/10 text-adm-nav-ink-3",
                       )}
                     >
                       {userCount}
@@ -223,7 +223,7 @@ export function AdminSidebar({
                   pendingWithdrawals > 0 ? (
                     // Its own colour even when inactive: a pending payout is
                     // the one number in this nav that is work waiting.
-                    <span className="tnum rounded-none bg-adm-accent-tint px-1.5 py-0.5 text-[11px] font-semibold text-adm-accent-deep">
+                    <span className="tnum rounded-none bg-adm-neg px-1.5 py-0.5 text-[11px] font-semibold text-white">
                       {pendingWithdrawals}
                     </span>
                   ) : null}
@@ -231,8 +231,8 @@ export function AdminSidebar({
                     // A live broadcast is time-bounded in a way nothing else in
                     // this console is: whatever the admin came here for, it is
                     // worth knowing that one is running right now.
-                    <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-adm-neg">
-                      <span aria-hidden className="h-1.5 w-1.5 animate-pulse bg-adm-neg" />
+                    <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#ff8a80]">
+                      <span aria-hidden className="h-1.5 w-1.5 animate-pulse bg-[#ff8a80]" />
                       Live
                     </span>
                   ) : null}
@@ -242,18 +242,18 @@ export function AdminSidebar({
           })}
         </ul>
 
-        <p className="adm-eyebrow px-2 pb-2 pt-5">Not yet live</p>
+        <p className="adm-eyebrow px-2 pb-2 pt-5 text-adm-nav-ink-3">Not yet live</p>
         <ul className="space-y-0.5">
           {UPCOMING.map((item) => {
             const Icon = item.icon;
             return (
               <li
                 key={item.label}
-                className="flex cursor-not-allowed items-center gap-2.5 rounded-none px-2.5 py-2 text-[13.5px] font-medium text-adm-ink-4"
+                className="flex cursor-not-allowed items-center gap-2.5 rounded-none px-2.5 py-2 text-[13.5px] font-medium text-adm-nav-ink-3/60"
               >
                 <Icon size={16} />
                 <span className="flex-1">{item.label}</span>
-                <span className="rounded-none border border-adm-line bg-adm-surface px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-adm-ink-4">
+                <span className="rounded-none border border-adm-nav-line bg-adm-nav-raise px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-adm-nav-ink-3">
                   Soon
                 </span>
               </li>
@@ -263,14 +263,14 @@ export function AdminSidebar({
       </nav>
 
       {/* --- Context ------------------------------------------------------- */}
-      <div className="shrink-0 border-t border-adm-line p-3">
-        <div className="rounded-none border border-adm-line bg-adm-surface px-3 py-2.5">
+      <div className="shrink-0 border-t border-adm-nav-line p-3">
+        <div className="rounded-none border border-adm-nav-line bg-adm-nav-raise px-3 py-2.5">
           <div className="flex items-center gap-1.5">
-            <span aria-hidden className="h-1.5 w-1.5 bg-adm-pos" />
-            <span className="adm-eyebrow">Supabase</span>
+            <span aria-hidden className="h-1.5 w-1.5 bg-[#4ade80]" />
+            <span className="adm-eyebrow text-adm-nav-ink-3">Supabase</span>
           </div>
           <p
-            className="mt-1 truncate font-mono text-[11px] text-adm-ink-2"
+            className="mt-1 truncate font-mono text-[11px] text-adm-nav-ink-2"
             title={projectRef ?? undefined}
           >
             {projectRef ?? "not configured"}
@@ -280,16 +280,16 @@ export function AdminSidebar({
         <div className="mt-2 space-y-0.5">
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-none px-2.5 py-2 text-[13px] font-medium text-adm-ink-2 transition-colors hover:bg-adm-subtle hover:text-adm-ink"
+            className="flex items-center gap-2.5 rounded-none px-2.5 py-2 text-[13px] font-medium text-adm-nav-ink-2 transition-colors hover:bg-adm-nav-raise hover:text-adm-nav-ink"
           >
-            <ArrowUpRight size={15} className="text-adm-ink-4" />
+            <ArrowUpRight size={15} className="text-adm-nav-ink-3" />
             Open terminal
           </Link>
           <button
             onClick={onSignOut}
-            className="flex w-full items-center gap-2.5 rounded-none px-2.5 py-2 text-[13px] font-medium text-adm-ink-2 transition-colors hover:bg-adm-subtle hover:text-adm-ink"
+            className="flex w-full items-center gap-2.5 rounded-none px-2.5 py-2 text-[13px] font-medium text-adm-nav-ink-2 transition-colors hover:bg-adm-nav-raise hover:text-adm-nav-ink"
           >
-            <LogOut size={15} className="text-adm-ink-4" />
+            <LogOut size={15} className="text-adm-nav-ink-3" />
             Sign out
           </button>
         </div>

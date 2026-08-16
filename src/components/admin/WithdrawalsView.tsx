@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Banknote, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCheck, Inbox, Loader2 } from "lucide-react";
 import { formatMoney } from "@/lib/format";
 import { formatPhone } from "@/lib/auth";
 import type { AdminWithdrawal } from "@/lib/admin/types";
@@ -22,6 +22,7 @@ import type { WithdrawalsState } from "./useWithdrawals";
 export function WithdrawalsView({ state }: { state: WithdrawalsState }) {
   const { withdrawals, error, pending, decide } = state;
   const notify = useNotify();
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const queue = withdrawals?.filter((w) => w.status === "PENDING") ?? [];
   const decided = withdrawals?.filter((w) => w.status !== "PENDING") ?? [];
@@ -58,19 +59,32 @@ export function WithdrawalsView({ state }: { state: WithdrawalsState }) {
           subtitle="Funds are already held. Send the money via M-Pesa, then confirm with the reference — or reject to refund."
           action={
             queue.length > 0 ? (
-              <Badge tone="accent">{queue.length} pending</Badge>
+              <div className="flex items-center gap-2">
+                <Badge tone="accent">{queue.length} pending</Badge>
+                {queue.length > 1 ? (
+                  <Button onClick={() => setBulkOpen((value) => !value)}>
+                    <CheckCheck size={14} />
+                    {bulkOpen ? "Cancel" : "Mark all paid"}
+                  </Button>
+                ) : null}
+              </div>
             ) : null
           }
         />
 
+        {bulkOpen && queue.length > 1 ? (
+          <BulkPayPanel queue={queue} state={state} onDone={() => setBulkOpen(false)} />
+        ) : null}
+
         {error ? (
-          <EmptyState title="Could not load withdrawals" hint={error} />
+          <EmptyState title="Could not load withdrawals" hint={error} tone="error" />
         ) : withdrawals === null ? (
           <QueueSkeletons />
         ) : queue.length === 0 ? (
           <EmptyState
-            title="Nothing waiting"
-            hint="New withdrawal requests land here the moment a customer raises them. Refresh to check for new ones."
+            title="Everyone has been paid"
+            tone="good"
+            hint="The payout queue is clear. New requests land here the moment a customer raises one, and the sidebar carries a count so you do not have to keep this page open."
           />
         ) : (
           <ul className="divide-y divide-adm-line">
@@ -224,14 +238,169 @@ function DecidedRow({ row }: { row: AdminWithdrawal }) {
 // States
 // ---------------------------------------------------------------------------
 
-function EmptyState({ title, hint }: { title: string; hint: string }) {
+/**
+ * Bulk payout.
+ *
+ * One reference for the whole batch, because that is the only case where paying
+ * in bulk is honest: an admin who sent one M-Pesa batch has one code, and
+ * recording it against every request is the truth. Anyone paying individually
+ * has a code per payout and should use the per-row form — which is why this
+ * says so rather than quietly accepting a blank.
+ *
+ * It states the count and the total before it will do anything, and the confirm
+ * is a second, separate click. This moves real money out of a real till; a
+ * control that did it on one press would eventually do it by accident.
+ *
+ * Failures do not stop the run. Each request is its own movement, and a batch
+ * that aborted halfway would leave a queue nobody can read.
+ */
+function BulkPayPanel({
+  queue,
+  state,
+  onDone,
+}: {
+  queue: AdminWithdrawal[];
+  state: WithdrawalsState;
+  onDone: () => void;
+}) {
+  const notify = useNotify();
+  const [reference, setReference] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const total = queue.reduce((sum, row) => sum + BigInt(row.amountMinor), 0n);
+  const ready = reference.trim().length >= 4;
+
+  async function run() {
+    setBusy(true);
+    try {
+      const { done, failed } = await state.decideMany(
+        queue.map((row) => row.id),
+        reference.trim(),
+      );
+
+      if (failed.length === 0) {
+        notify({
+          tone: "success",
+          title: `${done} ${done === 1 ? "request" : "requests"} marked paid`,
+          body: `All recorded against reference ${reference.trim()}.`,
+        });
+      } else {
+        notify({
+          tone: "error",
+          title: `${done} paid, ${failed.length} could not be`,
+          body: `${failed[0]?.reason ?? "Unknown error"} — the rest are still in the queue.`,
+        });
+      }
+      onDone();
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <div className="border-b border-adm-line bg-adm-subtle px-5 py-4">
+      <div className="flex items-start gap-2.5">
+        <AlertTriangle size={15} className="mt-0.5 shrink-0 text-adm-neg" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] font-medium text-adm-ink">
+            Mark all {queue.length} requests paid —{" "}
+            {formatMoney(total, { currency: "KSh" })}
+          </p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-adm-ink-3">
+            Only do this if you sent the money as one M-Pesa batch. One reference
+            is recorded against every request, so individual payouts can no
+            longer be told apart afterwards — pay those one at a time below.
+          </p>
+
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!confirming) setConfirming(true);
+              else void run();
+            }}
+            className="mt-3 flex flex-wrap items-end gap-2"
+          >
+            <div className="min-w-[200px]">
+              <label
+                htmlFor="adm-bulk-ref"
+                className="mb-1.5 block text-[12px] font-medium text-adm-ink-2"
+              >
+                M-Pesa reference for the batch
+              </label>
+              <input
+                id="adm-bulk-ref"
+                value={reference}
+                onChange={(event) => {
+                  setReference(event.target.value.toUpperCase());
+                  setConfirming(false);
+                }}
+                placeholder="TG49H2K1LM"
+                className="h-9 w-full rounded-none border border-adm-line-strong bg-adm-surface px-3 font-mono text-[13px] uppercase text-adm-ink outline-none focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!ready || busy}
+              className={cn("h-9", confirming && "bg-adm-neg hover:bg-[#96201a]")}
+            >
+              {busy ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <CheckCheck size={14} />
+              )}
+              {confirming ? `Yes — pay all ${queue.length}` : "Mark all paid"}
+            </Button>
+
+            {confirming ? (
+              <Button type="button" onClick={() => setConfirming(false)} className="h-9">
+                Cancel
+              </Button>
+            ) : null}
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The empty state.
+ *
+ * `tone` picks what the emptiness *means*. "Nothing waiting" on a payout queue
+ * is the good outcome — everybody has been paid — and drawing it with the same
+ * grey shrug as an error made a finished queue look like a broken one.
+ */
+function EmptyState({
+  title,
+  hint,
+  tone = "neutral",
+}: {
+  title: string;
+  hint: string;
+  tone?: "neutral" | "good" | "error";
+}) {
+  const Icon = tone === "good" ? CheckCheck : tone === "error" ? AlertTriangle : Inbox;
+
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-      <span className="grid h-10 w-10 place-items-center rounded-none bg-adm-subtle text-adm-ink-4">
-        <Banknote size={18} />
+      <span
+        className={cn(
+          "grid h-11 w-11 place-items-center rounded-none",
+          tone === "good"
+            ? "bg-[#e8f6ef] text-adm-pos"
+            : tone === "error"
+              ? "bg-[#fdeceb] text-adm-neg"
+              : "bg-adm-subtle text-adm-ink-4",
+        )}
+      >
+        <Icon size={19} />
       </span>
       <p className="mt-1 text-[13.5px] font-medium text-adm-ink">{title}</p>
-      <p className="max-w-[400px] text-[12.5px] leading-relaxed text-adm-ink-3">
+      <p className="max-w-[420px] text-[12.5px] leading-relaxed text-adm-ink-3">
         {hint}
       </p>
     </div>
