@@ -19,6 +19,28 @@ import type { WithdrawalsState } from "./useWithdrawals";
  * confirming is one bare click is a queue that gets confirmed by accident.
  */
 
+/**
+ * Does this look like an M-Pesa transaction code?
+ *
+ * Both forms used to accept any non-empty string, and the predictable happened
+ * within a day of shipping the bulk action: a batch went through with the word
+ * `PAID` in the reference field, so five payouts now carry no way to trace the
+ * money that left the till. The reference is the entire point of the step — a
+ * field that accepts anything is a field that records nothing.
+ *
+ * Safaricom codes are ten uppercase alphanumerics (`T93R3LXXPT`). The rule is
+ * slightly looser than that — 8 to 15 characters — so a format change does not
+ * lock the queue, but it requires **at least one digit**, which is what rejects
+ * every English word somebody might type in a hurry.
+ */
+export function looksLikeReference(value: string): boolean {
+  const trimmed = value.trim().toUpperCase();
+  return /^[A-Z0-9]{8,15}$/.test(trimmed) && /\d/.test(trimmed);
+}
+
+const REFERENCE_HINT =
+  "8–15 letters and numbers, at least one digit — the code from the M-Pesa message.";
+
 export function WithdrawalsView({ state }: { state: WithdrawalsState }) {
   const { withdrawals, error, pending, decide } = state;
   const notify = useNotify();
@@ -100,24 +122,19 @@ export function WithdrawalsView({ state }: { state: WithdrawalsState }) {
         )}
       </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader
-          title="Decided"
-          subtitle="Paid and rejected requests, newest first."
-        />
-        {decided.length === 0 ? (
-          <EmptyState
-            title="No decided requests yet"
-            hint="Once a request is paid or rejected it moves down here with its outcome."
-          />
-        ) : (
-          <ul className="divide-y divide-adm-line">
-            {decided.slice(0, 50).map((row) => (
-              <DecidedRow key={row.id} row={row} />
-            ))}
-          </ul>
-        )}
-      </Card>
+      {/* The decided list is gone from the page.
+          Fifty rows of "Paid · KSh 1,000 · Ayan · PAID" is not a record
+          anybody reads — it is the queue's exhaust, and it pushed the thing
+          this page is actually for below the fold. Nothing is deleted: every
+          decision is still on its `cash_events` row with its reference and its
+          timestamp, so it can come back as a searchable table the day there is
+          a payout to look up, which is the only time anyone wants it. */}
+      {decided.length > 0 ? (
+        <p className="px-1 text-[12.5px] text-adm-ink-3">
+          {decided.length.toLocaleString()} decided{" "}
+          {decided.length === 1 ? "request is" : "requests are"} on record.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -138,7 +155,11 @@ function PendingRow({
   ) => void;
 }) {
   const [reference, setReference] = useState("");
-  const canConfirm = reference.trim().length > 0 && !busy;
+  const valid = looksLikeReference(reference);
+  const canConfirm = valid && !busy;
+  // Only complain once they have typed enough to mean it — a validation error
+  // that appears on the first keystroke is noise.
+  const showHint = reference.trim().length >= 3 && !valid;
 
   return (
     <li className="space-y-3 px-4 py-4 sm:px-5">
@@ -170,13 +191,16 @@ function PendingRow({
           onChange={(event) => setReference(event.target.value.toUpperCase())}
           placeholder="M-Pesa reference, e.g. SJ42K9L1MN"
           aria-label="M-Pesa reference"
+          aria-invalid={showHint ? true : undefined}
           disabled={busy}
           className={cn(
-            "h-9 w-full max-w-[260px] rounded-none border border-adm-line-strong bg-adm-surface px-3",
+            "h-9 w-full max-w-[260px] rounded-none border bg-adm-surface px-3",
             "font-mono text-[12.5px] uppercase tracking-wide text-adm-ink outline-none transition-colors",
             "placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-adm-ink-4",
-            "focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint",
             "disabled:opacity-50",
+            showHint
+              ? "border-adm-neg focus:ring-2 focus:ring-[#fdeceb]"
+              : "border-adm-line-strong focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint",
           )}
         />
         <Button
@@ -194,45 +218,16 @@ function PendingRow({
           Reject &amp; refund
         </Button>
       </div>
+
+      {showHint ? (
+        <p role="alert" className="text-[12px] text-adm-neg">
+          {REFERENCE_HINT}
+        </p>
+      ) : null}
     </li>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Decided row: the record
-// ---------------------------------------------------------------------------
-
-function DecidedRow({ row }: { row: AdminWithdrawal }) {
-  const paid = row.status === "COMPLETED";
-
-  return (
-    <li className="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3 sm:px-5">
-      <Badge tone={paid ? "positive" : "neutral"}>
-        {paid ? "Paid" : "Rejected"}
-      </Badge>
-      <span className="tnum font-mono text-[13px] text-adm-ink">
-        {formatMoney(row.amountMinor, { currency: "KSh" })}
-      </span>
-      <span className="text-[12.5px] text-adm-ink-2">
-        {row.username !== "—" ? row.username : formatPhone(row.phone)}
-      </span>
-      <span className="tnum font-mono text-[11.5px] text-adm-ink-3">
-        {paid ? (row.reference ?? "—") : (row.failureReason ?? "Declined")}
-      </span>
-      <span className="ml-auto text-[11.5px] text-adm-ink-4">
-        {row.settledAt
-          ? new Date(row.settledAt).toLocaleString([], {
-              day: "2-digit",
-              month: "short",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            })
-          : ""}
-      </span>
-    </li>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // States
@@ -269,7 +264,10 @@ function BulkPayPanel({
   const [busy, setBusy] = useState(false);
 
   const total = queue.reduce((sum, row) => sum + BigInt(row.amountMinor), 0n);
-  const ready = reference.trim().length >= 4;
+  // The same rule as the per-row form. This is the field that let `PAID`
+  // through, and it is the one where a bad value costs the whole batch.
+  const ready = looksLikeReference(reference);
+  const showHint = reference.trim().length >= 3 && !ready;
 
   async function run() {
     setBusy(true);
@@ -337,8 +335,19 @@ function BulkPayPanel({
                   setConfirming(false);
                 }}
                 placeholder="TG49H2K1LM"
-                className="h-9 w-full rounded-none border border-adm-line-strong bg-adm-surface px-3 font-mono text-[13px] uppercase text-adm-ink outline-none focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint"
+                aria-invalid={showHint ? true : undefined}
+                className={cn(
+                  "h-9 w-full rounded-none border bg-adm-surface px-3 font-mono text-[13px] uppercase text-adm-ink outline-none",
+                  showHint
+                    ? "border-adm-neg focus:ring-2 focus:ring-[#fdeceb]"
+                    : "border-adm-line-strong focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint",
+                )}
               />
+              {showHint ? (
+                <p role="alert" className="mt-1 text-[11.5px] text-adm-neg">
+                  {REFERENCE_HINT}
+                </p>
+              ) : null}
             </div>
 
             <Button
