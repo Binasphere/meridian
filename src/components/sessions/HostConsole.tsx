@@ -13,6 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { formatMoney, wholeToMinor } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { setHostToken } from "@/lib/sessions/client";
 import {
   elapsedMs,
@@ -47,7 +48,16 @@ export function HostConsole({ onSignedOut }: { onSignedOut: () => void }) {
   }
 
   return (
-    <div className="adm-root min-h-dvh">
+    // The same shell as the admin console: a dark rail the full height of the
+    // window, with the header living inside the scrolling column rather than
+    // spanning both. That is what makes the rail read as the frame around the
+    // page instead of a card that happens to be on the left.
+    <div className="adm-root min-h-dvh lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
+      <aside className="sticky top-0 hidden h-dvh lg:block">
+        {snapshot ? <HostRail snapshot={snapshot} onSignOut={signOut} /> : null}
+      </aside>
+
+      <div className="flex min-w-0 flex-col">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-adm-line bg-adm-canvas/85 px-4 py-4 backdrop-blur-md sm:px-6">
         <span
           aria-hidden
@@ -80,38 +90,30 @@ export function HostConsole({ onSignedOut }: { onSignedOut: () => void }) {
         </Button>
       </header>
 
-      {/* Two columns on a laptop, one on a phone — and the phone is the case
-          that matters, since a host is holding one while talking to a camera.
-          The aside comes *second* in the source so that on a narrow screen the
-          live panel is the first thing under the header rather than something
-          to scroll past. `lg:order-first` puts it back on the left where there
-          is room for both. */}
-      <main className="mx-auto grid w-full max-w-[1180px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[248px_minmax(0,1fr)] lg:py-6">
-        <div className="min-w-0 space-y-5">
-          {error && !snapshot ? (
-            <Card className="p-6">
-              <p className="text-[13.5px] font-medium text-adm-ink">
-                Could not load the desk
-              </p>
-              <p className="mt-1 text-[12.5px] text-adm-ink-3">{error}</p>
-            </Card>
-          ) : !snapshot ? (
-            <LoadingSkeleton />
-          ) : snapshot.live ? (
-            <LivePanel session={snapshot.live} state={state} />
-          ) : snapshot.blockedBy ? (
-            <BlockedPanel blockedBy={snapshot.blockedBy} />
-          ) : (
-            <StartPanel state={state} suspended={snapshot.host.status === "SUSPENDED"} />
-          )}
-        </div>
+      <main className="mx-auto w-full max-w-[860px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
+        {error && !snapshot ? (
+          <Card className="p-6">
+            <p className="text-[13.5px] font-medium text-adm-ink">
+              Could not load the desk
+            </p>
+            <p className="mt-1 text-[12.5px] text-adm-ink-3">{error}</p>
+          </Card>
+        ) : !snapshot ? (
+          <LoadingSkeleton />
+        ) : snapshot.live ? (
+          <LivePanel session={snapshot.live} state={state} />
+        ) : snapshot.blockedBy ? (
+          <BlockedPanel blockedBy={snapshot.blockedBy} />
+        ) : (
+          <StartPanel state={state} suspended={snapshot.host.status === "SUSPENDED"} />
+        )}
 
-        {snapshot ? (
-          <aside className="min-w-0 lg:order-first">
-            <SidePanel snapshot={snapshot} />
-          </aside>
-        ) : null}
+        {/* The rail's figures, for the phone that never sees the rail. Same
+            three numbers, laid flat — a host on a phone is mid-live and wants
+            the clock, not a second column. */}
+        {snapshot ? <HostRecordStrip snapshot={snapshot} className="lg:hidden" /> : null}
       </main>
+      </div>
     </div>
   );
 }
@@ -121,99 +123,176 @@ export function HostConsole({ onSignedOut }: { onSignedOut: () => void }) {
 // ---------------------------------------------------------------------------
 
 /**
- * A host's own record, and what is coming.
+ * A host's own record, and what is coming — the dark rail.
  *
- * Three figures, and none of them money the host did not spend: how many lives
- * they have run, how long they have been on air across all of them, and what
- * they have paid to promote. The takings are absent here for the same reason
- * they are absent from the scoreboard — a promoter is paid for the work, not
- * for what the work collected.
+ * Deliberately the admin console's sidebar, down to the tokens: same ground,
+ * same ink steps, same three bands top to bottom (who you are, your record,
+ * what is next). One product should not have two chrome languages, and a host
+ * who has watched an admin drive the console should recognise the furniture.
  *
- * Promotion spend is the one shilling figure that belongs to them. They typed
- * every one of these numbers themselves before going live; totalling them is
- * arithmetic on their own input, not a disclosure.
+ * Three figures, none of them money the host did not spend: lives run, total
+ * time on air, and total promotion cost. The takings are absent for the same
+ * reason they are absent from the scoreboard — a promoter is paid for the work,
+ * not for what the work collected. The spend is theirs: they typed every one of
+ * those numbers before going live, so totalling them is arithmetic on their own
+ * input rather than a disclosure.
  *
- * The "Coming soon" items are shown rather than hidden, greyed and inert. A
- * link that looks clickable and does nothing is a lie; a list that is visibly
- * not ready is a roadmap, and it tells a host the desk is being built for them
- * rather than left as one screen with a button on it.
+ * "Coming soon" is shown greyed and inert rather than hidden. A link that looks
+ * clickable and does nothing is a lie; a list that is visibly not ready is a
+ * roadmap, and it tells a host the desk is being built for them.
  */
-function SidePanel({ snapshot }: { snapshot: HostSnapshot }) {
-  const { host, history, live } = snapshot;
-
-  // The live session is not in `history` until it ends, so it is counted here
-  // — a host who has just gone live for the first time should not read "0".
-  const all = live ? [live, ...history] : history;
-
-  const onAirMs = all.reduce(
-    (sum, session) => sum + elapsedMs(session, Date.now()),
-    0,
-  );
-  const spent = all.reduce(
-    (sum, session) => sum + (session.spendMinor ? BigInt(session.spendMinor) : 0n),
-    0n,
-  );
+function HostRail({
+  snapshot,
+  onSignOut,
+}: {
+  snapshot: HostSnapshot;
+  onSignOut: () => void;
+}) {
+  const { host } = snapshot;
+  const record = hostRecord(snapshot);
 
   return (
-    <div className="space-y-4 lg:sticky lg:top-[92px]">
-      <Card className="overflow-hidden">
-        <div className="flex items-center gap-2.5 border-b border-adm-line px-4 py-3.5">
-          <span
-            aria-hidden
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-none bg-adm-ink text-[13px] font-semibold text-white"
-          >
-            {initials(host.fullName)}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium text-adm-ink">
-              {host.fullName}
-            </p>
-            <p className="mt-0.5 text-[11.5px] text-adm-ink-3">
-              {host.status === "SUSPENDED" ? "Suspended" : "Host"}
-            </p>
+    <div className="flex h-full flex-col border-r border-adm-nav-line bg-adm-nav">
+      {/* --- Who you are ---------------------------------------------------- */}
+      <div className="flex h-16 shrink-0 items-center gap-2.5 px-5">
+        <span
+          aria-hidden
+          className="grid h-8 w-8 shrink-0 place-items-center rounded-none bg-adm-nav-raise text-[12px] font-semibold text-adm-nav-ink"
+        >
+          {initials(host.fullName)}
+        </span>
+        <div className="min-w-0 leading-tight">
+          <div className="truncate text-[13px] font-semibold tracking-[-0.01em] text-adm-nav-ink">
+            {host.fullName}
+          </div>
+          <div className="text-[11px] text-adm-nav-ink-3">
+            {host.status === "SUSPENDED" ? "Suspended" : "Live desk"}
           </div>
         </div>
+      </div>
 
-        <dl className="divide-y divide-adm-line">
-          <SideFigure label="Lives run" value={all.length.toLocaleString()} />
-          <SideFigure label="Time on air" value={formatSpan(onAirMs)} />
-          <SideFigure
+      {/* --- Your record ---------------------------------------------------- */}
+      <div className="px-3">
+        <p className="px-2 pb-2 pt-3 text-[10px] font-semibold uppercase tracking-[0.09em] text-adm-nav-ink-3">
+          Your record
+        </p>
+        <dl className="space-y-0.5">
+          <RailFigure label="Lives run" value={record.count.toLocaleString()} />
+          <RailFigure label="Time on air" value={formatSpan(record.onAirMs)} />
+          <RailFigure
             label="Spent promoting"
-            value={formatMoney(spent, { currency: "KSh", whole: true })}
+            value={formatMoney(record.spent, { currency: "KSh", whole: true })}
           />
         </dl>
-      </Card>
+      </div>
 
-      <Card className="overflow-hidden">
-        <p className="border-b border-adm-line px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-adm-ink-3">
+      {/* --- What is next ---------------------------------------------------- */}
+      <nav className="flex-1 overflow-y-auto px-3 pb-4">
+        <p className="px-2 pb-2 pt-5 text-[10px] font-semibold uppercase tracking-[0.09em] text-adm-nav-ink-3">
           Coming soon
         </p>
-        <ul className="divide-y divide-adm-line">
+        <ul className="space-y-0.5">
           {UPCOMING.map((item) => (
             <li
               key={item.label}
-              className="flex cursor-not-allowed items-center gap-2.5 px-4 py-3 text-adm-ink-4"
+              className="flex cursor-not-allowed items-center gap-2.5 rounded-none px-2.5 py-2 text-[13px] font-medium text-adm-nav-ink-3/60"
             >
               <item.icon size={15} className="shrink-0" />
-              <span className="min-w-0 flex-1 text-[12.5px] font-medium">
-                {item.label}
-              </span>
-              <span className="shrink-0 border border-adm-line px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em]">
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              <span className="shrink-0 border border-adm-nav-line px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.05em] text-adm-nav-ink-3">
                 Soon
               </span>
             </li>
           ))}
         </ul>
-      </Card>
+      </nav>
+
+      {/* --- The way out ----------------------------------------------------- */}
+      <div className="shrink-0 border-t border-adm-nav-line p-3">
+        <button
+          onClick={onSignOut}
+          className="flex w-full items-center gap-2.5 rounded-none px-2.5 py-2 text-[13px] font-medium text-adm-nav-ink-2 transition-colors hover:bg-adm-nav-raise hover:text-adm-nav-ink"
+        >
+          <LogOut size={15} className="text-adm-nav-ink-3" />
+          Sign out
+        </button>
+      </div>
     </div>
   );
+}
+
+function RailFigure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 rounded-none px-2.5 py-1.5">
+      <dt className="text-[12.5px] text-adm-nav-ink-2">{label}</dt>
+      <dd className="tnum text-[13px] font-medium text-adm-nav-ink">{value}</dd>
+    </div>
+  );
+}
+
+/** The same three figures, flat, for the phone that never sees the rail. */
+function HostRecordStrip({
+  snapshot,
+  className,
+}: {
+  snapshot: HostSnapshot;
+  className?: string;
+}) {
+  const record = hostRecord(snapshot);
+
+  return (
+    <Card className={cn("overflow-hidden", className)}>
+      <p className="border-b border-adm-line px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-adm-ink-3">
+        Your record
+      </p>
+      <dl className="grid grid-cols-3 divide-x divide-adm-line">
+        <StripFigure label="Lives run" value={record.count.toLocaleString()} />
+        <StripFigure label="Time on air" value={formatSpan(record.onAirMs)} />
+        <StripFigure
+          label="Spent"
+          value={formatMoney(record.spent, { currency: "KSh", whole: true })}
+        />
+      </dl>
+    </Card>
+  );
+}
+
+function StripFigure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="px-3 py-3 text-center">
+      <dt className="text-[10px] font-medium uppercase tracking-[0.08em] text-adm-ink-3">
+        {label}
+      </dt>
+      <dd className="tnum mt-1.5 text-[15px] font-medium text-adm-ink">{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * A host's totals across everything they have run.
+ *
+ * The live session is counted alongside the history, because it is not in
+ * `history` until it ends and a host who has just gone live for the first time
+ * should not be told they have run none.
+ */
+function hostRecord(snapshot: HostSnapshot) {
+  const all = snapshot.live ? [snapshot.live, ...snapshot.history] : snapshot.history;
+
+  return {
+    count: all.length,
+    onAirMs: all.reduce((sum, session) => sum + elapsedMs(session, Date.now()), 0),
+    spent: all.reduce(
+      (sum, session) => sum + (session.spendMinor ? BigInt(session.spendMinor) : 0n),
+      0n,
+    ),
+  };
 }
 
 /**
  * What the desk is going to grow.
  *
  * Named as the things a host actually asks about between lives — what am I
- * owed, how am I doing against the others — rather than as generic feature
+ * owed, how am I doing against the others — rather than in generic feature
  * words. A roadmap that does not say anything is decoration.
  */
 const UPCOMING = [
@@ -223,19 +302,12 @@ const UPCOMING = [
   { label: "Tips & guides", icon: BookOpen },
 ] as const;
 
-function SideFigure({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 px-4 py-3">
-      <dt className="text-[12px] text-adm-ink-3">{label}</dt>
-      <dd className="tnum text-[14px] font-medium text-adm-ink">{value}</dd>
-    </div>
-  );
-}
-
 /** `SO` from `Samuel Orina`. Two letters, because three is a monogram. */
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
-  return `${parts[0]?.[0] ?? ""}${parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : ""}`.toUpperCase();
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return `${first}${last}`.toUpperCase();
 }
 
 // ---------------------------------------------------------------------------
