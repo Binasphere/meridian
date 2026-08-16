@@ -23,6 +23,7 @@ import {
   type PromoSession,
 } from "@/lib/sessions/types";
 import { Button, Card, Skeleton, useNotify } from "@/components/admin/ui";
+import { LineChart } from "@/components/admin/charts";
 import { LiveDot, Scoreboard } from "./Scoreboard";
 import { useNow } from "@/lib/sessions/useNow";
 import { useHost } from "./useHost";
@@ -90,7 +91,10 @@ export function HostConsole({ onSignedOut }: { onSignedOut: () => void }) {
         </Button>
       </header>
 
-      <main className="mx-auto w-full max-w-[860px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
+      {/* Full width of its column. It was capped and centred, which left a
+          three-hour clock floating in the middle of a laptop screen with air
+          on both sides. */}
+      <main className="w-full space-y-5 px-4 py-5 sm:px-6 lg:py-6">
         {error && !snapshot ? (
           <Card className="p-6">
             <p className="text-[13.5px] font-medium text-adm-ink">
@@ -112,6 +116,8 @@ export function HostConsole({ onSignedOut }: { onSignedOut: () => void }) {
             three numbers, laid flat — a host on a phone is mid-live and wants
             the clock, not a second column. */}
         {snapshot ? <HostRecordStrip snapshot={snapshot} className="lg:hidden" /> : null}
+
+        {snapshot ? <HostTrends snapshot={snapshot} /> : null}
       </main>
       </div>
     </div>
@@ -289,6 +295,92 @@ function hostRecord(snapshot: HostSnapshot) {
 }
 
 /**
+ * Two charts, because there are two units.
+ *
+ * Minutes on air and shillings spent promoting are not the same quantity, so
+ * they never share an axis — a single plot with two scales would invent a
+ * relationship between effort and cost that the data does not contain, and that
+ * is the most common way a dashboard misleads. Two charts, one measure each,
+ * both read against the same run of lives.
+ *
+ * Oldest to newest, left to right, so the shape is a trend rather than a list.
+ * Neither chart has a legend: one series apiece, and the card title already
+ * names what is plotted.
+ *
+ * Takings are absent here as everywhere on this desk. The two things a host may
+ * see are the time they put in and the money they themselves put up.
+ */
+function HostTrends({ snapshot }: { snapshot: HostSnapshot }) {
+  const all = snapshot.live ? [snapshot.live, ...snapshot.history] : snapshot.history;
+
+  // Oldest first, and only as many as read as a shape rather than a hedge.
+  const runs = [...all].slice(0, 12).reverse();
+  if (runs.length < 2) return null;
+
+  const labels = runs.map((session) =>
+    new Date(session.startedAt).toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+    }),
+  );
+
+  const minutes = runs.map((session) =>
+    Math.round(elapsedMs(session, Date.now()) / 60000),
+  );
+  const spend = runs.map((session) =>
+    session.spendMinor ? Number(BigInt(session.spendMinor) / 100n) : 0,
+  );
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-2">
+      <Card>
+        <div className="border-b border-adm-line px-5 py-3.5">
+          <p className="text-[13.5px] font-semibold tracking-[-0.01em] text-adm-ink">
+            Time on air
+          </p>
+          <p className="mt-0.5 text-[12px] text-adm-ink-3">
+            Minutes per live, oldest first.
+          </p>
+        </div>
+        <div className="px-5 py-4">
+          <LineChart
+            series={[{ id: "minutes", label: "Minutes", values: minutes }]}
+            labels={labels}
+            format={(value) =>
+              value >= 60 ? `${Math.round(value / 60)}h` : `${Math.round(value)}m`
+            }
+            height={170}
+            emptyMessage="No lives recorded yet."
+          />
+        </div>
+      </Card>
+
+      <Card>
+        <div className="border-b border-adm-line px-5 py-3.5">
+          <p className="text-[13.5px] font-semibold tracking-[-0.01em] text-adm-ink">
+            Spent promoting
+          </p>
+          <p className="mt-0.5 text-[12px] text-adm-ink-3">
+            What you paid to promote each live.
+          </p>
+        </div>
+        <div className="px-5 py-4">
+          <LineChart
+            series={[{ id: "spend", label: "Spent", values: spend }]}
+            labels={labels}
+            format={(value) =>
+              value >= 1000 ? `${Math.round(value / 1000)}k` : String(Math.round(value))
+            }
+            height={170}
+            emptyMessage="Nothing spent on promotion yet."
+          />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/**
  * What the desk is going to grow.
  *
  * Named as the things a host actually asks about between lives — what am I
@@ -397,7 +489,14 @@ function LivePanel({
                 </Button>
               </>
             ) : (
-              <Button variant="primary" onClick={() => setConfirming(true)}>
+              <Button
+                variant="primary"
+                onClick={() => setConfirming(true)}
+                // Red from the first press, not only on the confirm. Ending a
+                // live is the destructive action on this page and the one a
+                // host must be able to find at a glance mid-broadcast.
+                className="bg-adm-neg hover:bg-[#96201a]"
+              >
                 <Square size={13} />
                 End session
               </Button>
