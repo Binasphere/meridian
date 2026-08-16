@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   LogOut,
   Radio,
+  ShieldCheck,
   Users,
   Wallet,
   X,
@@ -30,7 +31,12 @@ import { cn } from "@/lib/utils";
  * being one lonely link.
  */
 
-export type AdminView = "overview" | "users" | "withdrawals" | "sessions";
+export type AdminView =
+  | "overview"
+  | "users"
+  | "withdrawals"
+  | "sessions"
+  | "admins";
 
 interface NavItem {
   id: AdminView;
@@ -58,6 +64,12 @@ const NAV: readonly NavItem[] = [
     label: "Sessions",
     icon: Radio,
     description: "TikTok lives, and what each one brought in",
+  },
+  {
+    id: "admins",
+    label: "Admins",
+    icon: ShieldCheck,
+    description: "Who can sign in to this console",
   },
 ];
 

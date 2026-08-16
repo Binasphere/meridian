@@ -4,13 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Menu, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminFetch, setAdminToken } from "@/lib/admin/client";
+import type { AdminAccount } from "@/lib/admin/types";
 import { AdminSidebar, type AdminView } from "./AdminSidebar";
+import { AdminsView } from "./AdminsView";
 import { OverviewView } from "./OverviewView";
-import { PasscodeGate } from "./PasscodeGate";
 import { SessionsView } from "./SessionsView";
+import { SignInGate } from "./SignInGate";
 import { UsersView } from "./UsersView";
 import { WithdrawalsView } from "./WithdrawalsView";
 import { Button, ToastHost } from "./ui";
+import { useAdmins } from "./useAdmins";
 import { useSessions } from "./useSessions";
 import { useUsers } from "./useUsers";
 import { useWithdrawals } from "./useWithdrawals";
@@ -49,6 +52,10 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
     description:
       "Every TikTok live, how long it ran, and what it collected against what it cost to promote.",
   },
+  admins: {
+    title: "Admins",
+    description: "Who can sign in to this console, and what each of them may do.",
+  },
 };
 
 type Phase = "checking" | "setup" | "locked" | "open";
@@ -56,36 +63,56 @@ type Phase = "checking" | "setup" | "locked" | "open";
 export function AdminPanel({ projectRef }: { projectRef: string | null }) {
   const [phase, setPhase] = useState<Phase>("checking");
   const [missing, setMissing] = useState<string[]>([]);
+  const [needsBootstrap, setNeedsBootstrap] = useState(false);
+
+  /**
+   * Who is signed in, as the server describes them.
+   *
+   * Held here rather than derived in the console, because the role decides what
+   * the Admins view is allowed to render, and asking a second endpoint for it
+   * would let the two answers disagree for a render or two.
+   */
+  const [me, setMe] = useState<AdminAccount | null>(null);
+
+  const probe = useCallback(async () => {
+    try {
+      const response = await adminFetch("/api/admin/session");
+      const body = (await response.json()) as {
+        enabled?: boolean;
+        db?: boolean;
+        signedIn?: boolean;
+        admin?: AdminAccount | null;
+        needsBootstrap?: boolean;
+        bootstrapBlocked?: boolean;
+      };
+
+      if (!body.enabled || !body.db || body.bootstrapBlocked) {
+        setMissing(
+          [
+            body.enabled ? null : "AUTH_SECRET",
+            body.db ? null : "SUPABASE_SERVICE_ROLE_KEY",
+            // A console with no super admin and no passcode cannot be entered
+            // by anybody, and the only fix is an environment variable.
+            body.bootstrapBlocked ? "ADMIN_PASSCODE" : null,
+          ].filter((name): name is string => name !== null),
+        );
+        setPhase("setup");
+        return;
+      }
+
+      setNeedsBootstrap(Boolean(body.needsBootstrap));
+      setMe(body.admin ?? null);
+      setPhase(body.signedIn ? "open" : "locked");
+    } catch {
+      // Unreachable backend: show the gate — its submit will say plainly
+      // that the server could not be reached.
+      setPhase("locked");
+    }
+  }, []);
 
   useEffect(() => {
-    void (async () => {
-      try {
-        const response = await adminFetch("/api/admin/session");
-        const body = (await response.json()) as {
-          enabled?: boolean;
-          db?: boolean;
-          signedIn?: boolean;
-        };
-
-        if (!body.enabled || !body.db) {
-          setMissing(
-            [
-              body.enabled ? null : "ADMIN_PASSCODE",
-              body.db ? null : "SUPABASE_SERVICE_ROLE_KEY",
-            ].filter((name): name is string => name !== null),
-          );
-          setPhase("setup");
-          return;
-        }
-
-        setPhase(body.signedIn ? "open" : "locked");
-      } catch {
-        // Unreachable backend: show the gate — its submit will say plainly
-        // that the server could not be reached.
-        setPhase("locked");
-      }
-    })();
-  }, []);
+    void probe();
+  }, [probe]);
 
   if (phase === "checking") {
     return <div className="adm-root min-h-dvh" />;
@@ -96,10 +123,22 @@ export function AdminPanel({ projectRef }: { projectRef: string | null }) {
 
   return phase === "open" ? (
     <ToastHost>
-      <Console projectRef={projectRef} onSignedOut={() => setPhase("locked")} />
+      <Console
+        projectRef={projectRef}
+        me={me}
+        onSignedOut={() => {
+          setMe(null);
+          setPhase("locked");
+        }}
+      />
     </ToastHost>
   ) : (
-    <PasscodeGate onUnlock={() => setPhase("open")} />
+    <SignInGate
+      needsBootstrap={needsBootstrap}
+      // Re-probe rather than assuming: the sign-in handed us a token, and this
+      // is what turns it into a name and a role without a second source.
+      onUnlock={() => void probe()}
+    />
   );
 }
 
@@ -128,8 +167,9 @@ function SetupNotice({ missing }: { missing: string[] }) {
         </ul>
 
         <p className="mt-5 border-t border-adm-line pt-4 text-[12px] leading-relaxed text-adm-ink-3">
-          There is no default passcode. Until one is set the console serves
-          nothing at all.
+          There are no default credentials. Until the console has a super admin
+          — or a passcode to create the first one with — it serves nothing at
+          all.
         </p>
       </div>
     </div>
@@ -138,9 +178,11 @@ function SetupNotice({ missing }: { missing: string[] }) {
 
 function Console({
   projectRef,
+  me,
   onSignedOut,
 }: {
   projectRef: string | null;
+  me: AdminAccount | null;
   onSignedOut: () => void;
 }) {
   const [view, setView] = useState<AdminView>("overview");
@@ -152,6 +194,7 @@ function Console({
   const state = useUsers(handleUnauthorised);
   const withdrawalsState = useWithdrawals(handleUnauthorised);
   const sessionsState = useSessions(handleUnauthorised);
+  const adminsState = useAdmins(handleUnauthorised);
 
   const pendingWithdrawals =
     withdrawalsState.withdrawals?.filter((w) => w.status === "PENDING").length ??
@@ -245,6 +288,7 @@ function Console({
               void state.reload();
               void withdrawalsState.reload();
               void sessionsState.reload();
+              void adminsState.reload();
             }}
             disabled={state.loading || withdrawalsState.loading}
             title="Reload from Supabase"
@@ -268,8 +312,10 @@ function Console({
             <UsersView state={state} />
           ) : view === "withdrawals" ? (
             <WithdrawalsView state={withdrawalsState} />
-          ) : (
+          ) : view === "sessions" ? (
             <SessionsView state={sessionsState} />
+          ) : (
+            <AdminsView state={adminsState} me={me} />
           )}
         </main>
       </div>

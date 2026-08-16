@@ -24,6 +24,10 @@ last:
 3. `mpesa-demo.sql` — the VIP demo handsets (skip if you do not use them)
 4. `sessions.sql` — the promo live desk
 
+`admins.sql` — the admin accounts table — sits outside this sequence. It
+creates one new table and touches nothing that already exists, so it can be run
+at any point after `schema.sql` without disturbing the order above.
+
 `sessions.sql` redefines `deposit_start` so that a deposit records which
 broadcast was live when it was raised. Re-running `go-live.sql` afterwards
 restores the version without that line and every session's takings quietly read
@@ -41,8 +45,8 @@ minutes. So they cannot be baked in. They can come from either of two places
 | Name | What it is |
 | --- | --- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → Settings → API. Powers the admin panel, deposit routes, callback. |
-| `ADMIN_PASSCODE` | Your choice. The `/admin` door; unset = admin panel off. |
-| `AUTH_SECRET` | Your choice (any long random string). Signs admin sessions, promo-host sessions and PayHero callback URLs. Unset = the live desk at `/sessions` is off. |
+| `ADMIN_PASSCODE` | Your choice. **Bootstrap only** — it creates the first super admin and stops working the moment one exists. See "First sign-in" below. |
+| `AUTH_SECRET` | Your choice (any long random string). Signs admin sessions, promo-host sessions and PayHero callback URLs. Unset = the console and the live desk at `/sessions` are both off. |
 | `PAYHERO_USERNAME` | PayHero dashboard → API Keys → API Username. |
 | `PAYHERO_PASSWORD` | PayHero dashboard → API Keys → API Password. |
 | `PAYHERO_CHANNEL_ID` | PayHero dashboard → Payment Channels → My Payment Channels (numeric id of your till/paybill). |
@@ -61,6 +65,33 @@ So: **yes, it can be hosted without configuring env** — via
 `secrets.local.json` — as long as you deploy the folder rather than the git
 repo. On Vercel-style hosts, use their env dashboard (that is not a `.env`
 file in the repo; the repo stays clean either way).
+
+## 2a. First sign-in to `/admin`
+
+The console no longer takes a shared passcode. It takes an account, and the
+first account has to come from somewhere:
+
+1. Run `supabase/admins.sql`.
+2. Open `/admin`. With no accounts yet and `ADMIN_PASSCODE` set, it offers
+   **Set up the console**.
+3. Enter the passcode, then your name, a username and a password (10
+   characters minimum). That account is a **super admin**.
+4. From then on the passcode is refused everywhere. It is not a second way in.
+
+After that, Admins in the sidebar is where a super admin adds colleagues,
+suspends them, resets a forgotten password, or hands over the super-admin role.
+Every admin can change their own password there; doing so signs out every other
+browser holding that account's session, which is what makes it a real response
+to a leak rather than a note about one.
+
+Two things to know before you rely on it:
+
+- **A forgotten password cannot be recovered, only reset**, and only by a
+  super admin. The digests are one-way; that is the property you are paying for.
+- **If you lose every super admin**, the way back in is at the bottom of
+  `supabase/admins.sql` — three lines in the SQL editor that empty the
+  super-admin bench and re-open the bootstrap door for whoever holds
+  `ADMIN_PASSCODE`. Keep that variable set even after setup for exactly this.
 
 ## 3. PayHero
 

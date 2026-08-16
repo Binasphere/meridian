@@ -41,6 +41,43 @@ export function isLiveTier(value: unknown): value is LiveTier {
 }
 
 /**
+ * A console operator — a row of `admin_users`, not a customer.
+ *
+ * `AdminAccount` rather than `AdminUser` because that name was taken years
+ * earlier in this very file by the *customer* shape, and two types called
+ * almost the same thing on either side of the same console is how somebody
+ * eventually renders a balance where a role belongs.
+ *
+ * There is no password field of any kind, including a digest. The API never
+ * sends one — `admin_roster()` in `supabase/admins.sql` names its columns
+ * precisely so it cannot — and the absence here is the type system agreeing.
+ */
+export interface AdminAccount {
+  id: string;
+  username: string;
+  fullName: string;
+  role: AdminRole;
+  status: AdminStatus;
+  createdAt: string | null;
+  /** Null until they have signed in once. */
+  lastLoginAt: string | null;
+  /** Null for the bootstrap super admin, which nobody created. */
+  createdByName: string | null;
+}
+
+export const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN"] as const;
+export type AdminRole = (typeof ADMIN_ROLES)[number];
+
+export type AdminStatus = "ACTIVE" | "SUSPENDED";
+
+/** The password floor, mirrored from `MIN_ADMIN_PASSWORD_LENGTH` on the service. */
+export const MIN_ADMIN_PASSWORD_LENGTH = 10;
+
+export function isAdminRole(value: unknown): value is AdminRole {
+  return typeof value === "string" && (ADMIN_ROLES as readonly string[]).includes(value);
+}
+
+/**
  * A withdrawal request as the console sees it: the cash event joined with
  * enough of the requester's profile to know who is being paid.
  *
