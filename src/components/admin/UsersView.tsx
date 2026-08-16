@@ -15,7 +15,7 @@ import { formatPhone, normalisePhone } from "@/lib/auth";
 import type { AdminUser } from "@/lib/admin/types";
 import type { LiveTier } from "@/lib/trading";
 import { cn } from "@/lib/utils";
-import { Badge, Card, Skeleton, avatarTint, useNotify } from "./ui";
+import { Badge, Button, Card, Skeleton, avatarTint, useNotify } from "./ui";
 import type { UsersState } from "./useUsers";
 
 /**
@@ -30,11 +30,15 @@ import type { UsersState } from "./useUsers";
 type SortKey = "created" | "name" | "live";
 type TierFilter = "all" | LiveTier;
 
+/** How many accounts the list shows before you ask for the rest. */
+const RECENT_LIMIT = 10;
+
 export function UsersView({ state }: { state: UsersState }) {
   const { users, loading, error, pending, setTier, setWallet } = state;
   const notify = useNotify();
 
   const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({
     key: "created",
@@ -77,6 +81,21 @@ export function UsersView({ state }: { state: UsersState }) {
       }
     });
   }, [users, query, tierFilter, sort]);
+
+  /**
+   * Ten by default; everything on request.
+   *
+   * Opening on the whole population made the page a wall — the accounts anybody
+   * actually needs on landing are the ones that just signed up, and those are
+   * the top ten of the default sort. The cap is lifted automatically the moment
+   * a search or a tier filter is on: having narrowed the list yourself, being
+   * shown only the first ten *of the matches* would hide the very row you were
+   * looking for and give no hint that it existed.
+   */
+  const narrowed = query.trim().length > 0 || tierFilter !== "all";
+  const capped = !showAll && !narrowed;
+  const visible = rows === null ? null : capped ? rows.slice(0, RECENT_LIMIT) : rows;
+  const hidden = rows === null ? 0 : rows.length - (visible?.length ?? 0);
 
   async function changeTier(user: AdminUser, tier: LiveTier) {
     const result = await setTier(user, tier);
@@ -135,7 +154,14 @@ export function UsersView({ state }: { state: UsersState }) {
           ) : (
             <SlidersHorizontal size={13} className="text-adm-ink-4" />
           )}
-          {rows === null ? "Loading" : `${rows.length} shown`}
+          {rows === null
+            ? "Loading"
+            : hidden > 0
+              ? // Both numbers, because "10 shown" over a population of
+                // hundreds is the kind of half-truth that has somebody
+                // reporting the wrong figure in a meeting.
+                `${visible?.length ?? 0} of ${rows.length} shown`
+              : `${rows.length} shown`}
         </span>
       </div>
 
@@ -188,17 +214,39 @@ export function UsersView({ state }: { state: UsersState }) {
           }
         />
       ) : (
-        <ul className="divide-y divide-adm-line">
-          {rows.map((user) => (
-            <UserRow
-              key={user.id}
-              user={user}
-              busy={Boolean(pending[user.id])}
-              onSetTier={(tier) => void changeTier(user, tier)}
-              onSetWallet={(input) => setWallet(user, input)}
-            />
-          ))}
-        </ul>
+        <>
+          <ul className="divide-y divide-adm-line">
+            {(visible ?? []).map((user) => (
+              <UserRow
+                key={user.id}
+                user={user}
+                busy={Boolean(pending[user.id])}
+                onSetTier={(tier) => void changeTier(user, tier)}
+                onSetWallet={(input) => setWallet(user, input)}
+              />
+            ))}
+          </ul>
+
+          {/* The count is on the button, not beside it: "Show all 1,284" tells
+              you both that there is more and how much more, which is the
+              difference between a control you can weigh and one you have to
+              press to find out. */}
+          {hidden > 0 ? (
+            <div className="border-t border-adm-line px-5 py-3.5">
+              <Button onClick={() => setShowAll(true)}>
+                Show all {rows.length.toLocaleString()} accounts
+              </Button>
+              <span className="ml-3 text-[12.5px] text-adm-ink-3">
+                {hidden.toLocaleString()} older {hidden === 1 ? "account" : "accounts"}{" "}
+                hidden
+              </span>
+            </div>
+          ) : showAll && rows.length > RECENT_LIMIT ? (
+            <div className="border-t border-adm-line px-5 py-3.5">
+              <Button onClick={() => setShowAll(false)}>Show recent only</Button>
+            </div>
+          ) : null}
+        </>
       )}
     </Card>
   );

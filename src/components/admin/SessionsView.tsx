@@ -23,6 +23,7 @@ import {
 import { useNow } from "@/lib/sessions/useNow";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardHeader, Skeleton, StatTile, avatarTint, useNotify } from "./ui";
+import { BarRows, TableView } from "./charts";
 import type { SessionsState } from "./useSessions";
 
 /**
@@ -39,6 +40,9 @@ import type { SessionsState } from "./useSessions";
  * and the takings are the ledger's, so neither is anybody's to adjust after the
  * fact.
  */
+/** How many broadcasts the list shows before you ask for the rest. */
+const RECENT_LIMIT = 4;
+
 export function SessionsView({ state }: { state: SessionsState }) {
   const { sessions, hosts, error, pending, money, endSession, setHostStatus } =
     state;
@@ -55,6 +59,7 @@ export function SessionsView({ state }: { state: SessionsState }) {
    * starts, while still respecting a row an admin has deliberately picked.
    */
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const selected = useMemo(() => {
     if (!sessions || sessions.length === 0) return null;
@@ -86,11 +91,34 @@ export function SessionsView({ state }: { state: SessionsState }) {
         collected: sum.collected + toMinor(session.stats.depositMinor ?? "0"),
         spend: sum.spend + toMinor(session.spendMinor ?? "0"),
         depositors: sum.depositors + session.stats.depositors,
-        newDepositors: sum.newDepositors + session.stats.newDepositors,
+        depositCount: sum.depositCount + session.stats.depositCount,
       }),
-      { collected: 0n, spend: 0n, depositors: 0, newDepositors: 0 },
+      { collected: 0n, spend: 0n, depositors: 0, depositCount: 0 },
     );
   }, [sessions]);
+
+  /**
+   * The list is capped, but never at the cost of hiding a live broadcast.
+   *
+   * Four is enough to see the last night's work at a glance. The union with
+   * everything currently on air is what makes the cap safe: with a broadcast
+   * running on each domain, a plain `slice(0, 4)` could push one of them out of
+   * view on a busy day, and the one session an admin must be able to reach is
+   * the one that is still running.
+   */
+  const visible = useMemo(() => {
+    if (!sessions) return [];
+    if (showAll || sessions.length <= RECENT_LIMIT) return sessions;
+
+    const keep = new Set(
+      sessions
+        .filter((session) => session.endedAt === null)
+        .map((session) => session.id),
+    );
+    sessions.slice(0, RECENT_LIMIT).forEach((session) => keep.add(session.id));
+
+    return sessions.filter((session) => keep.has(session.id));
+  }, [sessions, showAll]);
 
   async function end(session: AdminPromoSession) {
     const result = await endSession(session.id);
@@ -161,58 +189,36 @@ export function SessionsView({ state }: { state: SessionsState }) {
               (hosts?.length ?? 0) === 1 ? "host" : "hosts"
             } on the roster`}
           />
-          {/* The three money tiles are replaced by reach figures for a role
-              without the finance capability, rather than left as gaps. A
-              session manager still needs to know whether a broadcast worked;
-              people and sign-ups answer that without naming a shilling. */}
+          {/* Customers, deposits, money. Sign-ups, first-timers and pending
+              pushes were dropped from this page: they are diagnostics about a
+              broadcast's funnel, and burying the three figures anybody actually
+              reports on among them made none of them prominent. */}
+          <StatTile
+            label="Customers"
+            value={totals.depositors}
+            hint="People who paid while a session was open"
+          />
+          <StatTile
+            label="Deposits"
+            value={totals.depositCount}
+            hint="Confirmed payments across every broadcast"
+          />
           {money ? (
-            <>
-              <StatTile
-                label="Collected"
-                value={formatMoney(totals.collected, { currency: "KSh", compact: true })}
-                hint="Deposits confirmed while a session was open"
-              />
-              <StatTile
-                label="Promotion spend"
-                value={formatMoney(totals.spend, { currency: "KSh", compact: true })}
-                hint="As entered by each host before going live"
-              />
-              <StatTile
-                label="Net"
-                value={
-                  <span
-                    className={cn(
-                      totals.collected > totals.spend && "text-adm-pos",
-                      totals.collected < totals.spend && "text-adm-neg",
-                    )}
-                  >
-                    {formatMoney(totals.collected - totals.spend, {
-                      currency: "KSh",
-                      compact: true,
-                    })}
-                  </span>
-                }
-                hint={`${totals.newDepositors} first-time depositors won`}
-              />
-            </>
+            <StatTile
+              label="Collected"
+              value={formatMoney(totals.collected, { currency: "KSh", compact: true })}
+              hint={
+                totals.spend > 0n
+                  ? `Against ${formatMoney(totals.spend, { currency: "KSh", compact: true })} promotion`
+                  : "Deposits confirmed during a broadcast"
+              }
+            />
           ) : (
-            <>
-              <StatTile
-                label="Depositors"
-                value={totals.depositors}
-                hint="People who paid while a session was open"
-              />
-              <StatTile
-                label="First-timers"
-                value={totals.newDepositors}
-                hint="Of those, depositing for the first time ever"
-              />
-              <StatTile
-                label="Sign-ups"
-                value={sessions?.reduce((sum, s) => sum + s.stats.signups, 0) ?? 0}
-                hint="Accounts created during a broadcast"
-              />
-            </>
+            <StatTile
+              label="Hosts"
+              value={hosts?.length ?? 0}
+              hint="On the roster across every domain"
+            />
           )}
         </div>
       ) : (
@@ -227,11 +233,29 @@ export function SessionsView({ state }: { state: SessionsState }) {
         </div>
       )}
 
+      {/* --- The two charts ------------------------------------------------ */}
+      {sessions && sessions.length > 0 ? (
+        <SessionCharts sessions={sessions} money={money} />
+      ) : null}
+
       {/* --- Every session -------------------------------------------------- */}
       <Card className="overflow-hidden">
         <CardHeader
           title="Sessions"
-          subtitle="Every live, newest first, with what it brought in against what it cost."
+          subtitle={
+            showAll || (sessions?.length ?? 0) <= visible.length
+              ? "Every broadcast, newest first."
+              : `The ${visible.length} most recent broadcasts, plus anything still on air.`
+          }
+          action={
+            sessions && sessions.length > visible.length ? (
+              <Button onClick={() => setShowAll(true)}>
+                Show all {sessions.length}
+              </Button>
+            ) : showAll && sessions && sessions.length > RECENT_LIMIT ? (
+              <Button onClick={() => setShowAll(false)}>Show recent only</Button>
+            ) : null
+          }
         />
 
         {error ? (
@@ -249,10 +273,12 @@ export function SessionsView({ state }: { state: SessionsState }) {
           />
         ) : (
           <SessionsTable
-            sessions={sessions}
+            sessions={visible}
             money={money}
             selectedId={selected?.id ?? null}
             onSelect={setPickedId}
+            onEnd={(session) => void end(session)}
+            busyIds={pending}
           />
         )}
       </Card>
@@ -445,21 +471,22 @@ function SessionDetailCard({
       {/* The live figures, inline. A separate scoreboard card would push the
           rest of the page below the fold for the one state where the rest of
           the page matters least. */}
-      <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3 border-t border-adm-line pt-4">
+      {/* Customers, deposits, money — and nothing else. Sign-ups, first-timers
+          and pending pushes were here and are gone: seven figures in a row all
+          read as equally important, which meant the three anybody actually
+          quotes were as easy to miss as the four they never used. */}
+      <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-3 border-t border-adm-line pt-4">
+        <Inline label="Customers" value={String(session.stats.depositors)} />
+        <Inline label="Deposits" value={String(session.stats.depositCount)} />
         {session.stats.depositMinor === undefined ? null : (
           <Inline
             label="Collected"
             value={formatMoney(session.stats.depositMinor, { currency: "KSh" })}
           />
         )}
-        <Inline label="Deposits" value={String(session.stats.depositCount)} />
-        <Inline label="People" value={String(session.stats.depositors)} />
-        <Inline label="New" value={String(session.stats.newDepositors)} />
-        <Inline label="Sign-ups" value={String(session.stats.signups)} />
-        <Inline label="Pending" value={String(session.stats.pendingCount)} />
         {net === null ? null : (
           <Inline
-            label="Net"
+            label="Net of promotion"
             value={formatMoney(net, { currency: "KSh", withSign: net > 0n })}
             className={cn(net > 0n && "text-adm-pos", net < 0n && "text-adm-neg")}
           />
@@ -591,6 +618,108 @@ function OffAirCard({ state }: { state: SessionsState }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// The two charts
+// ---------------------------------------------------------------------------
+
+/**
+ * Per broadcast, side by side: **what it collected** and **how many customers
+ * it brought**.
+ *
+ * Two charts rather than one with two scales. Shillings and people are
+ * different units, and putting them on a shared axis would invent a
+ * relationship between them that the data does not contain — the single most
+ * common way a dashboard misleads.
+ *
+ * Ordered oldest-to-newest, left to right, against the list above which runs
+ * newest first. That is deliberate: a list is scanned for "what happened last",
+ * a chart is read for "which way is this going", and each ordering serves its
+ * own question.
+ *
+ * A bar rather than a line, because these are discrete events with names, not a
+ * continuous quantity sampled over time — the gap between two broadcasts is not
+ * a slope.
+ */
+function SessionCharts({
+  sessions,
+  money,
+}: {
+  sessions: AdminPromoSession[];
+  money: boolean;
+}) {
+  // Oldest first, and only as many as read legibly as rows.
+  const recent = useMemo(() => [...sessions].slice(0, 8).reverse(), [sessions]);
+
+  const label = (session: AdminPromoSession) => {
+    const first = session.hostName.split(" ")[0] ?? session.hostName;
+    const when = new Date(session.startedAt).toLocaleDateString([], {
+      day: "numeric",
+      month: "short",
+    });
+    return `${first} · ${when}`;
+  };
+
+  const collected = recent.map((session) => ({
+    id: session.id,
+    label: label(session),
+    value: Number(BigInt(session.stats.depositMinor ?? "0") / 100n),
+    display: formatMoney(session.stats.depositMinor ?? "0", {
+      currency: "KSh",
+      whole: true,
+    }),
+  }));
+
+  const customers = recent.map((session) => ({
+    id: session.id,
+    label: label(session),
+    value: session.stats.depositors,
+    display: `${session.stats.depositors} · ${session.stats.depositCount} deposits`,
+  }));
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {money ? (
+        <Card>
+          <CardHeader
+            title="Collected per broadcast"
+            subtitle="Confirmed deposits stamped to each live, oldest first."
+          />
+          <div className="px-5 py-4">
+            {/* One measure across many broadcasts, so every bar is slot 1 — a
+                colour that varied with the value would double-encode the bar's
+                own length and spend the only free channel on nothing. */}
+            <BarRows data={collected} colorByIndex={false} />
+            <TableView
+              columns={["Broadcast", "Collected"]}
+              rows={collected.map((row) => [row.label, row.display])}
+            />
+          </div>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardHeader
+          title="Customers per broadcast"
+          subtitle="People who paid while each live was open."
+        />
+        <div className="px-5 py-4">
+          <BarRows data={customers} colorByIndex={false} />
+          <TableView
+            columns={["Broadcast", "Customers", "Deposits"]}
+            rows={recent.map((session) => [
+              label(session),
+              session.stats.depositors,
+              session.stats.depositCount,
+            ])}
+          />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 function Inline({
   label,
   value,
@@ -625,11 +754,15 @@ function SessionsTable({
   money,
   selectedId,
   onSelect,
+  onEnd,
+  busyIds,
 }: {
   sessions: AdminPromoSession[];
   money: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onEnd: (session: AdminPromoSession) => void;
+  busyIds: Record<string, boolean>;
 }) {
   const now = useNow(sessions.some((session) => session.endedAt === null));
 
@@ -650,11 +783,16 @@ function SessionsTable({
                 <Th>Collected</Th>
               </>
             ) : null}
+            {/* Customers, deposits, money — the three figures this page is
+                read for. First-timers and sign-ups moved out: they answered a
+                funnel question nobody was asking here and cost the columns
+                that matter their width. */}
+            <Th>Customers</Th>
             <Th>Deposits</Th>
-            <Th>People</Th>
-            <Th>New</Th>
-            <Th>Sign-ups</Th>
             {money ? <Th>Net</Th> : null}
+            <Th className="text-right">
+              <span className="sr-only">Actions</span>
+            </Th>
           </tr>
         </thead>
         <tbody className="divide-y divide-adm-line">
@@ -726,10 +864,8 @@ function SessionsTable({
                     </Td>
                   </>
                 ) : null}
-                <Td>{session.stats.depositCount}</Td>
                 <Td>{session.stats.depositors}</Td>
-                <Td>{session.stats.newDepositors}</Td>
-                <Td>{session.stats.signups}</Td>
+                <Td>{session.stats.depositCount}</Td>
                 {net === null ? null : (
                   <Td
                     className={cn(
@@ -740,6 +876,32 @@ function SessionsTable({
                     {formatMoney(net, { currency: "KSh", withSign: net > 0n, whole: true })}
                   </Td>
                 )}
+
+                {/* End, in the row. Ending a broadcast from the list is the one
+                    action worth reaching without first selecting the session —
+                    an admin closing a host who went offline is not there to
+                    read figures. `stopPropagation` keeps the click off the
+                    row's own select. */}
+                <Td className="text-right">
+                  {running ? (
+                    <Button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEnd(session);
+                      }}
+                      disabled={busyIds[session.id]}
+                      className="h-7 px-2 text-[12px] text-adm-neg hover:bg-[#fdeceb]"
+                      title={`End ${session.hostName}'s broadcast`}
+                    >
+                      {busyIds[session.id] ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Square size={11} />
+                      )}
+                      End
+                    </Button>
+                  ) : null}
+                </Td>
               </tr>
             );
           })}

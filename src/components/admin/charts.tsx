@@ -394,6 +394,135 @@ export function BarRows({
 }
 
 // ---------------------------------------------------------------------------
+// Donut
+// ---------------------------------------------------------------------------
+
+export interface DonutSlice {
+  id: string;
+  label: string;
+  /** Raw magnitude. Shares are computed here, never passed in pre-rounded. */
+  value: number;
+  display: string;
+}
+
+/**
+ * Part-to-whole, at a glance.
+ *
+ * A donut earns its place only when the question is "what share of the total",
+ * with few enough segments to read as shape — never for comparing close values,
+ * which an arc does badly and a bar does well. Two guards keep it honest here:
+ * the **total sits in the hole**, so the chart is also the stat tile it would
+ * otherwise be replaced by, and every segment's amount and percentage is
+ * printed in the legend. Nobody has to judge a quantity by arc length.
+ *
+ * Segments are separated by a 2px gap in the surface colour rather than by a
+ * stroke around each arc — a border adds ink that is not data, and at these
+ * radii it reads as a second ring.
+ */
+export function Donut({
+  slices,
+  centreLabel,
+  centreValue,
+  size = 168,
+}: {
+  slices: DonutSlice[];
+  centreLabel: string;
+  centreValue: string;
+  size?: number;
+}) {
+  const total = slices.reduce((sum, slice) => sum + Math.max(0, slice.value), 0);
+
+  const stroke = 22;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  // The gap is expressed in path length so it stays 2px on screen whatever the
+  // radius is.
+  const gap = total > 0 && slices.filter((s) => s.value > 0).length > 1 ? 2 : 0;
+
+  let offset = 0;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} role="img" aria-label={`${centreLabel}: ${centreValue}`}>
+          <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+            {/* The track. Visible when there is nothing to plot, so an empty
+                donut reads as "nothing yet" rather than as a failed render. */}
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={total > 0 ? SURFACE : "#f2f4f8"}
+              strokeWidth={stroke}
+            />
+            {total > 0
+              ? slices.map((slice, index) => {
+                  const share = Math.max(0, slice.value) / total;
+                  const length = Math.max(0, circumference * share - gap);
+                  const dash = `${length} ${circumference - length}`;
+                  const element = (
+                    <circle
+                      key={slice.id}
+                      cx={size / 2}
+                      cy={size / 2}
+                      r={radius}
+                      fill="none"
+                      stroke={seriesColor(index)}
+                      strokeWidth={stroke}
+                      strokeDasharray={dash}
+                      strokeDashoffset={-offset}
+                    />
+                  );
+                  offset += circumference * share;
+                  return element;
+                })
+              : null}
+          </g>
+        </svg>
+
+        <div className="pointer-events-none absolute inset-0 grid place-items-center">
+          <div className="text-center">
+            <div className="text-[17px] font-semibold tracking-[-0.02em] text-adm-ink">
+              {centreValue}
+            </div>
+            <div className="mt-0.5 text-[10.5px] uppercase tracking-[0.07em] text-adm-ink-3">
+              {centreLabel}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Legend with the numbers on it — the arc is the glance, this is the
+          answer. */}
+      <ul className="min-w-[150px] flex-1 space-y-2.5">
+        {slices.map((slice, index) => {
+          const share = total > 0 ? (slice.value / total) * 100 : 0;
+          return (
+            <li key={slice.id} className="flex items-center gap-2.5">
+              <span
+                aria-hidden
+                className="h-2.5 w-2.5 shrink-0"
+                style={{ background: seriesColor(index) }}
+              />
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-adm-ink-2">
+                {slice.label}
+              </span>
+              <span className="text-[12.5px] font-medium tabular-nums text-adm-ink">
+                {slice.display}
+              </span>
+              <span className="w-11 text-right text-[11.5px] tabular-nums text-adm-ink-3">
+                {total > 0 ? `${share.toFixed(1)}%` : "—"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 

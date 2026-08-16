@@ -2,9 +2,9 @@
 
 import { ArrowUpRight, Check, Globe, Radio } from "lucide-react";
 import { formatMoney } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import type { SiteTotals } from "@/lib/admin/types";
 import { Badge, Card, CardHeader, Skeleton } from "./ui";
+import { Donut, TableView } from "./charts";
 import type { SitesState } from "./useSites";
 
 /**
@@ -50,7 +50,7 @@ export function DomainsView({ state }: { state: SitesState }) {
         )}
       </Card>
 
-      {money && sites && sites.length > 1 ? <Comparison sites={sites} /> : null}
+      {money && sites && sites.length > 0 ? <Comparison sites={sites} /> : null}
     </div>
   );
 }
@@ -97,35 +97,21 @@ function SiteRow({ site, money }: { site: SiteTotals; money: boolean }) {
             <ArrowUpRight size={11} />
           </a>
 
+          {/* Collected and nothing else financial. Withdrawals and held
+              balances are the platform's obligations, not a domain's takings,
+              and this page is about what each product brought in. Both live on
+              Overview, where the whole ledger belongs. */}
           <dl className="mt-3 flex flex-wrap gap-x-7 gap-y-2">
             <Figure label="Customers" value={site.users.toLocaleString()} />
             {money ? (
-              <>
-                <Figure
-                  label="Deposited"
-                  value={formatMoney(site.depositMinor ?? "0", {
-                    currency: "KSh",
-                    whole: true,
-                  })}
-                  hint={`${site.depositCount} deposits`}
-                />
-                <Figure
-                  label="Withdrawn"
-                  value={formatMoney(site.withdrawalMinor ?? "0", {
-                    currency: "KSh",
-                    whole: true,
-                  })}
-                  hint={`${site.withdrawalCount} paid out`}
-                />
-                <Figure
-                  label="Held"
-                  value={formatMoney(site.liveBalanceMinor ?? "0", {
-                    currency: "KSh",
-                    whole: true,
-                  })}
-                  hint="Customer balances"
-                />
-              </>
+              <Figure
+                label="Collected"
+                value={formatMoney(site.depositMinor ?? "0", {
+                  currency: "KSh",
+                  whole: true,
+                })}
+                hint={`${site.depositCount} deposits`}
+              />
             ) : (
               <Figure label="Deposits" value={site.depositCount.toLocaleString()} />
             )}
@@ -141,72 +127,87 @@ function SiteRow({ site, money }: { site: SiteTotals; money: boolean }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Side by side, as a share of the whole.
+ * Where the money came from — collected, and only collected.
  *
- * A bar rather than a second table of the same numbers: the question this
- * answers is "which product is carrying the platform", and a proportion answers
- * it at a glance where two totals require arithmetic.
+ * Two donuts rather than one: **shillings** and **deposits** answer different
+ * questions, and a product can lead on one while trailing the other. A single
+ * chart would force a choice between them, and the difference between "most of
+ * the money" and "most of the customers paying" is the whole story of which
+ * product is worth the promotion budget.
+ *
+ * The caveat of the form is handled rather than ignored: an arc compares close
+ * values badly, so the total sits in the hole and every slice carries its
+ * amount and percentage in the legend. Nothing here has to be judged by eye.
  */
 function Comparison({ sites }: { sites: SiteTotals[] }) {
-  const amounts = sites.map((site) => ({
+  const money = sites.map((site) => ({
     id: site.id,
-    name: site.name,
-    minor: BigInt(site.depositMinor ?? "0"),
+    label: site.name,
+    value: Number(BigInt(site.depositMinor ?? "0") / 100n),
+    display: formatMoney(site.depositMinor ?? "0", { currency: "KSh", whole: true }),
   }));
 
-  const total = amounts.reduce((sum, row) => sum + row.minor, 0n);
+  const counts = sites.map((site) => ({
+    id: site.id,
+    label: site.name,
+    value: site.depositCount,
+    display: site.depositCount.toLocaleString(),
+  }));
+
+  const totalMinor = sites.reduce(
+    (sum, site) => sum + BigInt(site.depositMinor ?? "0"),
+    0n,
+  );
+  const totalCount = sites.reduce((sum, site) => sum + site.depositCount, 0);
 
   return (
-    <Card>
-      <CardHeader
-        title="Share of deposits"
-        subtitle="Confirmed deposits, lifetime, by product."
-      />
-      <div className="px-5 py-4">
-        {total === 0n ? (
-          <p className="text-[13px] text-adm-ink-3">
-            No confirmed deposits on any domain yet.
-          </p>
-        ) : (
-          <>
-            <div className="flex h-2.5 w-full overflow-hidden bg-adm-subtle">
-              {amounts.map((row, index) => (
-                <div
-                  key={row.id}
-                  style={{
-                    width: `${Number((row.minor * 1000n) / total) / 10}%`,
-                  }}
-                  className={cn(
-                    index === 0 ? "bg-adm-accent" : "bg-adm-ink-3",
-                    "transition-[width] duration-500",
-                  )}
-                />
-              ))}
-            </div>
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardHeader
+          title="Collected by domain"
+          subtitle="Confirmed deposits, lifetime. Demo handsets excluded."
+        />
+        <div className="px-5 py-5">
+          <Donut
+            slices={money}
+            centreLabel="Collected"
+            centreValue={formatMoney(totalMinor, { currency: "KSh", compact: true })}
+          />
+          <TableView
+            columns={["Domain", "Collected", "Share"]}
+            rows={money.map((row) => [
+              row.label,
+              row.display,
+              totalMinor > 0n
+                ? `${((row.value / Number(totalMinor / 100n)) * 100).toFixed(1)}%`
+                : "—",
+            ])}
+          />
+        </div>
+      </Card>
 
-            <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-              {amounts.map((row, index) => (
-                <li key={row.id} className="flex items-center gap-2">
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "h-2.5 w-2.5",
-                      index === 0 ? "bg-adm-accent" : "bg-adm-ink-3",
-                    )}
-                  />
-                  <span className="text-[12.5px] text-adm-ink-2">{row.name}</span>
-                  <span className="text-[12.5px] tabular-nums text-adm-ink-3">
-                    {total === 0n
-                      ? "0%"
-                      : `${(Number((row.minor * 1000n) / total) / 10).toFixed(1)}%`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-    </Card>
+      <Card>
+        <CardHeader
+          title="Deposits by domain"
+          subtitle="How many payments each product took."
+        />
+        <div className="px-5 py-5">
+          <Donut
+            slices={counts}
+            centreLabel="Deposits"
+            centreValue={totalCount.toLocaleString()}
+          />
+          <TableView
+            columns={["Domain", "Deposits", "Share"]}
+            rows={counts.map((row) => [
+              row.label,
+              row.display,
+              totalCount > 0 ? `${((row.value / totalCount) * 100).toFixed(1)}%` : "—",
+            ])}
+          />
+        </div>
+      </Card>
+    </div>
   );
 }
 
