@@ -23,7 +23,7 @@ import {
 import { useNow } from "@/lib/sessions/useNow";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardHeader, Skeleton, StatTile, avatarTint, useNotify } from "./ui";
-import { BarRows, TableView } from "./charts";
+import { BarRows, Donut, TableView } from "./charts";
 import type { SessionsState } from "./useSessions";
 
 /**
@@ -471,27 +471,7 @@ function SessionDetailCard({
       {/* The live figures, inline. A separate scoreboard card would push the
           rest of the page below the fold for the one state where the rest of
           the page matters least. */}
-      {/* Customers, deposits, money — and nothing else. Sign-ups, first-timers
-          and pending pushes were here and are gone: seven figures in a row all
-          read as equally important, which meant the three anybody actually
-          quotes were as easy to miss as the four they never used. */}
-      <dl className="mt-5 flex flex-wrap gap-x-10 gap-y-3 border-t border-adm-line pt-4">
-        <Inline label="Customers" value={String(session.stats.depositors)} />
-        <Inline label="Deposits" value={String(session.stats.depositCount)} />
-        {session.stats.depositMinor === undefined ? null : (
-          <Inline
-            label="Collected"
-            value={formatMoney(session.stats.depositMinor, { currency: "KSh" })}
-          />
-        )}
-        {net === null ? null : (
-          <Inline
-            label="Net of promotion"
-            value={formatMoney(net, { currency: "KSh", withSign: net > 0n })}
-            className={cn(net > 0n && "text-adm-pos", net < 0n && "text-adm-neg")}
-          />
-        )}
-      </dl>
+      <SessionScorecard session={session} net={net} />
     </Card>
   );
 }
@@ -619,6 +599,141 @@ function OffAirCard({ state }: { state: SessionsState }) {
 }
 
 // ---------------------------------------------------------------------------
+// The scorecard
+// ---------------------------------------------------------------------------
+
+/**
+ * What the broadcast did, as four figures and one ring.
+ *
+ * The figures were a row of inline `<dt>/<dd>` pairs, which reads as a caption
+ * strip — every value the same weight, none of them the answer. As tiles they
+ * have somewhere to sit, room to be large, and an order that means something:
+ * reach first (who came, how many paid), then money (what came in, what was
+ * left).
+ *
+ * The ring is the one thing the tiles cannot show, because it is a
+ * *relationship* rather than a value: the takings split into the part that paid
+ * the promotion back and the part that was kept. `Collected = covered + kept`
+ * is a genuine part-to-whole, which is the only case a donut is the right form
+ * for — and it makes the question the page exists to answer ("was the
+ * promotion worth it") readable without arithmetic.
+ *
+ * When the takings fall short, "kept" is zero and the whole ring is the
+ * recovered part; the shortfall is stated in words underneath rather than drawn
+ * as a slice, because a segment for money that never arrived would be inventing
+ * a quantity.
+ */
+function SessionScorecard({
+  session,
+  net,
+}: {
+  session: AdminPromoSession;
+  net: bigint | null;
+}) {
+  const collected = session.stats.depositMinor;
+  const spend = session.spendMinor;
+  const hasMoney = collected !== undefined && spend !== undefined;
+
+  const takings = hasMoney ? BigInt(collected) : 0n;
+  const cost = hasMoney ? BigInt(spend) : 0n;
+  const covered = takings < cost ? takings : cost;
+  const kept = takings > cost ? takings - cost : 0n;
+  const short = cost > takings ? cost - takings : 0n;
+
+  return (
+    <div className="mt-5 grid gap-5 border-t border-adm-line pt-5 lg:grid-cols-[minmax(0,1fr)_auto]">
+      {/* --- The figures ------------------------------------------------- */}
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Customers" value={session.stats.depositors.toLocaleString()} />
+        <Kpi label="Deposits" value={session.stats.depositCount.toLocaleString()} />
+        {hasMoney ? (
+          <>
+            <Kpi
+              label="Collected"
+              value={formatMoney(takings, { currency: "KSh", whole: true })}
+            />
+            <Kpi
+              label="Net of promotion"
+              value={
+                net === null
+                  ? "—"
+                  : formatMoney(net, { currency: "KSh", withSign: net > 0n, whole: true })
+              }
+              tone={net === null ? undefined : net > 0n ? "pos" : net < 0n ? "neg" : undefined}
+            />
+          </>
+        ) : null}
+      </dl>
+
+      {/* --- The ring ------------------------------------------------------ */}
+      {hasMoney ? (
+        <div className="lg:w-[290px] lg:border-l lg:border-adm-line lg:pl-5">
+          <Donut
+            size={132}
+            centreLabel="Collected"
+            centreValue={formatMoney(takings, { currency: "KSh", compact: true })}
+            slices={[
+              {
+                id: "covered",
+                label: "Covered promotion",
+                value: Number(covered / 100n),
+                display: formatMoney(covered, { currency: "KSh", whole: true }),
+              },
+              {
+                id: "kept",
+                label: "Kept",
+                value: Number(kept / 100n),
+                display: formatMoney(kept, { currency: "KSh", whole: true }),
+              },
+            ]}
+          />
+          {short > 0n ? (
+            <p className="mt-3 text-[12px] text-adm-neg">
+              {formatMoney(short, { currency: "KSh", whole: true })} short of the{" "}
+              {formatMoney(cost, { currency: "KSh", whole: true })} promotion.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One figure with room to breathe.
+ *
+ * Inset rather than carded: these sit *inside* a card already, and a border
+ * around each would draw four boxes inside a box. A wash and generous padding
+ * separate them at a fraction of the ink.
+ */
+function Kpi({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "pos" | "neg";
+}) {
+  return (
+    <div className="bg-adm-subtle px-3.5 py-3 transition-colors">
+      <dt className="adm-eyebrow">{label}</dt>
+      <dd
+        className={cn(
+          // Proportional figures, not tabular: at 22px equal-width digits make
+          // a number like 11 look loose. Tabular belongs in table columns.
+          "mt-1.5 text-[22px] font-semibold leading-none tracking-[-0.02em] text-adm-ink",
+          tone === "pos" && "text-adm-pos",
+          tone === "neg" && "text-adm-neg",
+        )}
+      >
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The two charts
 // ---------------------------------------------------------------------------
 
@@ -720,24 +835,6 @@ function SessionCharts({
 
 // ---------------------------------------------------------------------------
 
-function Inline({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div>
-      <dt className="adm-eyebrow">{label}</dt>
-      <dd className={cn("tnum mt-1 text-[15px] font-semibold text-adm-ink", className)}>
-        {value}
-      </dd>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // The table
