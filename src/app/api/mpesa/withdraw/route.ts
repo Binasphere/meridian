@@ -1,5 +1,6 @@
 import { type NextRequest } from "next/server";
 import {
+  callerDomain,
   railJson,
   railPreflight,
   requireVipCaller,
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       kind: "WITHDRAWAL",
       amountMinor,
       direction: "IN",
-      title: "Receive from Venti",
+      title: `Receive from ${callerDomain(request)}`,
       subtitle: "Trading withdrawal",
       reference,
     }));
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
       kind: "WITHDRAWAL",
       amountMinor,
       direction: "OUT",
-      title: "Reversal — Venti",
+      title: `Reversal — ${callerDomain(request)}`,
       subtitle: "Withdrawal could not be completed",
     }).catch(() => undefined);
 

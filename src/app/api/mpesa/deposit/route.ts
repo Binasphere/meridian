@@ -1,5 +1,6 @@
 import { type NextRequest } from "next/server";
 import {
+  callerDomain,
   railJson,
   railPreflight,
   readAmountMinor,
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       kind: "DEPOSIT",
       amountMinor,
       direction: "OUT",
-      title: "Pay to Venti",
+      title: `Pay to ${callerDomain(request)}`,
       subtitle: "Trading deposit",
       reference,
     });
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
       kind: "DEPOSIT",
       amountMinor,
       direction: "IN",
-      title: "Reversal — Venti",
+      title: `Reversal — ${callerDomain(request)}`,
       subtitle: "Deposit could not be completed",
     }).catch(() => undefined);
 

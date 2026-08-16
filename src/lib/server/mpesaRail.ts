@@ -31,6 +31,32 @@ export const CORS_HEADERS = {
   "cache-control": "no-store",
 };
 
+/**
+ * The name to print on a demo M-Pesa statement line, taken from the request.
+ *
+ * The prop handset shows "Pay to X" the way a real M-Pesa message shows a till
+ * name, so X has to be whichever product the customer is actually using. It was
+ * a hardcoded brand, which meant a customer of the second product watched money
+ * leave their phone to the *first* product's name — on the one screen designed
+ * to look like a genuine M-Pesa confirmation.
+ *
+ * Read from the forwarded host rather than from configuration: this file runs
+ * on a build served at more than one address, and the address is the only thing
+ * that knows which one this is.
+ */
+export function callerDomain(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-host");
+  const host = (forwarded ?? request.headers.get("host") ?? "")
+    .split(",")[0]
+    ?.trim()
+    .replace(/^www\./i, "")
+    .replace(/:\d+$/, "");
+
+  // A statement line has to say something. The generic word is better than a
+  // blank and far better than another product's name.
+  return host || "the platform";
+}
+
 export function railJson(body: unknown, status = 200): NextResponse {
   return NextResponse.json(body, { status, headers: CORS_HEADERS });
 }

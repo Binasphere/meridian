@@ -91,3 +91,35 @@ export function siteById(id: string | null | undefined): Site | null {
 export function siteName(id: string | null | undefined): string {
   return siteById(id)?.name ?? id ?? "—";
 }
+
+// ---------------------------------------------------------------------------
+// What the customer is told this place is called
+// ---------------------------------------------------------------------------
+
+/**
+ * The address the visitor typed, as the product's name.
+ *
+ * One build answers on every domain, so there is no name that is correct for
+ * all of them and no build-time constant that could be. The domain itself is
+ * the one label that is always true: a visitor on candixfx.com sees
+ * `candixfx.com`, and nobody is ever shown another product's name.
+ *
+ * **Returns null on the server and on the first client render**, and that is
+ * deliberate rather than a limitation. The alternatives are worse: a build-time
+ * name is wrong on every domain but one; rendering a guess and correcting it
+ * after hydration flashes the wrong product's name at the customer, which is
+ * the exact thing this exists to prevent; and reading the `Host` header in the
+ * layout would make every page dynamic, costing the static rendering that `/`
+ * and `/help` are indexed as.
+ *
+ * Callers render the mark, the layout, and the space — everything except the
+ * word — until it arrives one frame later. Nothing moves; a label fades in.
+ */
+export function currentDomainLabel(): string | null {
+  if (typeof window === "undefined") return null;
+
+  const host = window.location.hostname.replace(/^www\./i, "");
+  // `localhost` and preview hosts are shown as they are. A developer seeing the
+  // literal host they are on is more useful than a fabricated product name.
+  return host || null;
+}

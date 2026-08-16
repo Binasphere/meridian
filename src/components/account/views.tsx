@@ -23,6 +23,8 @@ import {
 import { effectivePayoutBps } from "@/lib/trading";
 import { formatPhoneMasked, useCurrentAccount } from "@/lib/auth";
 import { useStore } from "@/lib/store";
+import { currentDomainLabel } from "@/lib/sites";
+import { useDomainLabel } from "@/lib/useDomainLabel";
 import { Empty, Segmented } from "@/components/ui/primitives";
 import { StatsPanel } from "@/components/terminal/StatsPanel";
 import { Positions } from "@/components/terminal/Positions";
@@ -283,7 +285,12 @@ function downloadStatement(rows: StatementRow[]): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `venti-statement-${new Date().toISOString().slice(0, 10)}.csv`;
+  // Named after the domain it was exported from. A customer holding statements
+  // from both products needs to be able to tell them apart in a downloads
+  // folder, and a shared brand prefix made every file look like the same one.
+  anchor.download = `${currentDomainLabel() ?? "statement"}-statement-${new Date()
+    .toISOString()
+    .slice(0, 10)}.csv`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
@@ -695,6 +702,8 @@ function Field({
 // ===========================================================================
 
 export function HelpPage() {
+  const domain = useDomainLabel();
+
   const faqs = [
     {
       q: "How is a contract decided?",
@@ -769,8 +778,10 @@ export function HelpPage() {
               className="flex items-center gap-2.5 bg-surface-1 px-4 py-3.5 text-left transition-colors hover:bg-surface-2"
             >
               <Mail className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
-              <span className="text-[13px] text-ink-secondary">
-                support@venti.test
+              {/* Derived from the domain rather than fixed: a customer of one
+                  product must never be handed the other's support address. */}
+              <span className="min-h-[1lh] text-[13px] text-ink-secondary">
+                {domain ? `support@${domain}` : null}
               </span>
             </button>
           </div>
