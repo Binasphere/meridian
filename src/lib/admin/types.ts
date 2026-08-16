@@ -65,10 +65,48 @@ export interface AdminAccount {
   createdByName: string | null;
 }
 
-export const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN"] as const;
+export const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN", "SESSION_MANAGER"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 export type AdminStatus = "ACTIVE" | "SUSPENDED";
+
+/**
+ * What each role may do — the mirror of `CAPABILITIES` in the service's
+ * `admin.js`.
+ *
+ * A mirror, and only a mirror. Nothing here grants anything: the service
+ * refuses the routes and omits the figures on its own, and this copy exists
+ * solely so the console can avoid rendering a menu item that would 403. If the
+ * two ever disagree, the service wins and the user sees an error instead of a
+ * leak — which is the right way round for a duplicated rule.
+ */
+const CAPABILITIES: Record<AdminRole, readonly AdminCapability[]> = {
+  SUPER_ADMIN: ["admins", "finance", "sessions"],
+  ADMIN: ["finance", "sessions"],
+  SESSION_MANAGER: ["sessions"],
+};
+
+export type AdminCapability = "admins" | "finance" | "sessions";
+
+export function roleCan(
+  role: AdminRole | null | undefined,
+  capability: AdminCapability,
+): boolean {
+  return role ? CAPABILITIES[role].includes(capability) : false;
+}
+
+/** How each role is named to the people using the console. */
+export const ROLE_LABELS: Record<AdminRole, string> = {
+  SUPER_ADMIN: "Super admin",
+  ADMIN: "Admin",
+  SESSION_MANAGER: "Session manager",
+};
+
+export const ROLE_DESCRIPTIONS: Record<AdminRole, string> = {
+  SUPER_ADMIN: "Everything, including adding and removing admins",
+  ADMIN: "Everything except managing admins",
+  SESSION_MANAGER: "Broadcasts only — no customers, balances or money figures",
+};
 
 /** The password floor, mirrored from `MIN_ADMIN_PASSWORD_LENGTH` on the service. */
 export const MIN_ADMIN_PASSWORD_LENGTH = 10;

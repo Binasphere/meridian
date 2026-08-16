@@ -5,8 +5,10 @@ import { Menu, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminFetch, setAdminToken } from "@/lib/admin/client";
 import type { AdminAccount } from "@/lib/admin/types";
-import { AdminSidebar, type AdminView } from "./AdminSidebar";
+import { roleCan } from "@/lib/admin/types";
+import { AdminSidebar, visibleViews, type AdminView } from "./AdminSidebar";
 import { AdminsView } from "./AdminsView";
+import { DomainsView } from "./DomainsView";
 import { OverviewView } from "./OverviewView";
 import { SessionsView } from "./SessionsView";
 import { SignInGate } from "./SignInGate";
@@ -51,6 +53,10 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
     title: "Sessions",
     description:
       "Every TikTok live, how long it ran, and what it collected against what it cost to promote.",
+  },
+  domains: {
+    title: "Domains",
+    description: "The addresses this platform answers on, and what they share.",
   },
   admins: {
     title: "Admins",
@@ -185,15 +191,28 @@ function Console({
   me: AdminAccount | null;
   onSignedOut: () => void;
 }) {
-  const [view, setView] = useState<AdminView>("overview");
+  const role = me?.role ?? null;
+  const canSeeMoney = roleCan(role, "finance");
+
+  // The first view this role is allowed to open. A session manager landing on
+  // Overview would open the console on a 403 and a page of empty tiles.
+  const [view, setView] = useState<AdminView>(
+    () => visibleViews(role)[0] ?? "domains",
+  );
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Memoised: `useUsers` fetches from an effect keyed on this callback, so a
   // fresh identity each render would re-request in a loop.
   const handleUnauthorised = useCallback(() => onSignedOut(), [onSignedOut]);
-  const state = useUsers(handleUnauthorised);
-  const withdrawalsState = useWithdrawals(handleUnauthorised);
-  const sessionsState = useSessions(handleUnauthorised);
+
+  // The finance hooks are given a no-op when the role may not use them, so they
+  // never fire the request in the first place. Letting them 403 on a timer
+  // would work, but it would also mean a session manager's console spends its
+  // life being refused — noise in the logs and a standing invitation to
+  // misread one of those 403s as a bug.
+  const state = useUsers(handleUnauthorised, canSeeMoney);
+  const withdrawalsState = useWithdrawals(handleUnauthorised, canSeeMoney);
+  const sessionsState = useSessions(handleUnauthorised, roleCan(role, "sessions"));
   const adminsState = useAdmins(handleUnauthorised);
 
   const pendingWithdrawals =
@@ -229,6 +248,7 @@ function Console({
           pendingWithdrawals={pendingWithdrawals}
           liveNow={liveNow}
           projectRef={projectRef}
+          role={role}
           onSignOut={() => void signOut()}
         />
       </aside>
@@ -248,6 +268,7 @@ function Console({
               pendingWithdrawals={pendingWithdrawals}
               liveNow={liveNow}
               projectRef={projectRef}
+              role={role}
               onSignOut={() => void signOut()}
               onClose={() => setMenuOpen(false)}
             />
@@ -314,6 +335,8 @@ function Console({
             <WithdrawalsView state={withdrawalsState} />
           ) : view === "sessions" ? (
             <SessionsView state={sessionsState} />
+          ) : view === "domains" ? (
+            <DomainsView />
           ) : (
             <AdminsView state={adminsState} me={me} />
           )}

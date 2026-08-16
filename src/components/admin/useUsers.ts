@@ -44,13 +44,28 @@ export interface UsersState {
   ) => Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
-export function useUsers(onUnauthorised: () => void): UsersState {
+/**
+ * `enabled` is false for a console role without the `finance` capability. The
+ * request would be refused server-side anyway; not sending it keeps a session
+ * manager's console from generating a stream of 403s that look like a fault.
+ */
+export function useUsers(
+  onUnauthorised: () => void,
+  enabled = true,
+): UsersState {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
   const reload = useCallback(async () => {
+    if (!enabled) {
+      // An empty list rather than null: null means "still loading", and a view
+      // that will never load would sit on a skeleton for ever.
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const response = await adminFetch("/api/admin/users");
@@ -77,7 +92,7 @@ export function useUsers(onUnauthorised: () => void): UsersState {
     } finally {
       setLoading(false);
     }
-  }, [onUnauthorised]);
+  }, [enabled, onUnauthorised]);
 
   useEffect(() => {
     void reload();

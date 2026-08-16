@@ -54,8 +54,11 @@ create table if not exists public.admin_users (
   -- both tables and a future re-parameterisation is one change, not two.
   password_hash text        not null,
 
-  role          text        not null default 'ADMIN'
-    check (role in ('SUPER_ADMIN', 'ADMIN')),
+  -- The constraint is (re)stated below rather than trusted from here, because
+  -- `create table if not exists` does nothing to a table that already exists —
+  -- so a role added after the first run would be rejected by a constraint this
+  -- file appears to define but never updated.
+  role          text        not null default 'ADMIN',
 
   status        text        not null default 'ACTIVE'
     check (status in ('ACTIVE', 'SUSPENDED')),
@@ -75,6 +78,27 @@ create table if not exists public.admin_users (
 
   last_login_at timestamptz
 );
+
+/*
+ * The roles, swapped in idempotently so this file can be re-run to add one.
+ *
+ *   SUPER_ADMIN     — everything, including managing these accounts.
+ *   ADMIN           — everything except managing these accounts.
+ *   SESSION_MANAGER — the promo desk only: start and end broadcasts, suspend a
+ *                     host. No customers, no balances, no withdrawals, and no
+ *                     money figures even on the sessions they run.
+ *
+ * SESSION_MANAGER is not "ADMIN minus a menu". The service refuses the finance
+ * routes outright and strips the money fields from the sessions payload before
+ * it is serialised, so the figures never reach the browser. A console that
+ * merely hid them would be one devtools tab away from not hiding them.
+ */
+alter table public.admin_users
+  drop constraint if exists admin_users_role_check;
+
+alter table public.admin_users
+  add constraint admin_users_role_check
+  check (role in ('SUPER_ADMIN', 'ADMIN', 'SESSION_MANAGER'));
 
 -- Case-insensitive uniqueness. `Admin` and `admin` being two accounts is a
 -- phishing primitive inside your own console, not a feature.

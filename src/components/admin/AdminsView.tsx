@@ -11,7 +11,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  ADMIN_ROLES,
   MIN_ADMIN_PASSWORD_LENGTH,
+  ROLE_DESCRIPTIONS,
+  ROLE_LABELS,
   type AdminAccount,
   type AdminRole,
 } from "@/lib/admin/types";
@@ -279,8 +282,11 @@ function CreateCard({ state }: { state: AdminsState }) {
               onChange={(event) => setRole(event.target.value as AdminRole)}
               className="h-10 w-full rounded-none border border-adm-line-strong bg-adm-surface px-3 text-[14px] text-adm-ink outline-none focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint"
             >
-              <option value="ADMIN">Admin — everything except managing admins</option>
-              <option value="SUPER_ADMIN">Super admin — can manage admins too</option>
+              {ADMIN_ROLES.map((value) => (
+                <option key={value} value={value}>
+                  {ROLE_LABELS[value]} — {ROLE_DESCRIPTIONS[value]}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -354,6 +360,10 @@ function AdminRow({
                 <ShieldCheck size={10} />
                 Super
               </Badge>
+            ) : admin.role === "SESSION_MANAGER" ? (
+              // Named on every row, because "what can this person see" stops
+              // being obvious the moment a third role exists.
+              <Badge>{ROLE_LABELS.SESSION_MANAGER}</Badge>
             ) : null}
             {suspended ? <Badge>Suspended</Badge> : null}
             {isSelf ? <Badge tone="positive">You</Badge> : null}
@@ -401,20 +411,29 @@ function AdminRow({
             {suspended ? "Restore" : "Suspend"}
           </Button>
 
-          <Button
-            onClick={() =>
-              void run(
-                state.setRole(
-                  admin.id,
-                  admin.role === "SUPER_ADMIN" ? "ADMIN" : "SUPER_ADMIN",
-                ),
-                "Role updated",
-              )
-            }
-            disabled={busy}
-          >
-            {admin.role === "SUPER_ADMIN" ? "Demote to admin" : "Make super admin"}
-          </Button>
+          {/* A select rather than a toggle: with three roles there is no single
+              "other" to flip to, and a button that guesses which one you meant
+              is a button that eventually guesses wrong about a permission. */}
+          <label className="flex items-center gap-2 text-[12.5px] text-adm-ink-2">
+            Role
+            <select
+              value={admin.role}
+              disabled={busy}
+              onChange={(event) =>
+                void run(
+                  state.setRole(admin.id, event.target.value as AdminRole),
+                  "Role updated",
+                )
+              }
+              className="h-9 rounded-none border border-adm-line-strong bg-adm-surface px-2 text-[13px] text-adm-ink outline-none focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint disabled:opacity-45"
+            >
+              {ADMIN_ROLES.map((value) => (
+                <option key={value} value={value}>
+                  {ROLE_LABELS[value]}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <Button onClick={() => setResetting((value) => !value)} disabled={busy}>
             <KeyRound size={14} />

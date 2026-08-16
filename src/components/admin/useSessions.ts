@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { adminFetch } from "@/lib/admin/client";
-import type { HostStatus, PromoHost, PromoSession } from "@/lib/sessions/types";
+import type {
+  AdminPromoSession,
+  HostStatus,
+  PromoHost,
+} from "@/lib/sessions/types";
 
 /**
  * The promo desk, from the admin's side.
@@ -22,26 +26,44 @@ const POLL_MS = 15_000;
 export type SessionsResult = { ok: true } | { ok: false; reason: string };
 
 export interface SessionsState {
-  sessions: PromoSession[] | null;
+  sessions: AdminPromoSession[] | null;
   hosts: PromoHost[] | null;
   loading: boolean;
   error: string | null;
   pending: Record<string, boolean>;
+  /**
+   * Whether this admin's role was sent the money figures. Read from the
+   * server's own answer, never inferred from a missing field.
+   */
+  money: boolean;
   reload: () => Promise<void>;
+  startSession: (hostId: string, spendMinor: string) => Promise<SessionsResult>;
   endSession: (id: string) => Promise<SessionsResult>;
   setHostStatus: (id: string, status: HostStatus) => Promise<SessionsResult>;
 }
 
-export function useSessions(onUnauthorised: () => void): SessionsState {
-  const [sessions, setSessions] = useState<PromoSession[] | null>(null);
+export function useSessions(
+  onUnauthorised: () => void,
+  enabled = true,
+): SessionsState {
+  const [sessions, setSessions] = useState<AdminPromoSession[] | null>(null);
   const [hosts, setHosts] = useState<PromoHost[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  // Assume withheld until told otherwise: if the flag never arrives, the
+  // console shows no figures, which is the safe direction to fail in.
+  const [money, setMoney] = useState(false);
 
   const inFlight = useRef(false);
 
   const reload = useCallback(async () => {
+    if (!enabled) {
+      setSessions([]);
+      setHosts([]);
+      setLoading(false);
+      return;
+    }
     if (inFlight.current) return;
     inFlight.current = true;
     setLoading(true);
@@ -55,8 +77,9 @@ export function useSessions(onUnauthorised: () => void): SessionsState {
       }
 
       const body = (await response.json().catch(() => ({}))) as {
-        sessions?: PromoSession[];
+        sessions?: AdminPromoSession[];
         hosts?: PromoHost[];
+        money?: boolean;
         error?: string;
       };
 
@@ -70,6 +93,7 @@ export function useSessions(onUnauthorised: () => void): SessionsState {
       setError(null);
       setSessions(body.sessions ?? []);
       setHosts(body.hosts ?? []);
+      setMoney(Boolean(body.money));
     } catch {
       setError("Could not reach the server");
       setSessions([]);
@@ -78,7 +102,7 @@ export function useSessions(onUnauthorised: () => void): SessionsState {
       inFlight.current = false;
       setLoading(false);
     }
-  }, [onUnauthorised]);
+  }, [enabled, onUnauthorised]);
 
   useEffect(() => {
     void reload();
@@ -91,12 +115,17 @@ export function useSessions(onUnauthorised: () => void): SessionsState {
   }, [reload]);
 
   const patch = useCallback(
-    async (key: string, path: string, payload: unknown): Promise<SessionsResult> => {
+    async (
+      key: string,
+      path: string,
+      payload: unknown,
+      method: "PATCH" | "POST" = "PATCH",
+    ): Promise<SessionsResult> => {
       setPending((state) => ({ ...state, [key]: true }));
 
       try {
         const response = await adminFetch(path, {
-          method: "PATCH",
+          method,
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
         });
@@ -126,6 +155,12 @@ export function useSessions(onUnauthorised: () => void): SessionsState {
     [reload],
   );
 
+  const startSession = useCallback(
+    (hostId: string, spendMinor: string) =>
+      patch("start", "/api/admin/sessions", { hostId, spendMinor }, "POST"),
+    [patch],
+  );
+
   const endSession = useCallback(
     (id: string) => patch(id, `/api/admin/sessions/${id}`, { action: "END" }),
     [patch],
@@ -143,7 +178,9 @@ export function useSessions(onUnauthorised: () => void): SessionsState {
     loading,
     error,
     pending,
+    money,
     reload,
+    startSession,
     endSession,
     setHostStatus,
   };

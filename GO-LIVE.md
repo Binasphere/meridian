@@ -78,8 +78,28 @@ first account has to come from somewhere:
    characters minimum). That account is a **super admin**.
 4. From then on the passcode is refused everywhere. It is not a second way in.
 
+### The three roles
+
+| Role | Can see |
+| --- | --- |
+| **Super admin** | Everything, plus adding and removing admins |
+| **Admin** | Everything except managing admins |
+| **Session manager** | The promo desk only — start and end broadcasts, suspend a host. No customers, no balances, no withdrawals, and no money figures even on the sessions they run |
+
+A session manager's console has no Overview, Users or Withdrawals in the
+sidebar, and the finance routes refuse their token outright. On the Sessions
+page they see durations, depositor counts and sign-ups, but the shilling
+figures are **removed from the payload before it is sent** — not hidden in the
+browser, which would be one devtools tab away from not being hidden. They can
+start a broadcast on a host's behalf, entering the promotion cost; that is an
+input they are given, not a figure they are shown.
+
+**`admins.sql` is re-runnable and must be re-run to add this role.** It swaps
+the role constraint idempotently, so applying it a second time is safe and is
+what allows `SESSION_MANAGER` to exist.
+
 After that, Admins in the sidebar is where a super admin adds colleagues,
-suspends them, resets a forgotten password, or hands over the super-admin role.
+suspends them, resets a forgotten password, or changes anyone's role.
 Every admin can change their own password there; doing so signs out every other
 browser holding that account's session, which is what makes it a real response
 to a leak rather than a note about one.

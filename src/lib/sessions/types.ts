@@ -71,10 +71,48 @@ export interface HostSnapshot {
   history: PromoSession[];
 }
 
+// ---------------------------------------------------------------------------
+// The admin console's variant
+// ---------------------------------------------------------------------------
+
+/**
+ * The same broadcast, as seen by a console role that may not see money.
+ *
+ * A separate type rather than making the fields optional on `PromoSession`,
+ * because they are not optional everywhere — they are optional in exactly one
+ * place. The host portal reads its own takings from `/api/sessions/me` and
+ * always receives them; only `/api/admin/sessions` withholds, and only for a
+ * SESSION_MANAGER. Loosening the shared type would have pushed an
+ * `undefined` check into the host's console, where the case cannot arise.
+ *
+ * `PromoSession` is assignable to this, so an admin *with* the finance
+ * capability needs no conversion — the redacted type is simply the wider one.
+ */
+export type AdminSessionScore = Omit<
+  SessionScore,
+  "depositMinor" | "pendingMinor"
+> & {
+  depositMinor?: string;
+  pendingMinor?: string;
+};
+
+export type AdminPromoSession = Omit<PromoSession, "spendMinor" | "stats"> & {
+  spendMinor?: string;
+  stats: AdminSessionScore;
+};
+
 /** Everything `/api/admin/sessions` returns. */
 export interface SessionsReport {
-  sessions: PromoSession[];
+  sessions: AdminPromoSession[];
   hosts: PromoHost[];
+  /**
+   * Whether this caller's role was given the money figures.
+   *
+   * Stated by the server rather than inferred from the absent fields, so the
+   * console never has to guess whether a missing amount means "withheld" or
+   * "the payload changed shape".
+   */
+  money: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,12 +130,23 @@ export interface SessionsReport {
  * confirmed would make a broadcast look profitable minutes before it turns out
  * not to be.
  */
-export function netMinor(session: PromoSession): bigint {
-  return toMinor(session.stats.depositMinor) - toMinor(session.spendMinor);
+export function netMinor(session: AdminPromoSession): bigint | null {
+  const takings = session.stats.depositMinor;
+  const spend = session.spendMinor;
+  // Null rather than zero when either half was withheld. A net of zero and a
+  // net nobody is allowed to see must not render the same.
+  if (takings === undefined || spend === undefined) return null;
+  return toMinor(takings) - toMinor(spend);
 }
 
 /** How long a broadcast ran, or has been running. */
-export function elapsedMs(session: PromoSession, now: number): number {
+export function elapsedMs(
+  // Only the two timestamps, so this serves both the host's `PromoSession` and
+  // the console's redacted `AdminPromoSession` without either being converted.
+  // A duration was never a money figure and should not have depended on one.
+  session: Pick<PromoSession, "startedAt" | "endedAt">,
+  now: number,
+): number {
   const end = session.endedAt ? Date.parse(session.endedAt) : now;
   return Math.max(0, end - Date.parse(session.startedAt));
 }

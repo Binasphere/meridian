@@ -30,13 +30,22 @@ export interface WithdrawalsState {
   ) => Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 
-export function useWithdrawals(onUnauthorised: () => void): WithdrawalsState {
+/** `enabled` is false for a role without the `finance` capability — see `useUsers`. */
+export function useWithdrawals(
+  onUnauthorised: () => void,
+  enabled = true,
+): WithdrawalsState {
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[] | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Record<string, boolean>>({});
 
   const reload = useCallback(async () => {
+    if (!enabled) {
+      setWithdrawals([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const response = await adminFetch("/api/admin/withdrawals");
@@ -63,7 +72,7 @@ export function useWithdrawals(onUnauthorised: () => void): WithdrawalsState {
     } finally {
       setLoading(false);
     }
-  }, [onUnauthorised]);
+  }, [enabled, onUnauthorised]);
 
   useEffect(() => {
     void reload();

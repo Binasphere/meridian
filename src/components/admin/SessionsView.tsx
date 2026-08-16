@@ -10,7 +10,7 @@ import {
   formatSpan,
   netMinor,
   type PromoHost,
-  type PromoSession,
+  type AdminPromoSession,
 } from "@/lib/sessions/types";
 import { useNow } from "@/lib/sessions/useNow";
 import { cn } from "@/lib/utils";
@@ -32,7 +32,8 @@ import type { SessionsState } from "./useSessions";
  * fact.
  */
 export function SessionsView({ state }: { state: SessionsState }) {
-  const { sessions, hosts, error, pending, endSession, setHostStatus } = state;
+  const { sessions, hosts, error, pending, money, endSession, setHostStatus } =
+    state;
   const notify = useNotify();
 
   const live = sessions?.find((session) => session.endedAt === null) ?? null;
@@ -41,8 +42,12 @@ export function SessionsView({ state }: { state: SessionsState }) {
     if (!sessions) return null;
     return sessions.reduce(
       (sum, session) => ({
-        collected: sum.collected + toMinor(session.stats.depositMinor),
-        spend: sum.spend + toMinor(session.spendMinor),
+        // `?? "0"` is safe here and nowhere else: these two totals are only
+        // rendered when `state.money` is true, and in that case the server sent
+        // every figure. The fallback exists to satisfy the type, not to stand
+        // in for a number somebody was refused.
+        collected: sum.collected + toMinor(session.stats.depositMinor ?? "0"),
+        spend: sum.spend + toMinor(session.spendMinor ?? "0"),
         depositors: sum.depositors + session.stats.depositors,
         newDepositors: sum.newDepositors + session.stats.newDepositors,
       }),
@@ -50,7 +55,7 @@ export function SessionsView({ state }: { state: SessionsState }) {
     );
   }, [sessions]);
 
-  async function end(session: PromoSession) {
+  async function end(session: AdminPromoSession) {
     const result = await endSession(session.id);
     if (result.ok) {
       notify({
@@ -94,19 +99,7 @@ export function SessionsView({ state }: { state: SessionsState }) {
           onEnd={() => void end(live)}
         />
       ) : (
-        <Card className="flex flex-wrap items-center gap-x-4 gap-y-2 p-5">
-          <span
-            aria-hidden
-            className="h-2 w-2 shrink-0 bg-adm-ink-4"
-          />
-          <div className="min-w-0">
-            <p className="text-[13.5px] font-medium text-adm-ink">Nobody is live</p>
-            <p className="mt-0.5 text-[12.5px] text-adm-ink-3">
-              A host opens a session from the live desk at <code>/sessions</code>.
-              Only one runs at a time.
-            </p>
-          </div>
-        </Card>
+        <OffAirCard state={state} />
       )}
 
       {/* --- Totals -------------------------------------------------------- */}
@@ -119,33 +112,59 @@ export function SessionsView({ state }: { state: SessionsState }) {
               (hosts?.length ?? 0) === 1 ? "host" : "hosts"
             } on the roster`}
           />
-          <StatTile
-            label="Collected"
-            value={formatMoney(totals.collected, { currency: "KSh", compact: true })}
-            hint="Deposits confirmed while a session was open"
-          />
-          <StatTile
-            label="Promotion spend"
-            value={formatMoney(totals.spend, { currency: "KSh", compact: true })}
-            hint="As entered by each host before going live"
-          />
-          <StatTile
-            label="Net"
-            value={
-              <span
-                className={cn(
-                  totals.collected > totals.spend && "text-adm-pos",
-                  totals.collected < totals.spend && "text-adm-neg",
-                )}
-              >
-                {formatMoney(totals.collected - totals.spend, {
-                  currency: "KSh",
-                  compact: true,
-                })}
-              </span>
-            }
-            hint={`${totals.newDepositors} first-time depositors won`}
-          />
+          {/* The three money tiles are replaced by reach figures for a role
+              without the finance capability, rather than left as gaps. A
+              session manager still needs to know whether a broadcast worked;
+              people and sign-ups answer that without naming a shilling. */}
+          {money ? (
+            <>
+              <StatTile
+                label="Collected"
+                value={formatMoney(totals.collected, { currency: "KSh", compact: true })}
+                hint="Deposits confirmed while a session was open"
+              />
+              <StatTile
+                label="Promotion spend"
+                value={formatMoney(totals.spend, { currency: "KSh", compact: true })}
+                hint="As entered by each host before going live"
+              />
+              <StatTile
+                label="Net"
+                value={
+                  <span
+                    className={cn(
+                      totals.collected > totals.spend && "text-adm-pos",
+                      totals.collected < totals.spend && "text-adm-neg",
+                    )}
+                  >
+                    {formatMoney(totals.collected - totals.spend, {
+                      currency: "KSh",
+                      compact: true,
+                    })}
+                  </span>
+                }
+                hint={`${totals.newDepositors} first-time depositors won`}
+              />
+            </>
+          ) : (
+            <>
+              <StatTile
+                label="Depositors"
+                value={totals.depositors}
+                hint="People who paid while a session was open"
+              />
+              <StatTile
+                label="First-timers"
+                value={totals.newDepositors}
+                hint="Of those, depositing for the first time ever"
+              />
+              <StatTile
+                label="Sign-ups"
+                value={sessions?.reduce((sum, s) => sum + s.stats.signups, 0) ?? 0}
+                hint="Accounts created during a broadcast"
+              />
+            </>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -180,7 +199,7 @@ export function SessionsView({ state }: { state: SessionsState }) {
             hint="Once a host runs their first live it appears here with its full record."
           />
         ) : (
-          <SessionsTable sessions={sessions} />
+          <SessionsTable sessions={sessions} money={money} />
         )}
       </Card>
 
@@ -231,7 +250,7 @@ function OnAirCard({
   busy,
   onEnd,
 }: {
-  session: PromoSession;
+  session: AdminPromoSession;
   busy: boolean;
   onEnd: () => void;
 }) {
@@ -265,8 +284,9 @@ function OnAirCard({
               minute: "2-digit",
               hour12: false,
             })}
-            {" · "}
-            {formatMoney(session.spendMinor, { currency: "KSh" })} promotion
+            {session.spendMinor === undefined
+              ? null
+              : ` · ${formatMoney(session.spendMinor, { currency: "KSh" })} promotion`}
           </p>
         </div>
 
@@ -303,18 +323,147 @@ function OnAirCard({
           rest of the page below the fold for the one state where the rest of
           the page matters least. */}
       <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-3 border-t border-adm-line pt-4">
-        <Inline label="Collected" value={formatMoney(session.stats.depositMinor, { currency: "KSh" })} />
+        {session.stats.depositMinor === undefined ? null : (
+          <Inline
+            label="Collected"
+            value={formatMoney(session.stats.depositMinor, { currency: "KSh" })}
+          />
+        )}
         <Inline label="Deposits" value={String(session.stats.depositCount)} />
         <Inline label="People" value={String(session.stats.depositors)} />
         <Inline label="New" value={String(session.stats.newDepositors)} />
         <Inline label="Sign-ups" value={String(session.stats.signups)} />
         <Inline label="Pending" value={String(session.stats.pendingCount)} />
-        <Inline
-          label="Net"
-          value={formatMoney(net, { currency: "KSh", withSign: net > 0n })}
-          className={cn(net > 0n && "text-adm-pos", net < 0n && "text-adm-neg")}
-        />
+        {net === null ? null : (
+          <Inline
+            label="Net"
+            value={formatMoney(net, { currency: "KSh", withSign: net > 0n })}
+            className={cn(net > 0n && "text-adm-pos", net < 0n && "text-adm-neg")}
+          />
+        )}
       </dl>
+    </Card>
+  );
+}
+
+/**
+ * Nobody is live — and the console's own way to change that.
+ *
+ * Starting from here is the mirror of the force-end: it exists for the host who
+ * is already broadcasting on TikTok and cannot get into the desk. The spend is
+ * required because it is the denominator of everything the session will be
+ * judged by, and a cost entered afterwards is a cost entered knowing the
+ * answer. Typing it is not the same as being shown takings, which is why a
+ * session manager may do this and still see no money anywhere else.
+ */
+function OffAirCard({ state }: { state: SessionsState }) {
+  const { hosts, pending, startSession } = state;
+  const notify = useNotify();
+  const [open, setOpen] = useState(false);
+  const [hostId, setHostId] = useState("");
+  const [spend, setSpend] = useState("");
+
+  const busy = Boolean(pending.start);
+  const active = hosts?.filter((host) => host.status === "ACTIVE") ?? [];
+  const ready = hostId.length > 0 && spend.trim().length > 0;
+
+  async function submit() {
+    if (busy || !ready) return;
+
+    // Whole shillings in the field, cents on the wire — the same conversion the
+    // host's own desk does, so a session started from either place records the
+    // figure identically.
+    const shillings = Number(spend);
+    if (!Number.isFinite(shillings) || shillings < 0) {
+      notify({ tone: "error", title: "Enter what the promotion cost" });
+      return;
+    }
+
+    const result = await startSession(hostId, String(Math.round(shillings * 100)));
+    if (result.ok) {
+      notify({
+        tone: "success",
+        title: "Session started",
+        body: "The host's desk will pick it up on its next refresh.",
+      });
+      setOpen(false);
+      setHostId("");
+      setSpend("");
+      return;
+    }
+    notify({ tone: "error", title: "Could not start the session", body: result.reason });
+  }
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span aria-hidden className="h-2 w-2 shrink-0 bg-adm-ink-4" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13.5px] font-medium text-adm-ink">Nobody is live</p>
+          <p className="mt-0.5 text-[12.5px] text-adm-ink-3">
+            A host normally opens a session from the live desk at{" "}
+            <code>/sessions</code>. Only one runs at a time.
+          </p>
+        </div>
+        <Button onClick={() => setOpen((value) => !value)} disabled={active.length === 0}>
+          <Radio size={14} />
+          {open ? "Cancel" : "Start for a host"}
+        </Button>
+      </div>
+
+      {open ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+          className="mt-4 flex flex-wrap items-end gap-3 border-t border-adm-line pt-4"
+        >
+          <div className="min-w-[200px] flex-1">
+            <label
+              htmlFor="adm-start-host"
+              className="mb-1.5 block text-[12.5px] font-medium text-adm-ink-2"
+            >
+              Host
+            </label>
+            <select
+              id="adm-start-host"
+              value={hostId}
+              onChange={(event) => setHostId(event.target.value)}
+              className="h-10 w-full rounded-none border border-adm-line-strong bg-adm-surface px-3 text-[14px] text-adm-ink outline-none focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint"
+            >
+              <option value="">Choose a host…</option>
+              {active.map((host) => (
+                <option key={host.id} value={host.id}>
+                  {host.fullName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="min-w-[160px]">
+            <label
+              htmlFor="adm-start-spend"
+              className="mb-1.5 block text-[12.5px] font-medium text-adm-ink-2"
+            >
+              Promotion cost (KSh)
+            </label>
+            <input
+              id="adm-start-spend"
+              inputMode="numeric"
+              value={spend}
+              onChange={(event) => setSpend(event.target.value.replace(/[^\d.]/g, ""))}
+              placeholder="0"
+              className="h-10 w-full rounded-none border border-adm-line-strong bg-adm-surface px-3 text-[14px] tabular-nums text-adm-ink outline-none focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint"
+            />
+          </div>
+
+          <Button type="submit" variant="primary" className="h-10" disabled={busy || !ready}>
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <Radio size={14} />}
+            Go live
+          </Button>
+        </form>
+      ) : null}
     </Card>
   );
 }
@@ -348,7 +497,7 @@ function Inline({
  * that hide half the figures. Comparing hosts is the whole job of this list,
  * and comparison needs columns that line up.
  */
-function SessionsTable({ sessions }: { sessions: PromoSession[] }) {
+function SessionsTable({ sessions, money }: { sessions: AdminPromoSession[]; money: boolean }) {
   const now = useNow(sessions.some((session) => session.endedAt === null));
 
   return (
@@ -359,13 +508,20 @@ function SessionsTable({ sessions }: { sessions: PromoSession[] }) {
             <Th className="text-left">Host</Th>
             <Th className="text-left">Started</Th>
             <Th>On air</Th>
-            <Th>Promo</Th>
-            <Th>Collected</Th>
+            {/* Kept in step with the cells below by the same `money` flag —
+                a header without a column shifts every figure one place left,
+                which is the worst way for a permission check to fail. */}
+            {money ? (
+              <>
+                <Th>Promo</Th>
+                <Th>Collected</Th>
+              </>
+            ) : null}
             <Th>Deposits</Th>
             <Th>People</Th>
             <Th>New</Th>
             <Th>Sign-ups</Th>
-            <Th>Net</Th>
+            {money ? <Th>Net</Th> : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-adm-line">
@@ -410,22 +566,36 @@ function SessionsTable({ sessions }: { sessions: PromoSession[] }) {
                     </span>
                   ) : null}
                 </Td>
-                <Td>{formatMoney(session.spendMinor, { currency: "KSh", whole: true })}</Td>
-                <Td className="font-medium text-adm-ink">
-                  {formatMoney(session.stats.depositMinor, { currency: "KSh", whole: true })}
-                </Td>
+                {money ? (
+                  <>
+                    <Td>
+                      {formatMoney(session.spendMinor ?? "0", {
+                        currency: "KSh",
+                        whole: true,
+                      })}
+                    </Td>
+                    <Td className="font-medium text-adm-ink">
+                      {formatMoney(session.stats.depositMinor ?? "0", {
+                        currency: "KSh",
+                        whole: true,
+                      })}
+                    </Td>
+                  </>
+                ) : null}
                 <Td>{session.stats.depositCount}</Td>
                 <Td>{session.stats.depositors}</Td>
                 <Td>{session.stats.newDepositors}</Td>
                 <Td>{session.stats.signups}</Td>
-                <Td
-                  className={cn(
-                    "font-medium",
-                    net > 0n ? "text-adm-pos" : net < 0n ? "text-adm-neg" : "text-adm-ink",
-                  )}
-                >
-                  {formatMoney(net, { currency: "KSh", withSign: net > 0n, whole: true })}
-                </Td>
+                {net === null ? null : (
+                  <Td
+                    className={cn(
+                      "font-medium",
+                      net > 0n ? "text-adm-pos" : net < 0n ? "text-adm-neg" : "text-adm-ink",
+                    )}
+                  >
+                    {formatMoney(net, { currency: "KSh", withSign: net > 0n, whole: true })}
+                  </Td>
+                )}
               </tr>
             );
           })}

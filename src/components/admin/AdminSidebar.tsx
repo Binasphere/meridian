@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   ArrowUpRight,
   Banknote,
+  Globe,
   LayoutGrid,
   LogOut,
   Radio,
@@ -15,6 +16,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { roleCan, type AdminCapability, type AdminRole } from "@/lib/admin/types";
 
 /**
  * The console's left panel.
@@ -36,6 +38,7 @@ export type AdminView =
   | "users"
   | "withdrawals"
   | "sessions"
+  | "domains"
   | "admins";
 
 interface NavItem {
@@ -43,6 +46,11 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   description: string;
+  /**
+   * The capability this view needs. Absent means every signed-in admin may see
+   * it — which is true of Domains, a page of public addresses and a notice.
+   */
+  needs?: AdminCapability;
 }
 
 const NAV: readonly NavItem[] = [
@@ -51,19 +59,34 @@ const NAV: readonly NavItem[] = [
     label: "Overview",
     icon: LayoutGrid,
     description: "Accounts at a glance",
+    needs: "finance",
   },
-  { id: "users", label: "Users", icon: Users, description: "Manage accounts and tiers" },
+  {
+    id: "users",
+    label: "Users",
+    icon: Users,
+    description: "Manage accounts and tiers",
+    needs: "finance",
+  },
   {
     id: "withdrawals",
     label: "Withdrawals",
     icon: Banknote,
     description: "Review requests and record payouts",
+    needs: "finance",
   },
   {
     id: "sessions",
     label: "Sessions",
     icon: Radio,
     description: "TikTok lives, and what each one brought in",
+    needs: "sessions",
+  },
+  {
+    id: "domains",
+    label: "Domains",
+    icon: Globe,
+    description: "The addresses this platform answers on",
   },
   {
     id: "admins",
@@ -72,6 +95,18 @@ const NAV: readonly NavItem[] = [
     description: "Who can sign in to this console",
   },
 ];
+
+/**
+ * The views a role may open, in nav order.
+ *
+ * Exported because the panel needs the same answer to pick a landing view: a
+ * session manager whose console defaulted to Overview would open on a 403.
+ */
+export function visibleViews(role: AdminRole | null): AdminView[] {
+  return NAV.filter((item) => !item.needs || roleCan(role, item.needs)).map(
+    (item) => item.id,
+  );
+}
 
 const UPCOMING: ReadonlyArray<{ label: string; icon: LucideIcon }> = [
   { label: "Deposits", icon: Wallet },
@@ -85,11 +120,14 @@ export function AdminSidebar({
   pendingWithdrawals,
   liveNow,
   projectRef,
+  role,
   onSignOut,
   onClose,
 }: {
   view: AdminView;
   onNavigate: (view: AdminView) => void;
+  /** Decides which nav items exist at all. */
+  role: AdminRole | null;
   userCount: number | null;
   /** Requests awaiting payment — the number an admin signs in to deal with. */
   pendingWithdrawals: number | null;
@@ -134,7 +172,13 @@ export function AdminSidebar({
       <nav className="flex-1 overflow-y-auto px-3 pb-4">
         <p className="adm-eyebrow px-2 pb-2 pt-3">Manage</p>
         <ul className="space-y-0.5">
-          {NAV.map((item) => {
+          {NAV.filter(
+            // Not greyed out like the "Not yet live" group below: those are
+            // features that do not exist yet, which is worth showing. A view
+            // this role may never open is not a roadmap, it is a locked door,
+            // and drawing one only invites someone to rattle it.
+            (item) => !item.needs || roleCan(role, item.needs),
+          ).map((item) => {
             const active = item.id === view;
             const Icon = item.icon;
             return (
