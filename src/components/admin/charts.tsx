@@ -420,7 +420,7 @@ export interface DonutSlice {
  * radii it reads as a second ring.
  */
 export function Donut({
-  slices,
+  slices: input,
   centreLabel,
   centreValue,
   size = 168,
@@ -430,6 +430,35 @@ export function Donut({
   centreValue: string;
   size?: number;
 }) {
+  /*
+   * Past three, the tail folds into "Other" rather than cycling the palette.
+   *
+   * Only three slots were validated for all-pairs separation on this surface,
+   * so a fourth slice would have to reuse a hue — and two domains painted the
+   * same colour in one ring is not a cosmetic problem, it is a chart that says
+   * something false. The named slices stay the largest ones, which is what the
+   * eye goes to anyway; the exact figures for everything in the tail are in the
+   * table twin beneath.
+   */
+  const MAX_SLICES = 3;
+  const slices =
+    input.length <= MAX_SLICES
+      ? input
+      : (() => {
+          const ranked = [...input].sort((a, b) => b.value - a.value);
+          const head = ranked.slice(0, MAX_SLICES - 1);
+          const tail = ranked.slice(MAX_SLICES - 1);
+          return [
+            ...head,
+            {
+              id: "__other",
+              label: `Other (${tail.length})`,
+              value: tail.reduce((sum, slice) => sum + Math.max(0, slice.value), 0),
+              display: tail.map((slice) => slice.display).join(" + "),
+            },
+          ];
+        })();
+
   const total = slices.reduce((sum, slice) => sum + Math.max(0, slice.value), 0);
 
   const stroke = 22;

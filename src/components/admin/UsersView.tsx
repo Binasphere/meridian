@@ -39,7 +39,16 @@ export function UsersView({ state }: { state: UsersState }) {
 
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
-  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+  /**
+   * VIP first, because that is the working set.
+   *
+   * VIP is the tier an admin *does* something to — it is what gates the demo
+   * handset and the payout terms, and it is a few dozen accounts against a
+   * population in the thousands. Opening on everybody meant the rows that need
+   * attention were buried among rows that never do. "All" is one click away and
+   * lifts the recent-ten cap with it.
+   */
+  const [tierFilter, setTierFilter] = useState<TierFilter>("VIP");
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({
     key: "created",
     desc: true,
@@ -205,12 +214,22 @@ export function UsersView({ state }: { state: UsersState }) {
       ) : rows.length === 0 ? (
         <EmptyState
           title={
-            users && users.length === 0 ? "No accounts yet" : "No matching users"
+            users && users.length === 0
+              ? "No accounts yet"
+              : tierFilter === "VIP" && !query.trim()
+                ? "No VIP accounts"
+                : "No matching users"
           }
           hint={
             users && users.length === 0
               ? "Accounts appear here as soon as people sign up."
-              : "Try a different name or number, or clear the tier filter."
+              : tierFilter === "VIP" && !query.trim()
+                ? // Named explicitly, because the list opens filtered and an
+                  // empty page with no explanation reads as "no customers".
+                  `Nobody is on VIP terms. Choose All to see the other ${
+                    users?.length.toLocaleString() ?? ""
+                  } accounts.`
+                : "Try a different name or number, or clear the tier filter."
           }
         />
       ) : (

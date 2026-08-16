@@ -23,7 +23,6 @@ import {
 import { useNow } from "@/lib/sessions/useNow";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardHeader, Skeleton, StatTile, avatarTint, useNotify } from "./ui";
-import { BarRows, TableView } from "./charts";
 import type { SessionsState } from "./useSessions";
 
 /**
@@ -232,11 +231,6 @@ export function SessionsView({ state }: { state: SessionsState }) {
           ))}
         </div>
       )}
-
-      {/* --- The two charts ------------------------------------------------ */}
-      {sessions && sessions.length > 0 ? (
-        <SessionCharts sessions={sessions} money={money} />
-      ) : null}
 
       {/* --- Every session -------------------------------------------------- */}
       <Card className="overflow-hidden">
@@ -763,107 +757,6 @@ function Kpi({
   );
 }
 
-// ---------------------------------------------------------------------------
-// The two charts
-// ---------------------------------------------------------------------------
-
-/**
- * Per broadcast, side by side: **what it collected** and **how many customers
- * it brought**.
- *
- * Two charts rather than one with two scales. Shillings and people are
- * different units, and putting them on a shared axis would invent a
- * relationship between them that the data does not contain — the single most
- * common way a dashboard misleads.
- *
- * Ordered oldest-to-newest, left to right, against the list above which runs
- * newest first. That is deliberate: a list is scanned for "what happened last",
- * a chart is read for "which way is this going", and each ordering serves its
- * own question.
- *
- * A bar rather than a line, because these are discrete events with names, not a
- * continuous quantity sampled over time — the gap between two broadcasts is not
- * a slope.
- */
-function SessionCharts({
-  sessions,
-  money,
-}: {
-  sessions: AdminPromoSession[];
-  money: boolean;
-}) {
-  // Oldest first, and only as many as read legibly as rows.
-  const recent = useMemo(() => [...sessions].slice(0, 8).reverse(), [sessions]);
-
-  const label = (session: AdminPromoSession) => {
-    const first = session.hostName.split(" ")[0] ?? session.hostName;
-    const when = new Date(session.startedAt).toLocaleDateString([], {
-      day: "numeric",
-      month: "short",
-    });
-    return `${first} · ${when}`;
-  };
-
-  const collected = recent.map((session) => ({
-    id: session.id,
-    label: label(session),
-    value: Number(BigInt(session.stats.depositMinor ?? "0") / 100n),
-    display: formatMoney(session.stats.depositMinor ?? "0", {
-      currency: "KSh",
-      whole: true,
-    }),
-  }));
-
-  const customers = recent.map((session) => ({
-    id: session.id,
-    label: label(session),
-    value: session.stats.depositors,
-    display: `${session.stats.depositors} · ${session.stats.depositCount} deposits`,
-  }));
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {money ? (
-        <Card>
-          <CardHeader
-            title="Collected per broadcast"
-            subtitle="Confirmed deposits stamped to each live, oldest first."
-          />
-          <div className="px-5 py-4">
-            {/* One measure across many broadcasts, so every bar is slot 1 — a
-                colour that varied with the value would double-encode the bar's
-                own length and spend the only free channel on nothing. */}
-            <BarRows data={collected} colorByIndex={false} />
-            <TableView
-              columns={["Broadcast", "Collected"]}
-              rows={collected.map((row) => [row.label, row.display])}
-            />
-          </div>
-        </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader
-          title="Customers per broadcast"
-          subtitle="People who paid while each live was open."
-        />
-        <div className="px-5 py-4">
-          <BarRows data={customers} colorByIndex={false} />
-          <TableView
-            columns={["Broadcast", "Customers", "Deposits"]}
-            rows={recent.map((session) => [
-              label(session),
-              session.stats.depositors,
-              session.stats.depositCount,
-            ])}
-          />
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 
 
 // ---------------------------------------------------------------------------
