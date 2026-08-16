@@ -2,22 +2,26 @@
 
 import { useState } from "react";
 import {
+  BookOpen,
   History,
   Loader2,
   LogOut,
   Radio,
   RefreshCw,
   Square,
+  Trophy,
+  Wallet,
 } from "lucide-react";
-import { wholeToMinor } from "@/lib/format";
+import { formatMoney, wholeToMinor } from "@/lib/format";
 import { setHostToken } from "@/lib/sessions/client";
 import {
   elapsedMs,
   formatElapsed,
   formatSpan,
+  type HostSnapshot,
   type PromoSession,
 } from "@/lib/sessions/types";
-import { Badge, Button, Card, CardHeader, Skeleton, useNotify } from "@/components/admin/ui";
+import { Button, Card, Skeleton, useNotify } from "@/components/admin/ui";
 import { LiveDot, Scoreboard } from "./Scoreboard";
 import { useNow } from "@/lib/sessions/useNow";
 import { useHost } from "./useHost";
@@ -76,28 +80,162 @@ export function HostConsole({ onSignedOut }: { onSignedOut: () => void }) {
         </Button>
       </header>
 
-      <main className="mx-auto w-full max-w-[1100px] space-y-5 px-4 py-5 sm:px-6 lg:py-6">
-        {error && !snapshot ? (
-          <Card className="p-6">
-            <p className="text-[13.5px] font-medium text-adm-ink">
-              Could not load the desk
-            </p>
-            <p className="mt-1 text-[12.5px] text-adm-ink-3">{error}</p>
-          </Card>
-        ) : !snapshot ? (
-          <LoadingSkeleton />
-        ) : snapshot.live ? (
-          <LivePanel session={snapshot.live} state={state} />
-        ) : snapshot.blockedBy ? (
-          <BlockedPanel blockedBy={snapshot.blockedBy} />
-        ) : (
-          <StartPanel state={state} suspended={snapshot.host.status === "SUSPENDED"} />
-        )}
+      {/* Two columns on a laptop, one on a phone — and the phone is the case
+          that matters, since a host is holding one while talking to a camera.
+          The aside comes *second* in the source so that on a narrow screen the
+          live panel is the first thing under the header rather than something
+          to scroll past. `lg:order-first` puts it back on the left where there
+          is room for both. */}
+      <main className="mx-auto grid w-full max-w-[1180px] gap-5 px-4 py-5 sm:px-6 lg:grid-cols-[248px_minmax(0,1fr)] lg:py-6">
+        <div className="min-w-0 space-y-5">
+          {error && !snapshot ? (
+            <Card className="p-6">
+              <p className="text-[13.5px] font-medium text-adm-ink">
+                Could not load the desk
+              </p>
+              <p className="mt-1 text-[12.5px] text-adm-ink-3">{error}</p>
+            </Card>
+          ) : !snapshot ? (
+            <LoadingSkeleton />
+          ) : snapshot.live ? (
+            <LivePanel session={snapshot.live} state={state} />
+          ) : snapshot.blockedBy ? (
+            <BlockedPanel blockedBy={snapshot.blockedBy} />
+          ) : (
+            <StartPanel state={state} suspended={snapshot.host.status === "SUSPENDED"} />
+          )}
+        </div>
 
-        {snapshot ? <HistoryCard sessions={snapshot.history} /> : null}
+        {snapshot ? (
+          <aside className="min-w-0 lg:order-first">
+            <SidePanel snapshot={snapshot} />
+          </aside>
+        ) : null}
       </main>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// The side panel
+// ---------------------------------------------------------------------------
+
+/**
+ * A host's own record, and what is coming.
+ *
+ * Three figures, and none of them money the host did not spend: how many lives
+ * they have run, how long they have been on air across all of them, and what
+ * they have paid to promote. The takings are absent here for the same reason
+ * they are absent from the scoreboard — a promoter is paid for the work, not
+ * for what the work collected.
+ *
+ * Promotion spend is the one shilling figure that belongs to them. They typed
+ * every one of these numbers themselves before going live; totalling them is
+ * arithmetic on their own input, not a disclosure.
+ *
+ * The "Coming soon" items are shown rather than hidden, greyed and inert. A
+ * link that looks clickable and does nothing is a lie; a list that is visibly
+ * not ready is a roadmap, and it tells a host the desk is being built for them
+ * rather than left as one screen with a button on it.
+ */
+function SidePanel({ snapshot }: { snapshot: HostSnapshot }) {
+  const { host, history, live } = snapshot;
+
+  // The live session is not in `history` until it ends, so it is counted here
+  // — a host who has just gone live for the first time should not read "0".
+  const all = live ? [live, ...history] : history;
+
+  const onAirMs = all.reduce(
+    (sum, session) => sum + elapsedMs(session, Date.now()),
+    0,
+  );
+  const spent = all.reduce(
+    (sum, session) => sum + (session.spendMinor ? BigInt(session.spendMinor) : 0n),
+    0n,
+  );
+
+  return (
+    <div className="space-y-4 lg:sticky lg:top-[92px]">
+      <Card className="overflow-hidden">
+        <div className="flex items-center gap-2.5 border-b border-adm-line px-4 py-3.5">
+          <span
+            aria-hidden
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-none bg-adm-ink text-[13px] font-semibold text-white"
+          >
+            {initials(host.fullName)}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-medium text-adm-ink">
+              {host.fullName}
+            </p>
+            <p className="mt-0.5 text-[11.5px] text-adm-ink-3">
+              {host.status === "SUSPENDED" ? "Suspended" : "Host"}
+            </p>
+          </div>
+        </div>
+
+        <dl className="divide-y divide-adm-line">
+          <SideFigure label="Lives run" value={all.length.toLocaleString()} />
+          <SideFigure label="Time on air" value={formatSpan(onAirMs)} />
+          <SideFigure
+            label="Spent promoting"
+            value={formatMoney(spent, { currency: "KSh", whole: true })}
+          />
+        </dl>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <p className="border-b border-adm-line px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-adm-ink-3">
+          Coming soon
+        </p>
+        <ul className="divide-y divide-adm-line">
+          {UPCOMING.map((item) => (
+            <li
+              key={item.label}
+              className="flex cursor-not-allowed items-center gap-2.5 px-4 py-3 text-adm-ink-4"
+            >
+              <item.icon size={15} className="shrink-0" />
+              <span className="min-w-0 flex-1 text-[12.5px] font-medium">
+                {item.label}
+              </span>
+              <span className="shrink-0 border border-adm-line px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em]">
+                Soon
+              </span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * What the desk is going to grow.
+ *
+ * Named as the things a host actually asks about between lives — what am I
+ * owed, how am I doing against the others — rather than as generic feature
+ * words. A roadmap that does not say anything is decoration.
+ */
+const UPCOMING = [
+  { label: "My payouts", icon: Wallet },
+  { label: "Leaderboard", icon: Trophy },
+  { label: "Past lives", icon: History },
+  { label: "Tips & guides", icon: BookOpen },
+] as const;
+
+function SideFigure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 px-4 py-3">
+      <dt className="text-[12px] text-adm-ink-3">{label}</dt>
+      <dd className="tnum text-[14px] font-medium text-adm-ink">{value}</dd>
+    </div>
+  );
+}
+
+/** `SO` from `Samuel Orina`. Two letters, because three is a monogram. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return `${parts[0]?.[0] ?? ""}${parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : ""}`.toUpperCase();
 }
 
 // ---------------------------------------------------------------------------
@@ -146,8 +284,10 @@ function LivePanel({
               {formatElapsed(elapsedMs(session, now))}
             </div>
 
-            {/* The promotion cost used to sit here. It is money, so it is gone
-                — the desk states when the live started and nothing else. */}
+            {/* The promotion cost is back, and it is the only shilling figure
+                on this page: the host typed it themselves minutes ago. The
+                takings it was spent against are not here and never arrive from
+                the server. */}
             <p className="mt-3 text-[12.5px] text-adm-ink-3">
               Started{" "}
               {new Date(session.startedAt).toLocaleTimeString([], {
@@ -155,6 +295,9 @@ function LivePanel({
                 minute: "2-digit",
                 hour12: false,
               })}
+              {session.spendMinor === undefined
+                ? null
+                : ` · ${formatMoney(session.spendMinor, { currency: "KSh" })} promotion`}
             </p>
           </div>
 
@@ -328,102 +471,6 @@ function BlockedPanel({
         exactly one live — this page will free up the moment they come off air.
       </p>
     </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// The record
-// ---------------------------------------------------------------------------
-
-function HistoryCard({ sessions }: { sessions: PromoSession[] }) {
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader
-        title="Your sessions"
-        subtitle="Every live you have run, newest first."
-        action={
-          sessions.length > 0 ? (
-            <Badge>{sessions.length} total</Badge>
-          ) : null
-        }
-      />
-
-      {sessions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-          <span className="grid h-10 w-10 place-items-center rounded-none bg-adm-subtle text-adm-ink-4">
-            <History size={18} />
-          </span>
-          <p className="mt-1 text-[13.5px] font-medium text-adm-ink">
-            No sessions yet
-          </p>
-          <p className="max-w-[380px] text-[12.5px] leading-relaxed text-adm-ink-3">
-            Your first live will appear here with everything it brought in, the
-            moment you end it.
-          </p>
-        </div>
-      ) : (
-        <ul className="divide-y divide-adm-line">
-          {sessions.map((session) => (
-            <HistoryRow key={session.id} session={session} />
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-/**
- * One past broadcast.
- *
- * Net is absent here for the same reason it is absent from `Scoreboard`: it is
- * an admin figure, shown only in the admin console.
- */
-function HistoryRow({ session }: { session: PromoSession }) {
-  const ran = elapsedMs(session, Date.now());
-
-  return (
-    <li className="flex flex-col gap-2 px-4 py-3.5 sm:px-5 lg:flex-row lg:items-center lg:gap-4">
-      <div className="min-w-0 flex-1">
-        <div className="text-[13.5px] font-medium text-adm-ink">
-          {new Date(session.startedAt).toLocaleString([], {
-            weekday: "short",
-            day: "2-digit",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          })}
-        </div>
-        <div className="mt-0.5 text-[12px] text-adm-ink-3">
-          {formatSpan(ran)} on air
-          {session.endedBy === "ADMIN" ? " · ended by admin" : null}
-          {session.endedBy === "AUTO" ? " · closed automatically" : null}
-        </div>
-      </div>
-
-      {/* Counts only. A host's own record is how many people they brought,
-          never what those people paid — see `Scoreboard`. */}
-      <Figure label="Paying" value={String(session.stats.depositors)} />
-      <Figure label="Deposits" value={String(session.stats.depositCount)} />
-      <Figure label="New" value={String(session.stats.newDepositors)} />
-      <Figure label="Sign-ups" value={String(session.stats.signups)} />
-    </li>
-  );
-}
-
-/**
- * One figure from a past session.
- *
- * The label is always rendered, not hoisted into a column heading: the row
- * stacks below `lg`, and a bare number with its heading three screens up is a
- * number nobody can read.
- */
-function Figure({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 lg:w-[112px] lg:flex-col lg:items-end lg:justify-start lg:gap-0.5">
-      <span className="adm-eyebrow">{label}</span>
-      <span className="tnum text-[13px] font-medium text-adm-ink">{value}</span>
-    </div>
   );
 }
 
