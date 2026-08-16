@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Loader2, Radio, Square, UserMinus, UserPlus } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Radio,
+  Square,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
 import { formatMoney, toMinor } from "@/lib/format";
 import { formatPhone } from "@/lib/phone";
 import {
@@ -37,6 +45,35 @@ export function SessionsView({ state }: { state: SessionsState }) {
   const notify = useNotify();
 
   const live = sessions?.find((session) => session.endedAt === null) ?? null;
+
+  /**
+   * Which broadcast the detail card is showing.
+   *
+   * Null means "follow the default", which is whatever is live and otherwise
+   * the most recent. Storing the *intent* rather than resolving it to an id up
+   * front is what lets the card move to a new broadcast on its own when one
+   * starts, while still respecting a row an admin has deliberately picked.
+   */
+  const [pickedId, setPickedId] = useState<string | null>(null);
+
+  const selected = useMemo(() => {
+    if (!sessions || sessions.length === 0) return null;
+    // A picked session that has since dropped out of the window falls back
+    // rather than leaving the card blank.
+    return (
+      sessions.find((session) => session.id === pickedId) ?? live ?? sessions[0] ?? null
+    );
+  }, [sessions, pickedId, live]);
+
+  const selectedIndex = selected
+    ? (sessions?.findIndex((session) => session.id === selected.id) ?? -1)
+    : -1;
+
+  const step = (delta: 1 | -1) => {
+    if (!sessions || selectedIndex < 0) return;
+    const next = sessions[selectedIndex + delta];
+    if (next) setPickedId(next.id);
+  };
 
   const totals = useMemo(() => {
     if (!sessions) return null;
@@ -91,16 +128,28 @@ export function SessionsView({ state }: { state: SessionsState }) {
 
   return (
     <div className="space-y-5">
-      {/* --- On air now --------------------------------------------------- */}
-      {live ? (
-        <OnAirCard
-          session={live}
-          busy={Boolean(pending[live.id])}
-          onEnd={() => void end(live)}
+      {/* --- The broadcast in focus --------------------------------------
+          Shown whether or not anyone is live: a finished session's figures
+          are the reason most people open this page, and collapsing them into
+          a table row the moment it ended threw that away. */}
+      {selected ? (
+        <SessionDetailCard
+          session={selected}
+          busy={Boolean(pending[selected.id])}
+          onEnd={() => void end(selected)}
+          onStep={step}
+          position={{
+            index: selectedIndex,
+            total: sessions?.length ?? 0,
+            hasPrev: selectedIndex > 0,
+            hasNext: selectedIndex >= 0 && selectedIndex < (sessions?.length ?? 0) - 1,
+          }}
         />
-      ) : (
-        <OffAirCard state={state} />
-      )}
+      ) : null}
+
+      {/* The Start control stays available whenever the desk is free, even
+          while an older broadcast is on screen. */}
+      {live ? null : <OffAirCard state={state} />}
 
       {/* --- Totals -------------------------------------------------------- */}
       {totals ? (
@@ -199,7 +248,12 @@ export function SessionsView({ state }: { state: SessionsState }) {
             hint="Once a host runs their first live it appears here with its full record."
           />
         ) : (
-          <SessionsTable sessions={sessions} money={money} />
+          <SessionsTable
+            sessions={sessions}
+            money={money}
+            selectedId={selected?.id ?? null}
+            onSelect={setPickedId}
+          />
         )}
       </Card>
 
@@ -245,16 +299,37 @@ export function SessionsView({ state }: { state: SessionsState }) {
 // On air
 // ---------------------------------------------------------------------------
 
-function OnAirCard({
+/**
+ * One broadcast in full — live or long finished.
+ *
+ * This used to render only while somebody was on air, which meant the moment a
+ * session ended its figures collapsed into a table row and the detail was gone.
+ * The card now follows a *selection*: it opens on whatever is live, falls back
+ * to the most recent broadcast, and follows any row you pick in the table.
+ *
+ * The controls change with the state rather than the layout: a live session
+ * gets the End button and a clock that ticks; an ended one gets its final
+ * duration and prev/next, because the reason to look at a finished broadcast is
+ * almost always to compare it with the one before.
+ */
+function SessionDetailCard({
   session,
   busy,
   onEnd,
+  onStep,
+  position,
 }: {
   session: AdminPromoSession;
   busy: boolean;
   onEnd: () => void;
+  /** Move through the list, newest first. Null when there is nowhere to go. */
+  onStep: (delta: 1 | -1) => void;
+  position: { index: number; total: number; hasPrev: boolean; hasNext: boolean };
 }) {
-  const now = useNow(true);
+  const running = session.endedAt === null;
+  // Only tick for a live session: a finished one's duration is fixed, and a
+  // timer re-rendering it every second is work that changes nothing.
+  const now = useNow(running);
   const [confirming, setConfirming] = useState(false);
   const net = netMinor(session);
 
@@ -263,8 +338,24 @@ function OnAirCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse bg-adm-neg" />
-            <span className="adm-eyebrow text-adm-neg">On air</span>
+            {running ? (
+              <>
+                <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse bg-adm-neg" />
+                <span className="adm-eyebrow text-adm-neg">On air</span>
+              </>
+            ) : (
+              <>
+                <span aria-hidden className="h-2 w-2 shrink-0 bg-adm-ink-4" />
+                <span className="adm-eyebrow">
+                  Ended
+                  {session.endedBy === "ADMIN"
+                    ? " by an admin"
+                    : session.endedBy === "AUTO"
+                      ? " automatically"
+                      : ""}
+                </span>
+              </>
+            )}
           </div>
 
           <h2 className="mt-2.5 text-[19px] font-semibold tracking-[-0.02em] text-adm-ink">
@@ -278,8 +369,10 @@ function OnAirCard({
             {formatElapsed(elapsedMs(session, now))}
           </div>
           <p className="mt-2 text-[12.5px] text-adm-ink-3">
-            Since{" "}
-            {new Date(session.startedAt).toLocaleTimeString([], {
+            {running ? "Since " : "Ran from "}
+            {new Date(session.startedAt).toLocaleString([], {
+              day: "numeric",
+              month: "short",
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
@@ -290,32 +383,62 @@ function OnAirCard({
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {confirming ? (
-            <>
-              <Button onClick={() => setConfirming(false)} disabled={busy}>
-                Cancel
-              </Button>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          {/* The switcher. Newest is index 0, so "previous" walks backwards in
+              time and the arrows point the way the list reads. */}
+          {position.total > 1 ? (
+            <div className="flex items-center gap-1">
               <Button
-                variant="primary"
-                onClick={onEnd}
-                disabled={busy}
-                className="bg-adm-neg hover:bg-[#96201a]"
+                onClick={() => onStep(-1)}
+                disabled={!position.hasPrev}
+                aria-label="Newer session"
+                className="h-8 px-2"
               >
-                {busy ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Square size={13} />
-                )}
-                Confirm end
+                <ChevronLeft size={15} />
               </Button>
-            </>
-          ) : (
-            <Button onClick={() => setConfirming(true)}>
-              <Square size={13} />
-              End session
-            </Button>
-          )}
+              <span className="tnum px-1 text-[12px] text-adm-ink-3">
+                {position.index + 1} / {position.total}
+              </span>
+              <Button
+                onClick={() => onStep(1)}
+                disabled={!position.hasNext}
+                aria-label="Older session"
+                className="h-8 px-2"
+              >
+                <ChevronRight size={15} />
+              </Button>
+            </div>
+          ) : null}
+
+          {running ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {confirming ? (
+                <>
+                  <Button onClick={() => setConfirming(false)} disabled={busy}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={onEnd}
+                    disabled={busy}
+                    className="bg-adm-neg hover:bg-[#96201a]"
+                  >
+                    {busy ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Square size={13} />
+                    )}
+                    Confirm end
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setConfirming(true)}>
+                  <Square size={13} />
+                  End session
+                </Button>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -497,7 +620,17 @@ function Inline({
  * that hide half the figures. Comparing hosts is the whole job of this list,
  * and comparison needs columns that line up.
  */
-function SessionsTable({ sessions, money }: { sessions: AdminPromoSession[]; money: boolean }) {
+function SessionsTable({
+  sessions,
+  money,
+  selectedId,
+  onSelect,
+}: {
+  sessions: AdminPromoSession[];
+  money: boolean;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
   const now = useNow(sessions.some((session) => session.endedAt === null));
 
   return (
@@ -528,9 +661,20 @@ function SessionsTable({ sessions, money }: { sessions: AdminPromoSession[]; mon
           {sessions.map((session) => {
             const net = netMinor(session);
             const running = session.endedAt === null;
+            const active = session.id === selectedId;
 
             return (
-              <tr key={session.id} className="transition-colors hover:bg-adm-raise">
+              <tr
+                key={session.id}
+                onClick={() => onSelect(session.id)}
+                aria-current={active ? "true" : undefined}
+                // A row is the fastest way to reach a broadcast's detail, so
+                // the whole row is the target rather than a link in one cell.
+                className={cn(
+                  "cursor-pointer transition-colors",
+                  active ? "bg-adm-accent-tint" : "hover:bg-adm-raise",
+                )}
+              >
                 <Td className="text-left">
                   <span className="flex items-center gap-2">
                     {running ? (

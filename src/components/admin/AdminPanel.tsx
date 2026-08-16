@@ -16,6 +16,7 @@ import { UsersView } from "./UsersView";
 import { WithdrawalsView } from "./WithdrawalsView";
 import { Button, ToastHost } from "./ui";
 import { useAdmins } from "./useAdmins";
+import { useOverview } from "./useOverview";
 import { useSessions } from "./useSessions";
 import { useSites } from "./useSites";
 import { useUsers } from "./useUsers";
@@ -230,6 +231,7 @@ function Console({
   );
   const adminsState = useAdmins(handleUnauthorised);
   const sitesState = useSites(handleUnauthorised);
+  const overviewState = useOverview(handleUnauthorised, canSeeMoney);
 
   const pendingWithdrawals =
     withdrawalsState.withdrawals?.filter((w) => w.status === "PENDING").length ??
@@ -338,6 +340,7 @@ function Console({
               void sessionsState.reload();
               void adminsState.reload();
               void sitesState.reload();
+              void overviewState.reload();
             }}
             disabled={state.loading || withdrawalsState.loading}
             title="Reload from Supabase"
@@ -356,7 +359,7 @@ function Console({
 
         <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
           {view === "overview" ? (
-            <OverviewView users={state.users} />
+            <OverviewView state={overviewState} />
           ) : view === "users" ? (
             <UsersView state={state} />
           ) : view === "withdrawals" ? (

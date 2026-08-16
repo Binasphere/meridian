@@ -211,11 +211,20 @@ create unique index if not exists promo_sessions_single_live_per_site_idx
  * site of the money at the time it moved is a fact about the event, and every
  * report in the console groups by it.
  */
+alter table public.cash_events
+  add column if not exists is_demo boolean not null default false;
+
+create index if not exists cash_events_real_money_idx
+  on public.cash_events (site, kind, status)
+  where not is_demo;
+
 create or replace function public.cash_events_stamp_site()
 returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
+declare
+  v_demo boolean := false;
 begin
   select p.site into new.site
     from public.profiles p
@@ -225,9 +234,56 @@ begin
     new.site := public.primary_site();
   end if;
 
+  /*
+   * Is this prop money?
+   *
+   * The M-Pesa clone settles against a demo wallet, but its deposits go through
+   * the same `deposit_start` / `deposit_settle` pair as a real PayHero push —
+   * so they land here as COMPLETED deposits and are, on the row alone,
+   * indistinguishable from money that actually arrived. That is why the console
+   * reported far more collected than the PayHero dashboard ever showed.
+   *
+   * Recorded at insert rather than derived at read, deliberately. The condition
+   * "this account is wired to the clone" is true *now*; unlinking a handset
+   * after a demo would silently turn a month of prop money into revenue if
+   * every report re-evaluated it. What was demo at the time it moved stays
+   * demo.
+   *
+   * The table is optional — a deployment that never runs mpesa-demo.sql has no
+   * such table — hence the catalogue check and the dynamic query.
+   */
+  if to_regclass('public.mpesa_demo_wallet') is not null then
+    execute 'select exists (select 1 from public.mpesa_demo_wallet where user_id = $1)'
+       into v_demo
+      using new.user_id;
+  end if;
+
+  new.is_demo := coalesce(v_demo, false);
+
   return new;
 end;
 $$;
+
+/*
+ * Backfill, once, for everything that predates the flag.
+ *
+ * The best available guess and no better: an account wired to the clone today
+ * is assumed to have been wired to it when it deposited. A demo account whose
+ * handset was unlinked before this ran is counted as real money and cannot be
+ * found — nothing recorded it. Guarded so re-running the file does not
+ * re-stamp rows an admin has since corrected by hand.
+ */
+do $$
+begin
+  if to_regclass('public.mpesa_demo_wallet') is not null
+     and not exists (select 1 from public.cash_events where is_demo)
+  then
+    update public.cash_events c
+       set is_demo = true
+      from public.mpesa_demo_wallet w
+     where w.user_id = c.user_id;
+  end if;
+end $$;
 
 drop trigger if exists cash_events_stamp_site_trg on public.cash_events;
 create trigger cash_events_stamp_site_trg
@@ -408,10 +464,15 @@ as $$
      where id = p_session
   ),
   booked as (
+    -- `not is_demo` is belt and braces: `promo_attribution` already refuses to
+    -- stamp a demo account's deposit with a session id, so one should never
+    -- appear here. Stated anyway, because a takings figure that silently
+    -- included prop money is precisely the failure this file exists to end.
     select user_id, status, amount_minor
       from public.cash_events
      where session_id = p_session
        and kind = 'DEPOSIT'
+       and not is_demo
   ),
   totals as (
     select
@@ -572,6 +633,8 @@ as $$
            sum(pr.live_balance) as live_balance
       from public.profiles pr group by pr.site
   ) p on p.for_site = s.id
+  -- Real money only. Every figure below excludes the clone rail, so what this
+  -- page reports as collected is what PayHero actually settled.
   left join (
     select ce.site as for_site,
            count(*) filter (
@@ -584,7 +647,9 @@ as $$
              where ce.kind = 'WITHDRAWAL' and ce.status = 'COMPLETED')          as withdrawal_count,
            coalesce(sum(ce.amount_minor) filter (
              where ce.kind = 'WITHDRAWAL' and ce.status = 'COMPLETED'), 0)      as withdrawal_minor
-      from public.cash_events ce group by ce.site
+      from public.cash_events ce
+     where not ce.is_demo
+     group by ce.site
   ) c on c.for_site = s.id
   left join (
     select ph.site as for_site, count(*) as hosts
@@ -597,6 +662,73 @@ as $$
       from public.promo_sessions ps group by ps.site
   ) g on g.for_site = s.id
   order by s.is_primary desc, s.name;
+$$;
+
+-- --- 12. The daily series behind the Overview charts -------------------------
+
+/*
+ * One row per site per day, for the last `p_days` days.
+ *
+ * Zero-filled from `generate_series` crossed with `sites`, so a day nobody
+ * deposited is a zero rather than a gap. A line chart that simply skips absent
+ * days draws a straight segment across the hole and reads as steady trade over
+ * a period when nothing happened, which is the opposite of the truth.
+ *
+ * Real money only, like everything else here: `not is_demo`.
+ */
+create or replace function public.site_daily(p_days integer default 30)
+returns table (
+  day            date,
+  site           text,
+  deposit_minor  bigint,
+  deposit_count  bigint,
+  depositors     bigint,
+  signups        bigint
+)
+language sql
+stable
+security definer set search_path = public
+as $$
+  with span as (
+    select generate_series(
+      (current_date - (greatest(1, least(coalesce(p_days, 30), 180)) - 1) * interval '1 day')::date,
+      current_date,
+      interval '1 day'
+    )::date as d
+  ),
+  grid as (
+    select span.d, s.id as for_site from span cross join public.sites s
+  ),
+  money as (
+    select ce.site as for_site,
+           (ce.settled_at at time zone 'Africa/Nairobi')::date as d,
+           coalesce(sum(ce.amount_minor), 0) as deposit_minor,
+           count(*)                          as deposit_count,
+           count(distinct ce.user_id)        as depositors
+      from public.cash_events ce
+     where ce.kind = 'DEPOSIT'
+       and ce.status = 'COMPLETED'
+       and not ce.is_demo
+       and ce.settled_at is not null
+     group by 1, 2
+  ),
+  joined as (
+    select pr.site as for_site,
+           (pr.created_at at time zone 'Africa/Nairobi')::date as d,
+           count(*) as signups
+      from public.profiles pr
+     group by 1, 2
+  )
+  select grid.d,
+         grid.for_site,
+         coalesce(money.deposit_minor, 0),
+         coalesce(money.deposit_count, 0),
+         coalesce(money.depositors, 0),
+         coalesce(joined.signups, 0)
+    from grid
+    left join money  on money.for_site  = grid.for_site and money.d  = grid.d
+    left join joined on joined.for_site = grid.for_site and joined.d = grid.d
+   order by grid.d, grid.for_site;
 $$;
 
 -- --- Grants -------------------------------------------------------------------
@@ -613,7 +745,10 @@ revoke all on function public.promo_session_start(uuid, bigint)               fr
 revoke all on function public.promo_session_stats(uuid)                       from public, anon, authenticated;
 revoke all on function public.promo_attribution(uuid)                         from public, anon, authenticated;
 
+revoke all on function public.site_daily(integer)                             from public, anon, authenticated;
+
 grant execute on function public.site_totals()                                to service_role;
+grant execute on function public.site_daily(integer)                          to service_role;
 grant execute on function public.promo_sessions_report(uuid, integer, text)   to service_role;
 grant execute on function public.deposit_start(uuid, bigint, text)            to service_role;
 grant execute on function public.promo_session_start(uuid, bigint)            to service_role;

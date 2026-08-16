@@ -89,6 +89,28 @@ export interface SiteTotals {
   withdrawalMinor?: string;
 }
 
+/**
+ * One site on one day. Zero-filled by `site_daily()`, so a day nobody deposited
+ * arrives as a zero rather than as a gap — a line that skips absent days draws
+ * a straight segment across the hole and reads as steady trade over a period
+ * when nothing happened.
+ */
+export interface DailyPoint {
+  /** `YYYY-MM-DD`, Nairobi time. */
+  day: string;
+  site: string;
+  depositMinor: string;
+  depositCount: number;
+  depositors: number;
+  signups: number;
+}
+
+export interface OverviewData {
+  days: number;
+  sites: SiteTotals[];
+  daily: DailyPoint[];
+}
+
 export const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN", "SESSION_MANAGER"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
