@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BookOpen,
   History,
@@ -23,7 +23,7 @@ import {
   type PromoSession,
 } from "@/lib/sessions/types";
 import { Button, Card, Skeleton, useNotify } from "@/components/admin/ui";
-import { LineChart } from "@/components/admin/charts";
+import { ColumnChart } from "@/components/admin/charts";
 import { LiveDot, Scoreboard } from "./Scoreboard";
 import { useNow } from "@/lib/sessions/useNow";
 import { useHost } from "./useHost";
@@ -311,46 +311,79 @@ function hostRecord(snapshot: HostSnapshot) {
  * see are the time they put in and the money they themselves put up.
  */
 function HostTrends({ snapshot }: { snapshot: HostSnapshot }) {
-  const all = snapshot.live ? [snapshot.live, ...snapshot.history] : snapshot.history;
+  const days = useMemo(() => {
+    const all = snapshot.live
+      ? [snapshot.live, ...snapshot.history]
+      : snapshot.history;
+    if (all.length === 0) return null;
 
-  // Oldest first, and only as many as read as a shape rather than a hedge.
-  const runs = [...all].slice(0, 12).reverse();
-  if (runs.length < 2) return null;
+    const spend = new Map<string, bigint>();
+    const minutes = new Map<string, number>();
 
-  const labels = runs.map((session) =>
-    new Date(session.startedAt).toLocaleDateString(undefined, {
-      day: "numeric",
-      month: "short",
-    }),
-  );
+    for (const session of all) {
+      // Local date, not the ISO one: a live that starts at 01:00 EAT belongs to
+      // the day the host was awake for, not to the previous UTC day.
+      const key = dayKey(new Date(session.startedAt));
+      spend.set(
+        key,
+        (spend.get(key) ?? 0n) +
+          (session.spendMinor ? BigInt(session.spendMinor) : 0n),
+      );
+      minutes.set(
+        key,
+        (minutes.get(key) ?? 0) +
+          Math.round(elapsedMs(session, Date.now()) / 60000),
+      );
+    }
 
-  const minutes = runs.map((session) =>
-    Math.round(elapsedMs(session, Date.now()) / 60000),
-  );
-  const spend = runs.map((session) =>
-    session.spendMinor ? Number(BigInt(session.spendMinor) / 100n) : 0,
-  );
+    // Every day from the first live to today, gaps included. A day off is a
+    // zero-height column and part of the picture — dropping it would squeeze
+    // the busy days together and hide the very pattern this chart is for.
+    const keys = [...spend.keys()].sort();
+    const first = new Date(`${keys[0]}T00:00:00`);
+    const filled: string[] = [];
+    const cursor = new Date(first);
+    const today = new Date();
+    while (cursor <= today && filled.length < 120) {
+      filled.push(dayKey(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return {
+      labels: filled.map((key) =>
+        new Date(`${key}T00:00:00`).toLocaleDateString(undefined, {
+          day: "numeric",
+          month: "short",
+        }),
+      ),
+      spend: filled.map((key) => Number((spend.get(key) ?? 0n) / 100n)),
+      minutes: filled.map((key) => minutes.get(key) ?? 0),
+    };
+  }, [snapshot]);
+
+  if (!days || days.labels.length < 2) return null;
 
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <Card>
         <div className="border-b border-adm-line px-5 py-3.5">
           <p className="text-[13.5px] font-semibold tracking-[-0.01em] text-adm-ink">
-            Time on air
+            Spent promoting
           </p>
           <p className="mt-0.5 text-[12px] text-adm-ink-3">
-            Minutes per live, oldest first.
+            Per day. The tallest day is labelled.
           </p>
         </div>
         <div className="px-5 py-4">
-          <LineChart
-            series={[{ id: "minutes", label: "Minutes", values: minutes }]}
-            labels={labels}
+          <ColumnChart
+            values={days.spend}
+            labels={days.labels}
             format={(value) =>
-              value >= 60 ? `${Math.round(value / 60)}h` : `${Math.round(value)}m`
+              value >= 1000
+                ? `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`
+                : String(Math.round(value))
             }
-            height={170}
-            emptyMessage="No lives recorded yet."
+            emptyMessage="Nothing spent on promotion yet."
           />
         </div>
       </Card>
@@ -358,26 +391,32 @@ function HostTrends({ snapshot }: { snapshot: HostSnapshot }) {
       <Card>
         <div className="border-b border-adm-line px-5 py-3.5">
           <p className="text-[13.5px] font-semibold tracking-[-0.01em] text-adm-ink">
-            Spent promoting
+            Time on air
           </p>
           <p className="mt-0.5 text-[12px] text-adm-ink-3">
-            What you paid to promote each live.
+            Minutes broadcast per day.
           </p>
         </div>
         <div className="px-5 py-4">
-          <LineChart
-            series={[{ id: "spend", label: "Spent", values: spend }]}
-            labels={labels}
+          <ColumnChart
+            values={days.minutes}
+            labels={days.labels}
             format={(value) =>
-              value >= 1000 ? `${Math.round(value / 1000)}k` : String(Math.round(value))
+              value >= 60 ? `${Math.round(value / 60)}h` : `${Math.round(value)}m`
             }
-            height={170}
-            emptyMessage="Nothing spent on promotion yet."
+            emptyMessage="No lives recorded yet."
           />
         </div>
       </Card>
     </div>
   );
+}
+
+/** `2026-08-16` in the viewer's own timezone, for grouping by day. */
+function dayKey(date: Date): string {
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 /**

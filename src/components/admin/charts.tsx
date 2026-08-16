@@ -394,6 +394,204 @@ export function BarRows({
 }
 
 // ---------------------------------------------------------------------------
+// Column chart
+// ---------------------------------------------------------------------------
+
+/**
+ * One column per day.
+ *
+ * A column rather than a line, because these are *discrete* daily totals, not a
+ * continuous quantity sampled over time. A line through them implies the value
+ * passed through every point between two days, which for "money spent on
+ * Tuesday" is meaningless — the gap between Monday and Wednesday is not a
+ * slope. Columns also make the thing the reader is looking for — the day that
+ * stands out — a matter of height rather than of tracing a path.
+ *
+ * The mark specs are the shared ones: capped at 24px so a sparse week does not
+ * draw four fat slabs, a 2px surface gap between neighbours, a 4px rounded top
+ * with a square foot on the baseline, and a hairline solid grid. The tallest
+ * column is labelled and no others are, because a number on every bar is chaos
+ * and the axis carries the rest.
+ *
+ * The hit area for hover is the full column slot, floor to ceiling, so a day
+ * with almost nothing in it is still reachable without landing on a 2px stub.
+ */
+export function ColumnChart({
+  values,
+  labels,
+  format,
+  height = 170,
+  emptyMessage = "Nothing in this period.",
+}: {
+  values: number[];
+  labels: string[];
+  format: (value: number) => string;
+  height?: number;
+  emptyMessage?: string;
+}) {
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [hover, setHover] = useState<number | null>(null);
+
+  const pad = { top: 14, right: 8, bottom: 24, left: 46 };
+  const plotW = Math.max(0, width - pad.left - pad.right);
+  const plotH = Math.max(0, height - pad.top - pad.bottom);
+
+  const count = values.length;
+  const max = Math.max(0, ...values);
+  const ticks = niceTicks(max, 3);
+  const scaleMax = ticks[ticks.length - 1] || 1;
+
+  const slot = count > 0 ? plotW / count : plotW;
+  const barW = Math.min(24, Math.max(2, slot - 2));
+  const peak = values.indexOf(max);
+  const allZero = values.every((value) => value === 0);
+
+  const y = (value: number) => pad.top + plotH - (plotH * value) / scaleMax;
+
+  return (
+    <div ref={ref} className="w-full">
+      {width > 0 ? (
+        <div className="relative">
+          <svg
+            width={width}
+            height={height}
+            role="img"
+            aria-label={`${count} days`}
+            onMouseLeave={() => setHover(null)}
+          >
+            {ticks.map((tick) => (
+              <g key={tick}>
+                <line
+                  x1={pad.left}
+                  x2={pad.left + plotW}
+                  y1={y(tick)}
+                  y2={y(tick)}
+                  stroke={tick === 0 ? AXIS : GRID}
+                  strokeWidth={1}
+                />
+                <text
+                  x={pad.left - 8}
+                  y={y(tick) + 3.5}
+                  textAnchor="end"
+                  fontSize={10.5}
+                  fill={INK_MUTED}
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  {format(tick)}
+                </text>
+              </g>
+            ))}
+
+            {values.map((value, index) => {
+              const x = pad.left + slot * index + (slot - barW) / 2;
+              const top = y(value);
+              const barH = pad.top + plotH - top;
+              const active = hover === index;
+
+              return (
+                <g key={`${labels[index]}-${index}`}>
+                  {value > 0 ? (
+                    // A 4px radius on the top corners only. `rx` on a rect
+                    // rounds all four, which would lift the column off its own
+                    // baseline and make a small value look like it floats.
+                    <path
+                      d={columnPath(x, top, barW, barH, 4)}
+                      fill={seriesColor(0)}
+                      opacity={hover === null || active ? 1 : 0.45}
+                      className="transition-opacity duration-150"
+                    />
+                  ) : null}
+
+                  <rect
+                    x={pad.left + slot * index}
+                    y={pad.top}
+                    width={slot}
+                    height={plotH}
+                    fill="transparent"
+                    onMouseEnter={() => setHover(index)}
+                  />
+                </g>
+              );
+            })}
+
+            {/* The peak, labelled. The only direct label on the chart. */}
+            {!allZero && peak >= 0 ? (
+              <text
+                x={pad.left + slot * peak + slot / 2}
+                y={y(max) - 5}
+                textAnchor="middle"
+                fontSize={10.5}
+                fontWeight={600}
+                fill="#454c60"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {format(max)}
+              </text>
+            ) : null}
+
+            {/* First and last day only. Every date would collide at this size. */}
+            {[0, count - 1]
+              .filter((index, at, all) => index >= 0 && all.indexOf(index) === at)
+              .map((index) => (
+                <text
+                  key={index}
+                  x={pad.left + slot * index + slot / 2}
+                  y={height - 7}
+                  textAnchor={index === 0 ? "start" : "end"}
+                  fontSize={10.5}
+                  fill={INK_MUTED}
+                >
+                  {labels[index]}
+                </text>
+              ))}
+          </svg>
+
+          {hover !== null ? (
+            <div
+              className="pointer-events-none absolute z-10 border border-adm-line-strong bg-adm-surface px-2.5 py-1.5 shadow-[0_8px_24px_-8px_rgba(16,20,38,.25)]"
+              style={{
+                left: Math.min(
+                  Math.max(pad.left + slot * hover + slot / 2 - 60, 0),
+                  Math.max(width - 124, 0),
+                ),
+                top: 0,
+              }}
+            >
+              <p className="text-[11px] text-adm-ink-3">{labels[hover]}</p>
+              <p className="text-[13px] font-medium tabular-nums text-adm-ink">
+                {format(values[hover] ?? 0)}
+              </p>
+            </div>
+          ) : null}
+
+          {allZero ? (
+            <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[12.5px] text-adm-ink-3">
+              {emptyMessage}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <div style={{ height }} />
+      )}
+    </div>
+  );
+}
+
+/** A rect with only its top corners rounded, drawn as a path. */
+function columnPath(x: number, y: number, w: number, h: number, r: number): string {
+  const radius = Math.min(r, w / 2, h);
+  return [
+    `M${x},${y + h}`,
+    `L${x},${y + radius}`,
+    `Q${x},${y} ${x + radius},${y}`,
+    `L${x + w - radius},${y}`,
+    `Q${x + w},${y} ${x + w},${y + radius}`,
+    `L${x + w},${y + h}`,
+    "Z",
+  ].join(" ");
+}
+
+// ---------------------------------------------------------------------------
 // Donut
 // ---------------------------------------------------------------------------
 
