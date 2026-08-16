@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Menu, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminFetch, setAdminToken } from "@/lib/admin/client";
-import type { AdminAccount } from "@/lib/admin/types";
+import type { AdminAccount, SiteTotals } from "@/lib/admin/types";
 import { roleCan } from "@/lib/admin/types";
 import { AdminSidebar, visibleViews, type AdminView } from "./AdminSidebar";
 import { AdminsView } from "./AdminsView";
@@ -17,6 +17,7 @@ import { WithdrawalsView } from "./WithdrawalsView";
 import { Button, ToastHost } from "./ui";
 import { useAdmins } from "./useAdmins";
 import { useSessions } from "./useSessions";
+import { useSites } from "./useSites";
 import { useUsers } from "./useUsers";
 import { useWithdrawals } from "./useWithdrawals";
 
@@ -210,10 +211,25 @@ function Console({
   // would work, but it would also mean a session manager's console spends its
   // life being refused — noise in the logs and a standing invitation to
   // misread one of those 403s as a bug.
-  const state = useUsers(handleUnauthorised, canSeeMoney);
-  const withdrawalsState = useWithdrawals(handleUnauthorised, canSeeMoney);
-  const sessionsState = useSessions(handleUnauthorised, roleCan(role, "sessions"));
+  /**
+   * Which product the console is showing, or null for both.
+   *
+   * Held here rather than per view so that switching domain does not silently
+   * un-switch when you move between Users and Withdrawals — an admin who filtered
+   * to one product and then saw the other product's payout queue would act on
+   * the wrong customer.
+   */
+  const [site, setSite] = useState<string | null>(null);
+
+  const state = useUsers(handleUnauthorised, canSeeMoney, site);
+  const withdrawalsState = useWithdrawals(handleUnauthorised, canSeeMoney, site);
+  const sessionsState = useSessions(
+    handleUnauthorised,
+    roleCan(role, "sessions"),
+    site,
+  );
   const adminsState = useAdmins(handleUnauthorised);
+  const sitesState = useSites(handleUnauthorised);
 
   const pendingWithdrawals =
     withdrawalsState.withdrawals?.filter((w) => w.status === "PENDING").length ??
@@ -304,12 +320,24 @@ function Console({
             </p>
           </div>
 
+          {/* Only where it changes what you see. Domains is the comparison
+              itself and Admins is platform-wide, so a filter on either would
+              be a control that does nothing. */}
+          {view === "users" || view === "withdrawals" || view === "sessions" ? (
+            <SiteFilter
+              value={site}
+              sites={sitesState.sites}
+              onChange={setSite}
+            />
+          ) : null}
+
           <Button
             onClick={() => {
               void state.reload();
               void withdrawalsState.reload();
               void sessionsState.reload();
               void adminsState.reload();
+              void sitesState.reload();
             }}
             disabled={state.loading || withdrawalsState.loading}
             title="Reload from Supabase"
@@ -336,12 +364,57 @@ function Console({
           ) : view === "sessions" ? (
             <SessionsView state={sessionsState} />
           ) : view === "domains" ? (
-            <DomainsView />
+            <DomainsView state={sitesState} />
           ) : (
             <AdminsView state={adminsState} me={me} />
           )}
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * Which product the figures cover.
+ *
+ * "All domains" is first and is the default, because the combined number is the
+ * one an owner asks for first and a filter that starts narrowed hides the
+ * existence of the other product from anyone who does not go looking.
+ *
+ * Rendered only once the site list has arrived. A picker that briefly offers
+ * one option and then grows is a picker people click twice.
+ */
+function SiteFilter({
+  value,
+  sites,
+  onChange,
+}: {
+  value: string | null;
+  sites: SiteTotals[] | null;
+  onChange: (site: string | null) => void;
+}) {
+  if (!sites || sites.length < 2) return null;
+
+  return (
+    <label className="flex items-center gap-2">
+      <span className="sr-only">Domain</span>
+      <select
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value || null)}
+        className={cn(
+          "h-9 rounded-none border border-adm-line-strong bg-adm-surface px-2.5",
+          "text-[13px] font-medium text-adm-ink-2 outline-none transition-colors",
+          "hover:bg-adm-subtle focus:border-adm-accent focus:ring-2 focus:ring-adm-accent-tint",
+          value && "border-adm-accent-line bg-adm-accent-tint text-adm-accent-deep",
+        )}
+      >
+        <option value="">All domains</option>
+        {sites.map((site) => (
+          <option key={site.id} value={site.id}>
+            {site.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

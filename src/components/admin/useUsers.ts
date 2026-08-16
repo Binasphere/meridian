@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { adminFetch } from "@/lib/admin/client";
+import { adminFetch, siteQuery } from "@/lib/admin/client";
 import type { AdminUser } from "@/lib/admin/types";
 import type { LiveTier } from "@/lib/trading";
 
@@ -52,6 +52,8 @@ export interface UsersState {
 export function useUsers(
   onUnauthorised: () => void,
   enabled = true,
+  /** Narrows to one product. Null shows every domain, which is the default. */
+  site: string | null = null,
 ): UsersState {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [loading, setLoading] = useState(enabled);
@@ -68,7 +70,7 @@ export function useUsers(
     }
     setLoading(true);
     try {
-      const response = await adminFetch("/api/admin/users");
+      const response = await adminFetch(`/api/admin/users${siteQuery(site)}`);
       const body = (await response.json().catch(() => ({}))) as {
         users?: AdminUser[];
         error?: string;
@@ -92,7 +94,7 @@ export function useUsers(
     } finally {
       setLoading(false);
     }
-  }, [enabled, onUnauthorised]);
+  }, [enabled, onUnauthorised, site]);
 
   useEffect(() => {
     void reload();

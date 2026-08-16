@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { adminFetch } from "@/lib/admin/client";
+import { adminFetch, siteQuery } from "@/lib/admin/client";
 import type { AdminWithdrawal } from "@/lib/admin/types";
 
 /**
@@ -34,6 +34,8 @@ export interface WithdrawalsState {
 export function useWithdrawals(
   onUnauthorised: () => void,
   enabled = true,
+  /** Narrows to one product. Null shows every domain, which is the default. */
+  site: string | null = null,
 ): WithdrawalsState {
   const [withdrawals, setWithdrawals] = useState<AdminWithdrawal[] | null>(null);
   const [loading, setLoading] = useState(enabled);
@@ -48,7 +50,7 @@ export function useWithdrawals(
     }
     setLoading(true);
     try {
-      const response = await adminFetch("/api/admin/withdrawals");
+      const response = await adminFetch(`/api/admin/withdrawals${siteQuery(site)}`);
       const body = (await response.json().catch(() => ({}))) as {
         withdrawals?: AdminWithdrawal[];
         error?: string;
@@ -72,7 +74,7 @@ export function useWithdrawals(
     } finally {
       setLoading(false);
     }
-  }, [enabled, onUnauthorised]);
+  }, [enabled, onUnauthorised, site]);
 
   useEffect(() => {
     void reload();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { adminFetch } from "@/lib/admin/client";
+import { adminFetch, siteQuery } from "@/lib/admin/client";
 import type {
   AdminPromoSession,
   HostStatus,
@@ -45,6 +45,8 @@ export interface SessionsState {
 export function useSessions(
   onUnauthorised: () => void,
   enabled = true,
+  /** Narrows to one product. Null shows every domain, which is the default. */
+  site: string | null = null,
 ): SessionsState {
   const [sessions, setSessions] = useState<AdminPromoSession[] | null>(null);
   const [hosts, setHosts] = useState<PromoHost[] | null>(null);
@@ -69,7 +71,7 @@ export function useSessions(
     setLoading(true);
 
     try {
-      const response = await adminFetch("/api/admin/sessions");
+      const response = await adminFetch(`/api/admin/sessions${siteQuery(site)}`);
 
       if (response.status === 401) {
         onUnauthorised();
@@ -102,7 +104,7 @@ export function useSessions(
       inFlight.current = false;
       setLoading(false);
     }
-  }, [enabled, onUnauthorised]);
+  }, [enabled, onUnauthorised, site]);
 
   useEffect(() => {
     void reload();

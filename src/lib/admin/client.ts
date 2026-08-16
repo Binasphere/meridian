@@ -39,6 +39,17 @@ export function setAdminToken(token: string | null): void {
   }
 }
 
+/**
+ * `?site=…`, or nothing at all when the console is showing every domain.
+ *
+ * An empty string rather than `?site=all` on purpose: the routes treat an
+ * absent parameter as "both", and a magic value would be one more thing that
+ * has to mean the same on both sides of the wire.
+ */
+export function siteQuery(site: string | null): string {
+  return site ? `?site=${encodeURIComponent(site)}` : "";
+}
+
 /** `fetch` against the admin API, with the session token attached. */
 export function adminFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = adminToken();

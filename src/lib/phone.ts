@@ -8,6 +8,8 @@
  * whose verdict counts.
  */
 
+import { currentSiteId } from "./sites";
+
 // ---------------------------------------------------------------------------
 // Numbers
 // ---------------------------------------------------------------------------
@@ -89,8 +91,38 @@ export function maskPhone(normalised: string): string {
  */
 const IDENTITY_DOMAIN = "meridian.invalid";
 
-export function identityEmail(normalisedPhone: string): string {
-  return `${normalisedPhone}@${IDENTITY_DOMAIN}`;
+/**
+ * The site whose customers keep the untagged address.
+ *
+ * Every account created before the platform was split has the bare
+ * `254…@meridian.invalid` in `auth.users`. Tagging it now would lock all of
+ * them out permanently, so the primary site is defined as "the one with no tag"
+ * and stays that way.
+ */
+const UNTAGGED_SITE = "venti";
+
+/**
+ * The Supabase Auth address for a phone number on a site.
+ *
+ * `auth.users.email` is globally unique, so two products that each let the same
+ * person hold an account cannot derive the same address from one number. The
+ * site joins the local part; the domain is never touched:
+ *
+ *     venti   254712345678  ->  254712345678@meridian.invalid
+ *     candix  254712345678  ->  candix.254712345678@meridian.invalid
+ *
+ * **This must stay byte-identical to `identityEmail` in the payments service's
+ * `phone.js`.** That service *creates* the auth user and this file *signs in*
+ * as it; if the two disagree by a character, every account registered there can
+ * never sign in here. The site defaults to whichever domain the browser is on,
+ * which is the same signal the service reads from the `Origin` header.
+ */
+export function identityEmail(
+  normalisedPhone: string,
+  site: string = currentSiteId(),
+): string {
+  const prefix = !site || site === UNTAGGED_SITE ? "" : `${site}.`;
+  return `${prefix}${normalisedPhone}@${IDENTITY_DOMAIN}`;
 }
 
 // ---------------------------------------------------------------------------

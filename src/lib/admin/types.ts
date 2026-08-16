@@ -65,6 +65,30 @@ export interface AdminAccount {
   createdByName: string | null;
 }
 
+/**
+ * One product's lifetime figures, from `site_totals()`.
+ *
+ * Every money field is optional for the same reason the session ones are: a
+ * role without the `finance` capability never receives them, and `undefined`
+ * is the honest value for a number the server refused to send.
+ */
+export interface SiteTotals {
+  id: string;
+  name: string;
+  origin: string;
+  isPrimary: boolean;
+  users: number;
+  hosts: number;
+  sessions: number;
+  liveNow: boolean;
+  depositCount: number;
+  withdrawalCount: number;
+  liveBalanceMinor?: string;
+  depositMinor?: string;
+  pendingMinor?: string;
+  withdrawalMinor?: string;
+}
+
 export const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN", "SESSION_MANAGER"] as const;
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 

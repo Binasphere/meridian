@@ -23,10 +23,17 @@ last:
 2. `go-live.sql` — real money movement
 3. `mpesa-demo.sql` — the VIP demo handsets (skip if you do not use them)
 4. `sessions.sql` — the promo live desk
+5. `sites.sql` — the two-product split
 
-`admins.sql` — the admin accounts table — sits outside this sequence. It
-creates one new table and touches nothing that already exists, so it can be run
-at any point after `schema.sql` without disturbing the order above.
+`sites.sql` is now the file that must be applied **last**. It redefines
+`promo_attribution`, `deposit_start`, `promo_session_start` and
+`promo_session_stats` so that each of them knows which product it is acting
+for. Re-running `sessions.sql` afterwards silently un-scopes attribution —
+deposits start being credited to whichever broadcast is live on *either*
+domain — so if you ever re-run it, re-run `sites.sql` after it.
+
+`admins.sql` sits outside this sequence. It creates one table and touches
+nothing that already exists, so it can be run at any point after `schema.sql`.
 
 `sessions.sql` redefines `deposit_start` so that a deposit records which
 broadcast was live when it was raised. Re-running `go-live.sql` afterwards
@@ -112,6 +119,53 @@ Two things to know before you rely on it:
   `supabase/admins.sql` — three lines in the SQL editor that empty the
   super-admin bench and re-open the bootstrap door for whoever holds
   `ADMIN_PASSCODE`. Keep that variable set even after setup for exactly this.
+
+## 2b. Two products on two domains
+
+`sites.sql` turns "two domains serving one app" into two products that share
+infrastructure and nothing else a customer can see.
+
+**How a request is attributed.** The service reads the browser's `Origin`
+header and matches it against `public.sites`. An unrecognised origin resolves to
+the **primary** site rather than being refused — a preview deploy or a domain
+added to Vercel before the table was updated should not break sign-ups. Add
+every real domain to `public.sites`; the service logs a warning once per unknown
+origin.
+
+**Separate customer bases.** `profiles.phone` is no longer globally unique — it
+is unique per site, so the same number can hold an account on each product with
+separate balances. The Supabase Auth identity carries the site to match:
+
+| Site | Identity |
+| --- | --- |
+| `venti` (primary) | `254712345678@meridian.invalid` |
+| `candix` | `candix.254712345678@meridian.invalid` |
+
+The primary site keeps the untagged form permanently, because every account
+created before the split already has it and tagging it now would lock all of
+them out. `meridian.invalid` itself is never renamed.
+
+> **The one thing that cannot be fixed retroactively.** Every row that already
+> existed is assigned to the primary site, because nothing ever recorded which
+> domain a signup or deposit came through. For anyone who arrived via
+> candixfx.com before this migration, that assignment is wrong and there is no
+> way to recover the truth — the information was never captured.
+
+**One live broadcast per domain.** A host on each product can be on air
+simultaneously; neither blocks the other. Hosts belong to the domain they
+enrolled on, so somebody marketing both products registers twice — which is the
+intent, since their record and their pay are per product.
+
+**In the console.** Domains shows each product's customers, deposits,
+withdrawals, balances held and share of takings. Users, Withdrawals and Sessions
+carry a domain filter in the header, defaulting to All domains. The filter is
+held across views, so filtering to one product and moving to Withdrawals cannot
+quietly show you the other product's payout queue.
+
+**What is still shared, by design:** one PayHero till, so the M-Pesa prompt on a
+customer's handset shows the same registered business name for both products.
+That is the only place the connection is visible to a customer, and closing it
+needs a second PayHero channel, not a code change.
 
 ## 3. PayHero
 
