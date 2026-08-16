@@ -228,7 +228,7 @@ function CreateCard({ state }: { state: AdminsState }) {
         title="Add an admin"
         subtitle="They sign in with the username and password you set here."
         action={
-          <Button onClick={() => setOpen((value) => !value)}>
+          <Button onClick={() => setOpen((value) => !value)} variant={open ? "secondary" : "primary"}>
             <UserPlus size={14} />
             {open ? "Cancel" : "New admin"}
           </Button>

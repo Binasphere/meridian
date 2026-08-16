@@ -9,7 +9,7 @@ import {
   RefreshCw,
   Square,
 } from "lucide-react";
-import { formatMoney, wholeToMinor } from "@/lib/format";
+import { wholeToMinor } from "@/lib/format";
 import { setHostToken } from "@/lib/sessions/client";
 import {
   elapsedMs,
@@ -146,6 +146,8 @@ function LivePanel({
               {formatElapsed(elapsedMs(session, now))}
             </div>
 
+            {/* The promotion cost used to sit here. It is money, so it is gone
+                — the desk states when the live started and nothing else. */}
             <p className="mt-3 text-[12.5px] text-adm-ink-3">
               Started{" "}
               {new Date(session.startedAt).toLocaleTimeString([], {
@@ -153,9 +155,6 @@ function LivePanel({
                 minute: "2-digit",
                 hour12: false,
               })}
-              {" · "}
-              {formatMoney(session.spendMinor, { currency: "KSh" })} spent
-              promoting
             </p>
           </div>
 
@@ -402,10 +401,12 @@ function HistoryRow({ session }: { session: PromoSession }) {
         </div>
       </div>
 
-      <Figure label="Collected" value={formatMoney(session.stats.depositMinor, { currency: "KSh" })} />
+      {/* Counts only. A host's own record is how many people they brought,
+          never what those people paid — see `Scoreboard`. */}
+      <Figure label="Paying" value={String(session.stats.depositors)} />
       <Figure label="Deposits" value={String(session.stats.depositCount)} />
       <Figure label="New" value={String(session.stats.newDepositors)} />
-      <Figure label="Spent" value={formatMoney(session.spendMinor, { currency: "KSh" })} />
+      <Figure label="Sign-ups" value={String(session.stats.signups)} />
     </li>
   );
 }

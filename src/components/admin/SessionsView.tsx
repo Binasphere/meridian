@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  ArrowUpRight,
   Loader2,
   Radio,
   Square,
@@ -473,7 +474,15 @@ function SessionDetailCard({
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setConfirming(true)} className="h-8">
+              <Button
+                onClick={() => setConfirming(true)}
+                variant="primary"
+                // Red rather than the default grey. Ending someone else's
+                // broadcast is the one destructive control on this page, and a
+                // control that looks like every other button gets pressed like
+                // every other button.
+                className="h-8 bg-adm-neg hover:bg-[#96201a]"
+              >
                 <Square size={13} />
                 End
               </Button>
@@ -545,14 +554,35 @@ function OffAirCard({ state }: { state: SessionsState }) {
         <div className="min-w-0 flex-1">
           <p className="text-[13.5px] font-medium text-adm-ink">Nobody is live</p>
           <p className="mt-0.5 text-[12.5px] text-adm-ink-3">
-            A host normally opens a session from the live desk at{" "}
-            <code>/sessions</code>. Only one runs at a time.
+            A host normally opens a session from the live desk. Only one runs
+            per domain at a time.
           </p>
         </div>
-        <Button onClick={() => setOpen((value) => !value)} disabled={active.length === 0}>
-          <Radio size={14} />
-          {open ? "Cancel" : "Start for a host"}
-        </Button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Straight to the desk the hosts use. An admin sending somebody to
+              "the live desk" needed to know the URL and type it; a link is the
+              same instruction without the folklore. New tab, because whoever
+              clicks it is usually mid-task in the console. */}
+          <a
+            href="/sessions"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-none border border-adm-line-strong bg-adm-surface px-3 text-[13px] font-medium text-adm-ink-2 transition-colors hover:bg-adm-subtle hover:text-adm-ink"
+          >
+            <ArrowUpRight size={14} />
+            Open live desk
+          </a>
+
+          <Button
+            onClick={() => setOpen((value) => !value)}
+            disabled={active.length === 0}
+            variant={open ? "secondary" : "primary"}
+          >
+            <Radio size={14} />
+            {open ? "Cancel" : "Start session"}
+          </Button>
+        </div>
       </div>
 
       {open ? (
@@ -1007,7 +1037,8 @@ function SessionsTable({
                         onEnd(session);
                       }}
                       disabled={busyIds[session.id]}
-                      className="h-7 px-2 text-[12px] text-adm-neg hover:bg-[#fdeceb]"
+                      variant="primary"
+                      className="h-7 bg-adm-neg px-2 text-[12px] hover:bg-[#96201a]"
                       title={`End ${session.hostName}'s broadcast`}
                     >
                       {busyIds[session.id] ? (

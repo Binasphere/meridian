@@ -1,81 +1,95 @@
 "use client";
 
-import { formatMoney } from "@/lib/format";
 import { type PromoSession } from "@/lib/sessions/types";
 import { cn } from "@/lib/utils";
-import { StatTile } from "@/components/admin/ui";
 
 /**
- * What a broadcast is worth, as five figures.
+ * What a broadcast is doing, as three numbers.
  *
- * The order is the order the questions get asked: how much came in, from how
- * many *new* people, how many signed up, what is still in the air, and what it
- * cost to run.
+ * **No money.** Not the takings, not the promotion cost, not the pending
+ * amount. A host is paid for running the live, not for what it collected, and a
+ * desk showing a shilling total to somebody who is on camera is a desk that
+ * eventually reads it out. The figures are withheld by the server, not by this
+ * component — `/api/sessions/me` never sends them — so there is nothing here to
+ * reveal by opening devtools.
  *
- * Net — takings less promotion — is deliberately absent. It is the figure the
- * business is judged on rather than the one the host is, and it belongs to the
- * admin console (`admin/SessionsView`), which is the only surface that shows
- * it. The host gets what they can act on while live: is money coming in, from
- * new people, and is anything stuck.
+ * What is left is what a host can actually act on mid-live: are people paying,
+ * are they new, and is anyone signing up. Five tiles of mixed money and counts
+ * became three counts, which is both more useful on a phone held in one hand
+ * and the only version that is theirs to see.
  *
- * Pending money is shown apart from the takings and never added to them. A
- * push that M-Pesa has not confirmed is not a shilling anybody has, and a
- * scoreboard that counted it would show a broadcast in profit minutes before
- * discovering it was not.
+ * Pending and failed pushes moved to a single line underneath. They matter when
+ * they are non-zero and are noise the rest of the time, which is the definition
+ * of something that should not hold a tile.
  */
 export function Scoreboard({ session }: { session: PromoSession }) {
   const { stats } = session;
 
+  const stuck = stats.pendingCount > 0 || stats.failedCount > 0;
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <StatTile
-        label="Collected"
-        value={formatMoney(stats.depositMinor, { currency: "KSh" })}
-        hint={
-          stats.depositCount === 0
-            ? "No deposits yet"
-            : `${stats.depositCount} ${
-                stats.depositCount === 1 ? "deposit" : "deposits"
-              } from ${stats.depositors} ${
-                stats.depositors === 1 ? "person" : "people"
-              }`
-        }
-      />
+    <div>
+      <dl className="grid grid-cols-3 divide-x divide-line border border-line">
+        <Figure
+          label="Paying"
+          value={stats.depositors}
+          hint={`${stats.depositCount} ${stats.depositCount === 1 ? "deposit" : "deposits"}`}
+        />
+        <Figure
+          label="New"
+          value={stats.newDepositors}
+          hint="first time ever"
+          accent
+        />
+        <Figure label="Sign-ups" value={stats.signups} hint="while you were live" />
+      </dl>
 
-      <StatTile
-        label="New customers"
-        value={stats.newDepositors}
-        hint="Depositing for the first time ever"
-      />
+      {stuck ? (
+        <p className="mt-2.5 text-[12px] text-ink-muted">
+          {stats.pendingCount > 0
+            ? `${stats.pendingCount} ${
+                stats.pendingCount === 1 ? "push" : "pushes"
+              } waiting on M-Pesa`
+            : null}
+          {stats.pendingCount > 0 && stats.failedCount > 0 ? " · " : null}
+          {stats.failedCount > 0 ? `${stats.failedCount} cancelled` : null}
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
-      <StatTile
-        label="Sign-ups"
-        value={stats.signups}
-        hint="Accounts created while you were live"
-      />
-
-      <StatTile
-        label="Awaiting M-Pesa"
-        value={stats.pendingCount}
-        hint={
-          <>
-            {formatMoney(stats.pendingMinor, { currency: "KSh" })} not confirmed
-            yet
-            {stats.failedCount > 0 ? (
-              <>
-                {" · "}
-                {stats.failedCount} cancelled
-              </>
-            ) : null}
-          </>
-        }
-      />
-
-      <StatTile
-        label="Promotion cost"
-        value={formatMoney(session.spendMinor, { currency: "KSh" })}
-        hint="Entered before you went live"
-      />
+/**
+ * One count.
+ *
+ * Large, quiet, and mono — the numbers move while a host watches them, and a
+ * proportional face makes a figure jump sideways every time a digit changes.
+ */
+function Figure({
+  label,
+  value,
+  hint,
+  accent,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="px-4 py-4 text-center sm:py-5">
+      <dt className="text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "tnum mt-2 font-mono text-[30px] leading-none tracking-[-0.02em] sm:text-[36px]",
+          accent ? "text-up" : "text-ink",
+        )}
+      >
+        {value}
+      </dd>
+      <p className="mt-1.5 text-[11px] text-ink-faint">{hint}</p>
     </div>
   );
 }

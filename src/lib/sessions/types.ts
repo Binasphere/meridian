@@ -33,10 +33,10 @@ export interface PromoHost {
 export interface SessionScore {
   /** Completed deposits stamped to this session — the takings. */
   depositCount: number;
-  depositMinor: string;
+  depositMinor?: string;
   /** Raised but not yet answered by M-Pesa. Not money yet, so never added in. */
   pendingCount: number;
-  pendingMinor: string;
+  pendingMinor?: string;
   /** Cancelled or timed out. A live where most pushes fail has a problem. */
   failedCount: number;
   /** Distinct people who actually paid. */
@@ -54,7 +54,7 @@ export interface PromoSession {
   hostPhone: string;
   hostStatus: HostStatus;
   /** What the host paid to promote this broadcast, entered before it started. */
-  spendMinor: string;
+  spendMinor?: string;
   startedAt: string;
   endedAt: string | null;
   endedBy: EndedBy | null;
@@ -76,30 +76,21 @@ export interface HostSnapshot {
 // ---------------------------------------------------------------------------
 
 /**
- * The same broadcast, as seen by a console role that may not see money.
+ * The money fields are optional on the shared type now, not on a variant.
  *
- * A separate type rather than making the fields optional on `PromoSession`,
- * because they are not optional everywhere — they are optional in exactly one
- * place. The host portal reads its own takings from `/api/sessions/me` and
- * always receives them; only `/api/admin/sessions` withholds, and only for a
- * SESSION_MANAGER. Loosening the shared type would have pushed an
- * `undefined` check into the host's console, where the case cannot arise.
+ * They used to be a separate `AdminPromoSession`, on the reasoning that only
+ * the console ever withheld them and the host always received them. That
+ * reasoning expired: the host portal withholds them too — a promoter is paid
+ * for running a broadcast, not for what it collected, and a desk that shows a
+ * shilling total to somebody on camera is a desk that reads it out.
  *
- * `PromoSession` is assignable to this, so an admin *with* the finance
- * capability needs no conversion — the redacted type is simply the wider one.
+ * So both readers now handle absence, and the alias is kept only so the console
+ * does not need renaming. Making the base type optional was also what made
+ * TypeScript point at every place the host page was still rendering an amount —
+ * which is how they were all found rather than most of them.
  */
-export type AdminSessionScore = Omit<
-  SessionScore,
-  "depositMinor" | "pendingMinor"
-> & {
-  depositMinor?: string;
-  pendingMinor?: string;
-};
-
-export type AdminPromoSession = Omit<PromoSession, "spendMinor" | "stats"> & {
-  spendMinor?: string;
-  stats: AdminSessionScore;
-};
+export type AdminSessionScore = SessionScore;
+export type AdminPromoSession = PromoSession;
 
 /** Everything `/api/admin/sessions` returns. */
 export interface SessionsReport {
