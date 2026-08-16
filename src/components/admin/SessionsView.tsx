@@ -23,7 +23,7 @@ import {
 import { useNow } from "@/lib/sessions/useNow";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, CardHeader, Skeleton, StatTile, avatarTint, useNotify } from "./ui";
-import { BarRows, Donut, TableView } from "./charts";
+import { BarRows, TableView } from "./charts";
 import type { SessionsState } from "./useSessions";
 
 /**
@@ -360,7 +360,7 @@ function SessionDetailCard({
   const net = netMinor(session);
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className="p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -384,17 +384,19 @@ function SessionDetailCard({
             )}
           </div>
 
-          <h2 className="mt-2.5 text-[19px] font-semibold tracking-[-0.02em] text-adm-ink">
-            {session.hostName}
+          {/* Name and number on one line. They were stacked over three lines
+              with a 38px clock beneath, which pushed the figures — the reason
+              anyone opens this card — below the fold on a laptop. */}
+          <h2 className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <span className="text-[17px] font-semibold tracking-[-0.02em] text-adm-ink">
+              {session.hostName}
+            </span>
+            <span className="tnum font-mono text-[12px] text-adm-ink-3">
+              {formatPhone(session.hostPhone)}
+            </span>
           </h2>
-          <p className="tnum mt-1 font-mono text-[12px] text-adm-ink-3">
-            {formatPhone(session.hostPhone)}
-          </p>
 
-          <div className="tnum mt-4 text-[38px] font-semibold leading-none tracking-[-0.03em] text-adm-ink">
-            {formatElapsed(elapsedMs(session, now))}
-          </div>
-          <p className="mt-2 text-[12.5px] text-adm-ink-3">
+          <p className="mt-1 text-[12.5px] text-adm-ink-3">
             {running ? "Since " : "Ran from "}
             {new Date(session.startedAt).toLocaleString([], {
               day: "numeric",
@@ -409,7 +411,21 @@ function SessionDetailCard({
           </p>
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The clock, small and top-right. It was the largest thing on the
+              card, which made a duration look like the headline figure — it is
+              context, not a result. Monospaced so a ticking second does not
+              shift the controls beside it. */}
+          <span
+            className={cn(
+              "tnum font-mono text-[13px] font-medium tabular-nums",
+              running ? "text-adm-ink" : "text-adm-ink-3",
+            )}
+            title={running ? "On air for" : "Ran for"}
+          >
+            {formatElapsed(elapsedMs(session, now))}
+          </span>
+
           {/* The switcher. Newest is index 0, so "previous" walks backwards in
               time and the arrows point the way the list reads. */}
           {position.total > 1 ? (
@@ -437,33 +453,31 @@ function SessionDetailCard({
           ) : null}
 
           {running ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {confirming ? (
-                <>
-                  <Button onClick={() => setConfirming(false)} disabled={busy}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={onEnd}
-                    disabled={busy}
-                    className="bg-adm-neg hover:bg-[#96201a]"
-                  >
-                    {busy ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Square size={13} />
-                    )}
-                    Confirm end
-                  </Button>
-                </>
-              ) : (
-                <Button onClick={() => setConfirming(true)}>
-                  <Square size={13} />
-                  End session
+            confirming ? (
+              <>
+                <Button onClick={() => setConfirming(false)} disabled={busy} className="h-8">
+                  Cancel
                 </Button>
-              )}
-            </div>
+                <Button
+                  variant="primary"
+                  onClick={onEnd}
+                  disabled={busy}
+                  className="h-8 bg-adm-neg hover:bg-[#96201a]"
+                >
+                  {busy ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Square size={13} />
+                  )}
+                  Confirm
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setConfirming(true)} className="h-8">
+                <Square size={13} />
+                End
+              </Button>
+            )
           ) : null}
         </div>
       </div>
@@ -619,9 +633,8 @@ function OffAirCard({ state }: { state: SessionsState }) {
  * promotion worth it") readable without arithmetic.
  *
  * When the takings fall short, "kept" is zero and the whole ring is the
- * recovered part; the shortfall is stated in words underneath rather than drawn
- * as a slice, because a segment for money that never arrived would be inventing
- * a quantity.
+ * recovered part; the shortfall is stated in words rather than drawn, because a
+ * segment for money that never arrived would be inventing a quantity.
  */
 function SessionScorecard({
   session,
@@ -640,10 +653,18 @@ function SessionScorecard({
   const kept = takings > cost ? takings - cost : 0n;
   const short = cost > takings ? cost - takings : 0n;
 
+  // Widths as a share of whichever is larger, so a shortfall reads as an
+  // unfilled remainder rather than silently rescaling the bar to look full.
+  const scale = takings > cost ? takings : cost;
+  const pct = (value: bigint) =>
+    scale === 0n ? 0 : Number((value * 10000n) / scale) / 100;
+
   return (
-    <div className="mt-5 grid gap-5 border-t border-adm-line pt-5 lg:grid-cols-[minmax(0,1fr)_auto]">
-      {/* --- The figures ------------------------------------------------- */}
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+    <div className="mt-4 border-t border-adm-line pt-4">
+      {/* One row of figures, divided rather than boxed. Four tiles with their
+          own padding and fills made a compact card tall; a divided row says the
+          same in a third of the height. */}
+      <dl className="grid grid-cols-2 divide-adm-line sm:grid-cols-4 sm:divide-x">
         <Kpi label="Customers" value={session.stats.depositors.toLocaleString()} />
         <Kpi label="Deposits" value={session.stats.depositCount.toLocaleString()} />
         {hasMoney ? (
@@ -653,7 +674,7 @@ function SessionScorecard({
               value={formatMoney(takings, { currency: "KSh", whole: true })}
             />
             <Kpi
-              label="Net of promotion"
+              label="Net"
               value={
                 net === null
                   ? "—"
@@ -665,34 +686,42 @@ function SessionScorecard({
         ) : null}
       </dl>
 
-      {/* --- The ring ------------------------------------------------------ */}
-      {hasMoney ? (
-        <div className="lg:w-[290px] lg:border-l lg:border-adm-line lg:pl-5">
-          <Donut
-            size={132}
-            centreLabel="Collected"
-            centreValue={formatMoney(takings, { currency: "KSh", compact: true })}
-            slices={[
-              {
-                id: "covered",
-                label: "Covered promotion",
-                value: Number(covered / 100n),
-                display: formatMoney(covered, { currency: "KSh", whole: true }),
-              },
-              {
-                id: "kept",
-                label: "Kept",
-                value: Number(kept / 100n),
-                display: formatMoney(kept, { currency: "KSh", whole: true }),
-              },
-            ]}
-          />
-          {short > 0n ? (
-            <p className="mt-3 text-[12px] text-adm-neg">
-              {formatMoney(short, { currency: "KSh", whole: true })} short of the{" "}
-              {formatMoney(cost, { currency: "KSh", whole: true })} promotion.
-            </p>
-          ) : null}
+      {/* The ring became a rule. Two quantities on a shared baseline are read
+          far more accurately along a line than around an arc, and at the size
+          this card wants a donut was a decoration with a hole in it. */}
+      {hasMoney && scale > 0n ? (
+        <div className="mt-4">
+          <div className="flex h-1.5 w-full gap-[2px] overflow-hidden bg-adm-subtle">
+            <div
+              className="h-full bg-adm-accent transition-[width] duration-500"
+              style={{ width: `${pct(covered)}%` }}
+            />
+            {kept > 0n ? (
+              <div
+                className="h-full bg-adm-pos transition-[width] duration-500"
+                style={{ width: `${pct(kept)}%` }}
+              />
+            ) : null}
+          </div>
+
+          <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-adm-ink-3">
+            <span className="flex items-center gap-1.5">
+              <span aria-hidden className="h-2 w-2 bg-adm-accent" />
+              {formatMoney(covered, { currency: "KSh", whole: true })} covered the
+              promotion
+            </span>
+            {kept > 0n ? (
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="h-2 w-2 bg-adm-pos" />
+                {formatMoney(kept, { currency: "KSh", whole: true })} kept
+              </span>
+            ) : null}
+            {short > 0n ? (
+              <span className="text-adm-neg">
+                {formatMoney(short, { currency: "KSh", whole: true })} short
+              </span>
+            ) : null}
+          </p>
         </div>
       ) : null}
     </div>
@@ -700,11 +729,12 @@ function SessionScorecard({
 }
 
 /**
- * One figure with room to breathe.
+ * One figure in a divided row.
  *
- * Inset rather than carded: these sit *inside* a card already, and a border
- * around each would draw four boxes inside a box. A wash and generous padding
- * separate them at a fraction of the ink.
+ * No fill and no border: these sit inside a card already, and four filled tiles
+ * inside a card is four boxes inside a box. A hairline divider and honest
+ * padding separate them for a fraction of the ink — and a third of the height,
+ * which is what the card actually needed.
  */
 function Kpi({
   label,
@@ -716,13 +746,13 @@ function Kpi({
   tone?: "pos" | "neg";
 }) {
   return (
-    <div className="bg-adm-subtle px-3.5 py-3 transition-colors">
+    <div className="px-1 py-1 sm:px-4 sm:first:pl-0">
       <dt className="adm-eyebrow">{label}</dt>
       <dd
         className={cn(
-          // Proportional figures, not tabular: at 22px equal-width digits make
-          // a number like 11 look loose. Tabular belongs in table columns.
-          "mt-1.5 text-[22px] font-semibold leading-none tracking-[-0.02em] text-adm-ink",
+          // Proportional figures, not tabular: at this size equal-width digits
+          // make a number like 11 look loose. Tabular belongs in table columns.
+          "mt-1 truncate text-[18px] font-semibold leading-none tracking-[-0.02em] text-adm-ink",
           tone === "pos" && "text-adm-pos",
           tone === "neg" && "text-adm-neg",
         )}
