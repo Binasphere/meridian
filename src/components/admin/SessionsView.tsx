@@ -45,7 +45,16 @@ import type { SessionsState } from "./useSessions";
 const RECENT_LIMIT = 4;
 
 export function SessionsView({ state }: { state: SessionsState }) {
-  const { sessions, hosts, error, pending, money, endSession, setHostStatus } =
+  const {
+    sessions,
+    hosts,
+    error,
+    pending,
+    money,
+    canManageHosts,
+    endSession,
+    setHostStatus,
+  } =
     state;
   const notify = useNotify();
 
@@ -284,7 +293,16 @@ export function SessionsView({ state }: { state: SessionsState }) {
         )}
       </Card>
 
-      {/* --- The roster ----------------------------------------------------- */}
+      {/* --- The roster -------------------------------------------------
+          Super admins only. Deciding who may work is staff management, the
+          same class of decision as suspending an admin, and it belongs to the
+          same people — an ordinary admin runs the broadcasts rather than the
+          roster. Not drawn at all for anyone else: a card of names and numbers
+          with disabled buttons on it would still be the disclosure.
+
+          The gate that matters is on the route (`PATCH /api/admin/hosts/:id`
+          now needs the `admins` capability); this hides the surface. */}
+      {canManageHosts ? (
       <Card className="overflow-hidden">
         <CardHeader
           title="Hosts"
@@ -318,6 +336,7 @@ export function SessionsView({ state }: { state: SessionsState }) {
           </ul>
         )}
       </Card>
+      ) : null}
     </div>
   );
 }

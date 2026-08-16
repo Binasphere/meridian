@@ -36,6 +36,8 @@ export interface SessionsState {
    * server's own answer, never inferred from a missing field.
    */
   money: boolean;
+  /** Whether this admin may see and change the host roster. Super admin only. */
+  canManageHosts: boolean;
   reload: () => Promise<void>;
   startSession: (hostId: string, spendMinor: string) => Promise<SessionsResult>;
   endSession: (id: string) => Promise<SessionsResult>;
@@ -56,6 +58,9 @@ export function useSessions(
   // Assume withheld until told otherwise: if the flag never arrives, the
   // console shows no figures, which is the safe direction to fail in.
   const [money, setMoney] = useState(false);
+  // Assume not until told: the safe direction is hiding a roster somebody may
+  // in fact manage, never showing one they may not.
+  const [canManageHosts, setCanManageHosts] = useState(false);
 
   const inFlight = useRef(false);
 
@@ -82,6 +87,7 @@ export function useSessions(
         sessions?: AdminPromoSession[];
         hosts?: PromoHost[];
         money?: boolean;
+        canManageHosts?: boolean;
         error?: string;
       };
 
@@ -96,6 +102,7 @@ export function useSessions(
       setSessions(body.sessions ?? []);
       setHosts(body.hosts ?? []);
       setMoney(Boolean(body.money));
+      setCanManageHosts(Boolean(body.canManageHosts));
     } catch {
       setError("Could not reach the server");
       setSessions([]);
@@ -181,6 +188,7 @@ export function useSessions(
     error,
     pending,
     money,
+    canManageHosts,
     reload,
     startSession,
     endSession,
