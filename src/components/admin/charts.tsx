@@ -21,15 +21,32 @@ import { cn } from "@/lib/utils";
  *   - **Never two y-scales.** Money and counts get separate charts; a shared
  *     axis between them would invent a correlation that is not in the data.
  *
- * The palette is two categorical slots, validated against this console's white
- * card surface (worst normal-vision ΔE 25.5, worst CVD ΔE 9.2 — both clear).
- * Slot 1 is the console's own accent so a chart looks like the rest of the
- * product; slot 2 is the orange that sits furthest from it under every
- * simulated colour vision. Colour follows the **domain**, never its rank, so
- * filtering never repaints the survivors.
+ * The palette is four categorical slots, validated against this console's white
+ * card surface. Slot 1 is the console's own accent so a chart looks like the
+ * rest of the product; the rest are the hues that sit furthest from it, and
+ * from each other, under simulated colour vision. Colour follows the **domain**,
+ * never its rank, so filtering never repaints the survivors.
+ *
+ * A slot is added only when a domain needs one and only after re-running the
+ * all-pairs check, because the cost of a fourth line is paid by every existing
+ * pair, not just the new one. Measured with CIEDE2000 over Viénot–Brettel–Mollon
+ * dichromat projections (protan, deutan, tritan), worst pair across all four:
+ *
+ *   - normal vision  ΔE 37.9  (orange vs magenta)
+ *   - dichromacy     ΔE 14.8  (orange vs green, protanopia)
+ *
+ * The magenta was chosen over darker candidates that scored higher: it holds
+ * the lightness register the other three occupy (contrast 6.2 on white), and
+ * its own tightest CVD pairing — blue vs magenta at ΔE 15.0 — sits *above* the
+ * worst pair already in the palette. The fourth slot is therefore not the weak
+ * link; orange vs green was the binding constraint before it and still is.
+ *
+ * Note for anyone comparing against the figures this comment used to carry:
+ * those were produced by a different CVD model, so the absolute numbers are not
+ * comparable to these. The method above is the one to re-run.
  */
 
-export const SERIES_COLORS = ["#256abf", "#eb6834", "#1baf7a"] as const;
+export const SERIES_COLORS = ["#256abf", "#eb6834", "#1baf7a", "#b81476"] as const;
 
 /** Ink and chrome, matching the `adm-*` tokens in `globals.css`. */
 const INK_MUTED = "#98a0b3";
@@ -39,8 +56,11 @@ const SURFACE = "#ffffff";
 
 /** The colour for a series, by its position in the series list. */
 export function seriesColor(index: number): string {
-  // Never generated, never cycled past the slots we validated: a fourth series
-  // would fold into "Other" rather than invent a hue.
+  // Never generated, never cycled past the slots we validated: a fifth series
+  // would fold into "Other" rather than invent a hue. The modulo is a guard
+  // against an out-of-range index, not a licence to wrap — two domains sharing
+  // a colour is a chart that says something false, so the fold happens at the
+  // call site, before it gets here.
   return SERIES_COLORS[index % SERIES_COLORS.length] ?? SERIES_COLORS[0];
 }
 
@@ -629,16 +649,18 @@ export function Donut({
   size?: number;
 }) {
   /*
-   * Past three, the tail folds into "Other" rather than cycling the palette.
+   * Past the validated slots, the tail folds into "Other" rather than cycling
+   * the palette.
    *
-   * Only three slots were validated for all-pairs separation on this surface,
-   * so a fourth slice would have to reuse a hue — and two domains painted the
-   * same colour in one ring is not a cosmetic problem, it is a chart that says
-   * something false. The named slices stay the largest ones, which is what the
-   * eye goes to anyway; the exact figures for everything in the tail are in the
-   * table twin beneath.
+   * Two domains painted the same colour in one ring is not a cosmetic problem,
+   * it is a chart that says something false — so the cap tracks the palette
+   * exactly rather than being a number chosen here. It was three; a fourth hue
+   * was validated when the fourth domain was added, so all four now get their
+   * own arc. The named slices stay the largest ones, which is what the eye goes
+   * to anyway; the exact figures for everything in the tail are in the table
+   * twin beneath.
    */
-  const MAX_SLICES = 3;
+  const MAX_SLICES = SERIES_COLORS.length;
   const slices =
     input.length <= MAX_SLICES
       ? input

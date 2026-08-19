@@ -41,13 +41,22 @@ const SRC = join(ROOT, "src");
 /**
  * Product names that must not be hardcoded anywhere a customer can read.
  *
- * `Bars FX` and `BarsFX` are listed rather than a bare `Bars`, deliberately.
- * The word on its own is ordinary vocabulary in a trading app — chart bars, a
- * bar series, `BarRows` — so listing it would flag legitimate text and turn
- * this check into noise somebody learns to skip. The two spellings that are
- * actually the *brand* are the two worth catching.
+ * `Bars FX` / `BarsFX` and `Zbar FX` / `ZbarFX` are listed as the two-word and
+ * one-word spellings rather than a bare `Bars` or `Zbar`. On its own the word
+ * is ordinary vocabulary in a trading app — chart bars, a bar series, `BarRows`
+ * — so listing it would flag legitimate text and turn this check into noise
+ * somebody learns to skip. The spellings that are actually the *brand* are the
+ * ones worth catching.
  */
-const BRANDS = ["Venti", "Candix", "Meridian", "Bars FX", "BarsFX"];
+const BRANDS = [
+  "Venti",
+  "Candix",
+  "Meridian",
+  "Bars FX",
+  "BarsFX",
+  "Zbar FX",
+  "ZbarFX",
+];
 
 /**
  * Exact `path:line` pairs that are allowed to contain the word, each with the

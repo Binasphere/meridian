@@ -80,7 +80,8 @@ create unique index if not exists sites_single_primary_idx
 insert into public.sites (id, origin, name, is_primary) values
   ('venti',  'https://ventitradingfx.com', 'Venti',     true),
   ('candix', 'https://candixfx.com',       'Candix FX', false),
-  ('barsfx', 'https://barsfx.com',         'Bars FX',   false)
+  ('barsfx', 'https://barsfx.com',         'Bars FX',   false),
+  ('zbarfx', 'https://zbarfx.com',         'Zbar FX',   false)
 on conflict (id) do update
   set origin = excluded.origin,
       name   = excluded.name;

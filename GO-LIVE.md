@@ -125,8 +125,8 @@ Two things to know before you rely on it:
 `sites.sql` turns "several domains serving one app" into separate products that
 share infrastructure and nothing else a customer can see.
 
-The domains live at `ventitradingfx.com` (primary), `candixfx.com` and
-`barsfx.com`.
+The domains live at `ventitradingfx.com` (primary), `candixfx.com`,
+`barsfx.com` and `zbarfx.com`.
 
 **How a request is attributed.** The service reads the browser's `Origin`
 header and matches it against `public.sites`. An unrecognised origin resolves to
@@ -144,6 +144,7 @@ separate balances. The Supabase Auth identity carries the site to match:
 | `venti` (primary) | ventitradingfx.com | `254712345678@meridian.invalid` |
 | `candix` | candixfx.com | `candix.254712345678@meridian.invalid` |
 | `barsfx` | barsfx.com | `barsfx.254712345678@meridian.invalid` |
+| `zbarfx` | zbarfx.com | `zbarfx.254712345678@meridian.invalid` |
 
 The primary site keeps the untagged form permanently, because every account
 created before the split already has it and tagging it now would lock all of
@@ -192,6 +193,14 @@ while quietly landing on the wrong product.
 
 **The site id is permanent.** It is written into every account's Supabase Auth
 identity, so renaming it later locks out everyone who registered under it.
+
+**Past four domains, the console needs a colour before it needs anything else.**
+`SERIES_COLORS` in `src/components/admin/charts.tsx` holds one validated hue per
+domain, and the charts fold anything beyond it into "Other" rather than reusing
+one — two domains painted the same colour is a chart that states something
+false. Adding a fifth means validating a fifth hue for all-pairs separation
+under simulated colour vision, not appending a nice-looking value; the method
+and the current worst-pair figures are recorded above that constant.
 `ALLOWED_ORIGINS` on the payments service needs the new origin too, but only if
 you have pinned it — unset, it defaults to `*`, which is safe here because auth
 is a Bearer token rather than a cookie.
