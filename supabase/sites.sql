@@ -2,10 +2,10 @@
 -- Venti — the site split
 -- ============================================================================
 --
--- Two domains, two products. This file is what makes that true in the data
--- rather than only in the branding: every account, every cash event, every
+-- Several domains, one per product. This file is what makes that true in the
+-- data rather than only in the branding: every account, every cash event, every
 -- promo host and every broadcast now carries the site it belongs to, and the
--- figures the console reports can be asked for one site or for both.
+-- figures the console reports can be asked for one site or for all of them.
 --
 -- ----------------------------------------------------------------------------
 -- RUN THIS LAST
@@ -23,7 +23,29 @@
 --
 -- Re-running sessions.sql afterwards silently un-scopes attribution: deposits
 -- would start being credited to whichever broadcast happened to be live on
--- *either* domain. If you ever re-run it, re-run this file after it.
+-- *any other* domain. If you ever re-run it, re-run this file after it.
+--
+-- ----------------------------------------------------------------------------
+-- ADDING A DOMAIN LATER
+-- ----------------------------------------------------------------------------
+-- Re-running this whole file is safe and is the simplest way — every statement
+-- in it is idempotent, and the seed below upserts. If you would rather not
+-- replay the migration, the single statement that adds one is:
+--
+--   insert into public.sites (id, origin, name, is_primary)
+--   values ('newid', 'https://example.com', 'Display Name', false)
+--   on conflict (id) do update
+--     set origin = excluded.origin, name = excluded.name;
+--
+-- Either way the id must also be added, by hand, to the two copies of the list
+-- that live outside the database — `src/lib/sites.ts` in the app and
+-- `FALLBACK_SITES` in the payments service's `sites.js`. Until it is, the
+-- service attributes that origin to the primary site and logs a warning once,
+-- so sign-ups keep working but land on the wrong product.
+--
+-- The id is permanent. It is written into every account's Supabase Auth
+-- identity (`newid.254…@meridian.invalid`), so renaming it later locks out
+-- every customer who registered under it.
 --
 -- ----------------------------------------------------------------------------
 -- What could not be recovered
@@ -57,7 +79,8 @@ create unique index if not exists sites_single_primary_idx
 
 insert into public.sites (id, origin, name, is_primary) values
   ('venti',  'https://ventitradingfx.com', 'Venti',     true),
-  ('candix', 'https://candixfx.com',       'Candix FX', false)
+  ('candix', 'https://candixfx.com',       'Candix FX', false),
+  ('barsfx', 'https://barsfx.com',         'Bars FX',   false)
 on conflict (id) do update
   set origin = excluded.origin,
       name   = excluded.name;
@@ -126,12 +149,12 @@ create index if not exists promo_hosts_site_idx  on public.promo_hosts (site);
 -- --- 3. One phone number per site, not per platform --------------------------
 
 /*
- * The change that makes them two products rather than two front doors.
+ * The change that makes them separate products rather than separate front doors.
  *
  * `profiles.phone` was globally unique, so one number meant one account across
- * everything. Two products means the same person may hold an account on each,
- * with separate balances, neither aware of the other — so the uniqueness moves
- * to (site, phone).
+ * everything. Separate products mean the same person may hold an account on
+ * each, with separate balances, none aware of the others — so the uniqueness
+ * moves to (site, phone).
  *
  * The login identity has to move with it, and that half lives in the service:
  * `phone.js` tags the derived address for every non-primary site. The primary
@@ -383,7 +406,7 @@ $$;
  * The host's site decides the session's, so nothing has to be passed in and a
  * host can never open a broadcast for the domain they do not work on.
  *
- * SESSION_RUNNING now means "on this site", which is the whole point: the two
+ * SESSION_RUNNING now means "on this site", which is the whole point: the
  * desks no longer block each other.
  */
 create or replace function public.promo_session_start(
@@ -440,8 +463,8 @@ $$;
 
 /*
  * Only `registered` changes: it counted every account created during the
- * broadcast's window, platform-wide. On a two-product platform that credited a
- * Venti host with Candix's sign-ups whenever the clocks overlapped.
+ * broadcast's window, platform-wide. On a multi-product platform that credited
+ * a Venti host with another domain's sign-ups whenever the clocks overlapped.
  */
 create or replace function public.promo_session_stats(p_session uuid)
 returns table (

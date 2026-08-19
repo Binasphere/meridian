@@ -25,7 +25,8 @@
  *     carry the untagged Supabase identity. Renaming it locks out every account
  *     created before the split — permanently.
  *   - `__ventiMarket`, `__ventiSupabase` are process globals. Invisible.
- *   - `ventitradingfx.com` is a real domain, in the sites list where it belongs.
+ *   - `ventitradingfx.com` and `barsfx.com` are real domains, in the sites list
+ *     where they belong.
  *
  * So the check is: flag the word in **user-visible strings and JSX text**,
  * ignore it inside identifiers, comments, and the allowlisted lines below.
@@ -37,8 +38,16 @@ import { join, relative } from "node:path";
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const SRC = join(ROOT, "src");
 
-/** Product names that must not be hardcoded anywhere a customer can read. */
-const BRANDS = ["Venti", "Candix", "Meridian"];
+/**
+ * Product names that must not be hardcoded anywhere a customer can read.
+ *
+ * `Bars FX` and `BarsFX` are listed rather than a bare `Bars`, deliberately.
+ * The word on its own is ordinary vocabulary in a trading app — chart bars, a
+ * bar series, `BarRows` — so listing it would flag legitimate text and turn
+ * this check into noise somebody learns to skip. The two spellings that are
+ * actually the *brand* are the two worth catching.
+ */
+const BRANDS = ["Venti", "Candix", "Meridian", "Bars FX", "BarsFX"];
 
 /**
  * Exact `path:line` pairs that are allowed to contain the word, each with the

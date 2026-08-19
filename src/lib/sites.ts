@@ -36,6 +36,12 @@ export const SITES: readonly Site[] = [
     name: "Candix FX",
     primary: false,
   },
+  {
+    id: "barsfx",
+    origin: "https://barsfx.com",
+    name: "Bars FX",
+    primary: false,
+  },
 ];
 
 // The non-null assertion is load-bearing rather than lazy: `SITES` is a literal
