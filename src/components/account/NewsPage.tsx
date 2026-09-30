@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Newspaper } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { formatRelative } from "@/lib/format";
 import { BACKEND_ORIGIN } from "@/lib/backend";
 import { Empty } from "@/components/ui/primitives";
 import { Spinner } from "@/components/ui/Spinner";
+import { FilterSelect } from "@/components/ui/FilterSelect";
 
 interface Article {
   id: string;
@@ -54,22 +54,13 @@ export function NewsPage() {
 
   return (
     <div className="mx-auto max-w-[760px]">
-      <div className="mb-3 flex gap-1">
-        {CATEGORIES.map((c) => (
-          <button
-            key={c.value}
-            onClick={() => setCategory(c.value)}
-            className={cn(
-              "h-8 border px-3 text-[12.5px] font-medium transition-colors",
-              category === c.value
-                ? "border-ink bg-ink text-surface-1"
-                : "border-line-strong text-ink-secondary hover:text-ink",
-            )}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      <FilterSelect
+        label="Category"
+        value={category}
+        options={CATEGORIES}
+        onChange={setCategory}
+        className="mb-3"
+      />
 
       <div className="border border-line bg-surface-1 lg:max-h-[calc(100dvh-210px)] lg:overflow-y-auto">
         {articles === null ? (

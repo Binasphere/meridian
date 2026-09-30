@@ -307,3 +307,17 @@ the console under Verification; document links are signed for ten minutes.
    Auth. Customers turn it on under Security.
 4. Live chat opens WhatsApp when the main app is built with
    `NEXT_PUBLIC_SUPPORT_WHATSAPP=2547XXXXXXXX`; otherwise it opens Support.
+
+## 2026-10-01 — Verified withdrawals, profile photos, live chat, VIP texts
+
+1. Run `supabase/profile-chat-withdraw.sql` (after `verification.sql`):
+   - a trigger on `cash_events` refuses any WITHDRAWAL until the customer's
+     verification is APPROVED (covers Standard and the VIP rail);
+   - a public `avatars` bucket (2 MB, images) and `profiles.avatar_url`;
+   - `chat_messages` with RLS, added to the realtime publication.
+2. `tradin-payments` → Environment: `AT_USERNAME`, `AT_API_KEY`, optional
+   `AT_SENDER_ID` (Africa's Talking). VIP deposits and withdrawals then send
+   an M-PESA-style confirmation quoting the handset's new balance. Until set,
+   the text is only logged.
+3. The M-PESA clone (Desktop/mpesaclone) is back on the Venti rail —
+   `services/config.ts` holds the one switch between Venti and Novi.

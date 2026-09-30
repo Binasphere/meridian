@@ -38,7 +38,7 @@ export function TopBar() {
         <Menu className="h-5 w-5" aria-hidden />
       </button>
 
-      <Wordmark className="h-[18px] min-w-0 shrink" />
+      <Wordmark showMark={false} className="h-[18px] min-w-0 shrink [&>span]:truncate" />
 
       <div className="ml-auto flex items-center gap-2">
         <AccountMenu />

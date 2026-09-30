@@ -175,6 +175,8 @@ export interface StoredAccount {
   method?: "phone" | "google";
   /** The Google address, for accounts that sign in with Google. */
   email?: string;
+  /** Public URL of the profile photo, if one was uploaded. */
+  avatarUrl?: string;
 }
 
 /**
@@ -546,7 +548,7 @@ async function readProfile(phone: string): Promise<StoredAccount> {
 
   const { data } = await db
     .from("profiles")
-    .select("phone, deposit_phone, username, created_at, live_tier")
+    .select("phone, deposit_phone, username, created_at, live_tier, avatar_url")
     .maybeSingle();
 
   const { data: auth } = await db.auth.getUser();
@@ -558,6 +560,7 @@ async function readProfile(phone: string): Promise<StoredAccount> {
     return {
       phone: data.phone ?? phone,
       depositPhone: data.deposit_phone ?? undefined,
+      avatarUrl: data.avatar_url ?? undefined,
       username: data.username ?? undefined,
       createdAt: new Date(data.created_at).getTime(),
       liveTier: data.live_tier === "VIP" ? "VIP" : "STANDARD",

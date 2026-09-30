@@ -136,15 +136,18 @@ export function currentDomainLabel(): string | null {
   return host || null;
 }
 
+/** Header names that are not simply the host's first label. */
+const BRAND_LABEL: Record<string, string> = { venti: "ventitrading" };
+
 /**
- * The short brand for the header: the site's id on a known domain ("venti"),
- * else the host's first label without its TLD ("example" from example.com).
+ * The short brand for the header: "ventitrading" on the primary domain, else
+ * the host's first label without its TLD ("candixfx" from candixfx.com).
  */
 export function currentBrandLabel(): string | null {
   if (typeof window === "undefined") return null;
   const here = canonical(window.location.origin);
   const known = SITES.find((site) => canonical(site.origin) === here);
-  if (known) return known.id;
+  if (known && BRAND_LABEL[known.id]) return BRAND_LABEL[known.id]!;
   const host = window.location.hostname.replace(/^www\./i, "");
   return host.split(".")[0] || null;
 }

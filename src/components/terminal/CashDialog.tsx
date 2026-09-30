@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowDownToLine,
+  BadgeCheck,
   ArrowUpFromLine,
   Check,
   Gift,
@@ -31,6 +32,7 @@ import {
 import { depositFromPhone, usesMpesaRail, withdrawToPhone } from "@/lib/mpesaRail";
 import { depositPhoneOf } from "@/lib/prefs";
 import { useUi } from "@/lib/ui";
+import { myVerification } from "@/lib/verification";
 import { Spinner } from "@/components/ui/Spinner";
 
 // Neither form offers amounts. A menu of chips beside a "pay now" button is a
@@ -80,6 +82,17 @@ export function CashDialog({
   const account = useCurrentAccount();
   const savedDepositPhone = depositPhoneOf(account);
   const openDepositNumber = useUi((s) => s.setDepositNumberOpen);
+  const openVerification = useUi((s) => s.setVerificationOpen);
+
+  // Withdrawals need an approved verification (the database refuses them
+  // otherwise), so the dialog checks first and offers the way through.
+  const [verified, setVerified] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!open || mode !== "withdraw") return;
+    if (!serverWalletActive()) return setVerified(true);
+    setVerified(null);
+    void myVerification().then((v) => setVerified(v.status === "APPROVED"));
+  }, [open, mode]);
   const requestDeposit = useStore((s) => s.requestDeposit);
   const requestWithdrawal = useStore((s) => s.requestWithdrawal);
   const liveBalance = useStore((s) => BigInt(s.balances.LIVE));
@@ -309,7 +322,27 @@ export function CashDialog({
               nothing ever scrolls. `overscroll-contain` stops a flick at the
               end of the list scrolling the terminal behind the dialog. */}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-            {stage === "form" ? (
+            {mode === "withdraw" && verified !== true ? (
+              verified === null ? (
+                <div className="grid place-items-center py-12">
+                  <Spinner size={30} label="Checking verification" />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
+                  <BadgeCheck className="h-8 w-8 text-ink-muted" aria-hidden />
+                  <p className="text-[15px] font-semibold text-ink">Verify to withdraw</p>
+                  <button
+                    onClick={() => {
+                      onOpenChange(false);
+                      openVerification(true);
+                    }}
+                    className="mt-1 h-11 w-full bg-cash text-[14px] font-semibold text-white transition-colors hover:bg-cash-hover"
+                  >
+                    Verify now
+                  </button>
+                </div>
+              )
+            ) : stage === "form" ? (
               <div className="flex flex-col gap-4 p-4">
                 {/* --- First-deposit bonus (promo only) ---------------------- */}
                 {isDeposit && !hasDeposited ? (

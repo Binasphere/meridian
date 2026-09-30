@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, Inbox } from "lucide-react";
 import { adminFetch } from "@/lib/admin/client";
 import { formatPhone } from "@/lib/auth";
-import { cn } from "@/lib/utils";
 import { Button, Card, Skeleton, useNotify } from "./ui";
+import { AdminSelect } from "./AdminSelect";
 
 type Status = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -75,21 +75,17 @@ export function VerificationsView({ onUnauthorised }: { onUnauthorised: () => vo
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-1">
-        {(["PENDING", "APPROVED", "REJECTED"] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatus(s)}
-            className={cn(
-              "h-8 rounded-none border px-3 text-[12.5px] font-medium transition-colors",
-              status === s
-                ? "border-adm-ink bg-adm-ink text-white"
-                : "border-adm-line-strong bg-adm-surface text-adm-ink-2 hover:text-adm-ink",
-            )}
-          >
-            {s === "PENDING" ? "Pending" : s === "APPROVED" ? "Approved" : "Rejected"}
-          </button>
-        ))}
+      <div>
+        <AdminSelect
+          label="Status"
+          value={status}
+          onChange={setStatus}
+          options={[
+            { value: "PENDING", label: "Pending" },
+            { value: "APPROVED", label: "Approved" },
+            { value: "REJECTED", label: "Rejected" },
+          ]}
+        />
       </div>
 
       {error ? <Card className="p-4 text-[13px] text-adm-neg">{error}</Card> : null}

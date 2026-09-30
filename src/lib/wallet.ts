@@ -211,6 +211,9 @@ export async function startServerWithdrawal(
 
   if (error || typeof data !== "string") {
     const message = error?.message ?? "";
+    if (message.includes("VERIFY_FIRST")) {
+      throw new Error("Verify your identity before withdrawing");
+    }
     if (message.includes("INSUFFICIENT_FUNDS")) {
       throw new Error("Amount exceeds your Live balance");
     }

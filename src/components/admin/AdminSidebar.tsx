@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   LifeBuoy,
   LogOut,
+  MessagesSquare,
   Radio,
   ShieldCheck,
   Users,
@@ -40,6 +41,7 @@ export type AdminView =
   | "users"
   | "withdrawals"
   | "tickets"
+  | "chats"
   | "verifications"
   | "sessions"
   | "domains"
@@ -84,6 +86,13 @@ const NAV: readonly NavItem[] = [
     label: "Support",
     icon: LifeBuoy,
     description: "Tickets from customers, and password resets",
+    needs: "finance",
+  },
+  {
+    id: "chats",
+    label: "Live chat",
+    icon: MessagesSquare,
+    description: "Customer conversations",
     needs: "finance",
   },
   {

@@ -41,8 +41,11 @@ export function AccountShell({
   description,
   children,
   publicPage = false,
+  hideTitle = false,
 }: {
   title: string;
+  /** For pages whose content says what they are (Wallet). */
+  hideTitle?: boolean;
   description?: string;
   children: React.ReactNode;
   /** Readable signed out — Markets and Support. Everything else gates. */
@@ -74,7 +77,7 @@ export function AccountShell({
       {/* Scrolls on phones, pinned on desktop. */}
       <main className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
         <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col px-3 py-4 sm:px-5 sm:py-5">
-          <div className="mb-4 shrink-0">
+          <div className={cn("mb-4 shrink-0", hideTitle && "sr-only")}>
             <h1 className="text-[20px] font-semibold tracking-tight text-ink">
               {title}
             </h1>

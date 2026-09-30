@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Account", robots: NO_INDEX };
 export default function Page() {
   return (
     <AccountShell
-      title="Account"
+      title="Profile"
     >
       <AccountDetails />
     </AccountShell>

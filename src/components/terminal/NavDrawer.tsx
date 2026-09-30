@@ -27,17 +27,8 @@ import { useStore } from "@/lib/store";
 import { usePrefs, depositPhoneOf } from "@/lib/prefs";
 import { useUi } from "@/lib/ui";
 import { Wordmark } from "@/components/Wordmark";
+import { Avatar } from "@/components/account/Avatar";
 import { useAuthGate } from "@/components/auth/SignInGate";
-
-/**
- * Live chat: WhatsApp with support when `NEXT_PUBLIC_SUPPORT_WHATSAPP` holds a
- * number (digits, country code first, e.g. 254712345678); the Support page
- * until then.
- */
-const LIVE_CHAT_URL = (() => {
-  const digits = (process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "").replace(/\D/g, "");
-  return digits ? `https://wa.me/${digits}` : null;
-})();
 
 /**
  * The menu behind the hamburger.
@@ -106,12 +97,7 @@ export function NavDrawer() {
             {/* --- Identity -------------------------------------------------- */}
             {account ? (
               <div className="flex items-center gap-3 border-b border-line px-4 py-4">
-                <span
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-[13px] font-semibold text-surface-1"
-                  aria-hidden
-                >
-                  {(account.username?.slice(0, 2) ?? account.phone.slice(-2)).toUpperCase()}
-                </span>
+                <Avatar account={account} size={40} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] font-semibold uppercase tracking-tight text-ink">
                     {account.username ?? formatPhoneMasked(account.phone)}
@@ -188,13 +174,7 @@ export function NavDrawer() {
 
             {/* --- Help ------------------------------------------------------- */}
             <Group label="Help">
-              <Row
-                icon={MessagesSquare}
-                label="Live chat"
-                href={LIVE_CHAT_URL ?? "/support"}
-                external={Boolean(LIVE_CHAT_URL)}
-                onNavigate={close}
-              />
+              <Row icon={MessagesSquare} label="Live chat" href="/chat" onNavigate={close} />
               <Row icon={LifeBuoy} label="Support" href="/support" onNavigate={close} />
             </Group>
           </div>

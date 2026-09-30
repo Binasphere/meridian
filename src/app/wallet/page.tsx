@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Wallet", robots: NO_INDEX };
 
 export default function Page() {
   return (
-    <AccountShell title="Wallet">
+    <AccountShell title="Wallet" hideTitle>
       <WalletPage />
     </AccountShell>
   );

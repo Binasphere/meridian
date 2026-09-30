@@ -29,6 +29,7 @@ export default function robots(): MetadataRoute.Robots {
         "/transactions",
         "/security",
         "/referrals",
+        "/chat",
         "/forgot-password",
         "/reset-password",
         "/positions",

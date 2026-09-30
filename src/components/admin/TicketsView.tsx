@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { Inbox } from "lucide-react";
 import { formatPhone } from "@/lib/auth";
-import { cn } from "@/lib/utils";
 import type { AdminTicket } from "@/lib/admin/types";
 import { Badge, Button, Card, Skeleton, useNotify } from "./ui";
 import { ResetPasswordControl } from "./ResetPasswordControl";
-import type { TicketFilter, TicketsState } from "./useTickets";
+import type { TicketsState } from "./useTickets";
+import { AdminSelect } from "./AdminSelect";
 
 const CATEGORY_LABEL: Record<AdminTicket["category"], string> = {
   DEPOSIT: "Deposit",
@@ -23,25 +23,19 @@ const CATEGORY_LABEL: Record<AdminTicket["category"], string> = {
  * customer sees on their Support page, so it is written to them.
  */
 export function TicketsView({ state }: { state: TicketsState }) {
-  const filters: TicketFilter[] = ["OPEN", "RESOLVED", "ALL"];
-
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-1">
-        {filters.map((f) => (
-          <button
-            key={f}
-            onClick={() => state.setFilter(f)}
-            className={cn(
-              "h-8 rounded-none border px-3 text-[12.5px] font-medium transition-colors",
-              state.filter === f
-                ? "border-adm-ink bg-adm-ink text-white"
-                : "border-adm-line-strong bg-adm-surface text-adm-ink-2 hover:text-adm-ink",
-            )}
-          >
-            {f === "OPEN" ? "Open" : f === "RESOLVED" ? "Resolved" : "All"}
-          </button>
-        ))}
+      <div>
+        <AdminSelect
+          label="Status"
+          value={state.filter}
+          onChange={state.setFilter}
+          options={[
+            { value: "OPEN", label: "Open" },
+            { value: "RESOLVED", label: "Resolved" },
+            { value: "ALL", label: "All" },
+          ]}
+        />
       </div>
 
       {state.error ? (

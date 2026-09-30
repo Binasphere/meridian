@@ -8,7 +8,8 @@ import { formatCountdown, formatMoney, formatTime } from "@/lib/format";
 import { useAllTicks, useNow } from "@/lib/hooks";
 import { computeStats, isWinning, type Trade } from "@/lib/trading";
 import { useHistory, useOpenTrades } from "@/lib/store";
-import { Empty, Segmented } from "@/components/ui/primitives";
+import { Empty } from "@/components/ui/primitives";
+import { FilterSelect } from "@/components/ui/FilterSelect";
 
 type Tab = "open" | "history";
 
@@ -20,25 +21,15 @@ export function Positions() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-line px-3">
-        <Segmented
-          options={[
-            {
-              value: "open" as const,
-              label: (
-                <span className="flex items-center gap-1.5">
-                  Positions
-                  {open.length > 0 ? (
-                    <span className="tnum rounded-none bg-accent/20 px-1 font-mono text-[10px] text-accent">
-                      {open.length}
-                    </span>
-                  ) : null}
-                </span>
-              ),
-            },
-            { value: "history" as const, label: "History" },
-          ]}
+        <FilterSelect
+          label="Show"
           value={tab}
           onChange={setTab}
+          className="h-8 min-w-[150px] text-[12.5px]"
+          options={[
+            { value: "open" as const, label: open.length > 0 ? `Open · ${open.length}` : "Open" },
+            { value: "history" as const, label: "History" },
+          ]}
         />
         <SessionSummary trades={history} />
       </div>
