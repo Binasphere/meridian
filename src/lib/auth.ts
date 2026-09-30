@@ -13,6 +13,7 @@ import {
   validateRegistration,
 } from "./phone";
 import { useStore } from "./store";
+import { pendingReferral } from "./referral";
 import { refreshWallet } from "./wallet";
 import type { LiveTier } from "./trading";
 
@@ -188,7 +189,9 @@ interface LocalCredential extends Omit<StoredAccount, "liveTier"> {
   hash: string;
 }
 
-export type AuthResult = { ok: true } | { ok: false; reason: string };
+export type AuthResult =
+  | { ok: true }
+  | { ok: false; reason: string; /** Password was right; a 2-step code is next. */ mfa?: true };
 
 interface AuthState {
   /** Local-simulation vault. Untouched when Supabase is configured. */
@@ -204,6 +207,11 @@ interface AuthState {
    * treats this as signed out everywhere except the link-your-number screen.
    */
   linkPending: boolean;
+  /**
+   * Password accepted, but the account has two-step verification on and the
+   * code has not been given yet. Treated as signed out until it is.
+   */
+  mfaPending: boolean;
 
   register: (
     phone: string,
@@ -223,6 +231,8 @@ interface AuthState {
    * replaces it with a new password in the same step.
    */
   resetPassword: (phone: string, code: string, password: string) => Promise<AuthResult>;
+  /** Finishes a sign-in that is waiting on a 2-step code. */
+  verifyMfa: (code: string) => Promise<AuthResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +247,7 @@ export const useAuth = create<AuthState>()(
       profile: null,
       hydrated: false,
       linkPending: false,
+      mfaPending: false,
 
       // --- Register --------------------------------------------------------
       register: async (phoneInput, usernameInput, password) => {
@@ -280,7 +291,7 @@ export const useAuth = create<AuthState>()(
           const response = await fetch(`${BACKEND_ORIGIN}/api/auth/register`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ phone, username, password }),
+            body: JSON.stringify({ phone, username, password, ref: pendingReferral() }),
           });
 
           if (!response.ok) {
@@ -344,6 +355,11 @@ export const useAuth = create<AuthState>()(
           return { ok: false, reason: "Incorrect number or password" };
         }
 
+        if (await needsSecondStep()) {
+          set({ mfaPending: true });
+          return { ok: false, reason: "", mfa: true };
+        }
+
         applyProfile(phone, await readProfile(phone));
         return { ok: true };
       },
@@ -353,7 +369,7 @@ export const useAuth = create<AuthState>()(
         // Clear locally first so the UI never sits on a stale session waiting
         // for a network call it does not need to wait for.
         applyProfile(null, null);
-        set({ linkPending: false });
+        set({ linkPending: false, mfaPending: false });
         void supabase()?.auth.signOut();
       },
 
@@ -396,6 +412,7 @@ export const useAuth = create<AuthState>()(
           body: JSON.stringify({
             phone: validated.value.phone,
             username: validated.value.username,
+            ref: pendingReferral(),
           }),
         });
         const body = (await response.json().catch(() => ({}))) as { error?: string };
@@ -406,6 +423,28 @@ export const useAuth = create<AuthState>()(
         const profile = await readProfile("");
         set({ linkPending: false });
         applyProfile(profile.phone || null, profile.phone ? profile : null);
+        return { ok: true };
+      },
+
+      verifyMfa: async (code) => {
+        const db = supabase();
+        if (!db) return { ok: false, reason: "Unavailable" };
+        const { data } = await db.auth.mfa.listFactors();
+        const factor = data?.totp?.find((f) => f.status === "verified");
+        if (!factor) return { ok: false, reason: "No authenticator on this account" };
+        const { error } = await db.auth.mfa.challengeAndVerify({
+          factorId: factor.id,
+          code: code.trim(),
+        });
+        if (error) return { ok: false, reason: "That code is not valid" };
+
+        const profile = await readProfile("");
+        set({ mfaPending: false });
+        if (profile.phone) {
+          applyProfile(profile.phone, profile);
+        } else {
+          set({ linkPending: true });
+        }
         return { ok: true };
       },
 
@@ -420,6 +459,11 @@ export const useAuth = create<AuthState>()(
         if (!db) return { ok: false, reason: "Password reset is unavailable" };
 
         const signedIn = await get().signIn(phoneInput, code.trim());
+        if (!signedIn.ok && signedIn.mfa) {
+          // The password cannot change until the 2-step code is given; the
+          // code screen takes over, and Security changes it afterwards.
+          return { ok: false, reason: "Enter your 2-step code, then change your password in Security." };
+        }
         if (!signedIn.ok) return { ok: false, reason: "Incorrect number or reset code" };
 
         const { error } = await db.auth.updateUser({ password });
@@ -476,6 +520,14 @@ export const useAuth = create<AuthState>()(
 // ---------------------------------------------------------------------------
 // Profile
 // ---------------------------------------------------------------------------
+
+/** True when the session has a verified factor but is still at password level. */
+async function needsSecondStep(): Promise<boolean> {
+  const db = supabase();
+  if (!db) return false;
+  const { data } = await db.auth.mfa.getAuthenticatorAssuranceLevel();
+  return data?.nextLevel === "aal2" && data.currentLevel !== "aal2";
+}
 
 /**
  * Reads the signed-in user's own profile row.
@@ -586,6 +638,14 @@ function bootstrap(): void {
       return;
     }
 
+    // Two-step on and not yet satisfied in this session: ask for the code
+    // before anything else, and show nothing of the account until then.
+    if (await needsSecondStep()) {
+      applyProfile(null, null);
+      useAuth.setState({ hydrated: true, mfaPending: true, linkPending: false });
+      return;
+    }
+
     // The profile row is the authority on the number. A phone account's row
     // always has one; a Google account's has none until it is linked, and
     // until then the app treats it as signed out behind the link screen.
@@ -604,7 +664,7 @@ function bootstrap(): void {
   db.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_OUT" || !session) {
       applyProfile(null, null);
-      useAuth.setState({ linkPending: false });
+      useAuth.setState({ linkPending: false, mfaPending: false });
     }
   });
 

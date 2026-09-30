@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { useApplyTheme } from "@/lib/prefs";
+import { captureReferral } from "@/lib/referral";
 import { useUi } from "@/lib/ui";
 import { CashDialog } from "./CashDialog";
 import { DepositNumberDialog } from "./DepositNumberDialog";
@@ -14,6 +16,8 @@ import { VerificationDialog } from "./VerificationDialog";
  */
 export function Overlays() {
   useApplyTheme();
+  // `?ref=CODE` from a friend's link, kept until sign-up sends it.
+  useEffect(() => captureReferral(), []);
   const cash = useUi((s) => s.cash);
   const setCash = useUi((s) => s.setCash);
 

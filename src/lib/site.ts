@@ -86,4 +86,5 @@ export const PUBLIC_ROUTES: { path: string; lastModified: Date }[] = [
   // questions somebody types into a search box.
   { path: "/markets", lastModified: new Date("2026-09-30") },
   { path: "/support", lastModified: new Date("2026-09-30") },
+  { path: "/news", lastModified: new Date("2026-10-01") },
 ];

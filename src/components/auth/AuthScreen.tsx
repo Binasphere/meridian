@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
@@ -9,6 +9,8 @@ import googleIcon from "@/app/assets/google.svg";
 import { cn } from "@/lib/utils";
 import { MIN_PASSWORD_LENGTH, useAuth } from "@/lib/auth";
 import { Wordmark } from "@/components/Wordmark";
+import { MfaScreen } from "./MfaScreen";
+import { captureReferral } from "@/lib/referral";
 import { Spinner } from "@/components/ui/Spinner";
 
 type Mode = "signin" | "register";
@@ -32,6 +34,10 @@ export function AuthScreen() {
 
   const register = useAuth((s) => s.register);
   const signIn = useAuth((s) => s.signIn);
+  const mfaPending = useAuth((s) => s.mfaPending);
+
+  // `?ref=CODE` from a friend's link, kept until sign-up sends it.
+  useEffect(() => captureReferral(), []);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -75,6 +81,9 @@ export function AuthScreen() {
     setPassword("");
     setConfirm("");
   };
+
+  // The password was right; the 2-step code comes next, in this same slot.
+  if (mfaPending) return <MfaScreen />;
 
   const label = "mb-1.5 block text-[12px] font-medium text-ink-secondary";
   const field =

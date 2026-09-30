@@ -5,6 +5,7 @@ import { useAuth, useAuthHydrated } from "@/lib/auth";
 import { useStoreHydrated } from "@/lib/store";
 import { AuthScreen } from "@/components/auth/AuthScreen";
 import { LinkNumberScreen } from "@/components/auth/LinkNumberScreen";
+import { MfaScreen } from "@/components/auth/MfaScreen";
 import { SignInGate } from "@/components/auth/SignInGate";
 import { BottomTabs } from "@/components/terminal/BottomTabs";
 import { Overlays } from "@/components/terminal/Overlays";
@@ -50,10 +51,12 @@ export function AccountShell({
   const authHydrated = useAuthHydrated();
   const currentPhone = useAuth((s) => s.currentPhone);
   const linkPending = useAuth((s) => s.linkPending);
+  const mfaPending = useAuth((s) => s.mfaPending);
   const storeHydrated = useStoreHydrated();
   useApplyTheme();
 
   // A Google account with no number yet finishes that first, on every page.
+  if (authHydrated && mfaPending) return <MfaScreen />;
   if (authHydrated && linkPending) return <LinkNumberScreen />;
 
   // Only once we know there is no session do we swap in sign-in — showing it

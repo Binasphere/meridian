@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { phone?: unknown; username?: unknown; password?: unknown };
+  let body: { phone?: unknown; username?: unknown; password?: unknown; ref?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -92,7 +92,13 @@ export async function POST(request: NextRequest) {
     // a confirmation that will never arrive would strand the account.
     email_confirm: true,
     // `handle_new_user` reads these to populate `public.profiles`.
-    user_metadata: { phone, username },
+    user_metadata: {
+      phone,
+      username,
+      ...(typeof body.ref === "string" && /^[A-Za-z0-9]{4,12}$/.test(body.ref)
+        ? { ref: body.ref.toUpperCase() }
+        : {}),
+    },
   });
 
   if (error) {

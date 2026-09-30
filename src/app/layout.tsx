@@ -96,7 +96,7 @@ export const metadata: Metadata = {
  * the threshold iOS uses to decide whether to zoom at all.
  */
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: "#171716",
   colorScheme: "light dark",
   width: "device-width",
   initialScale: 1,
@@ -110,7 +110,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      data-theme="light"
+      data-theme="dark"
       // The boot script below rewrites data-theme before paint.
       suppressHydrationWarning
       className={`${plexSans.variable} ${plexMono.variable}`}

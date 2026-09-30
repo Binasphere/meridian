@@ -10,6 +10,7 @@ import { usePrefs } from "@/lib/prefs";
 import { Panel } from "@/components/ui/primitives";
 import { SignInGate } from "@/components/auth/SignInGate";
 import { LinkNumberScreen } from "@/components/auth/LinkNumberScreen";
+import { MfaScreen } from "@/components/auth/MfaScreen";
 import { Spinner } from "@/components/ui/Spinner";
 import { TopBar } from "./TopBar";
 import { MarketHeader } from "./MarketHeader";
@@ -39,6 +40,7 @@ export function Terminal() {
   const authHydrated = useAuthHydrated();
   const currentPhone = useAuth((s) => s.currentPhone);
   const linkPending = useAuth((s) => s.linkPending);
+  const mfaPending = useAuth((s) => s.mfaPending);
 
   const symbol = useStore((s) => s.symbol);
   const setSymbol = useStore((s) => s.setSymbol);
@@ -77,6 +79,8 @@ export function Terminal() {
   // gate themselves.
   if (!mounted || !authHydrated) return <Boot />;
 
+  // Password accepted, 2-step code outstanding.
+  if (mfaPending) return <MfaScreen />;
   // Back from Google with no number on the account yet: finish that first.
   if (linkPending) return <LinkNumberScreen />;
 

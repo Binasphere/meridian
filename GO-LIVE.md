@@ -295,3 +295,15 @@ Run `supabase/verification.sql` (after `support-and-deposit.sql`): a private
 own folder only), the `verifications` table and the `submit_verification`
 RPC. Redeploy `tradin-payments` for the admin review routes. Review lives in
 the console under Verification; document links are signed for ten minutes.
+
+## 2026-10-01 — Referrals, two-step sign-in, market news
+
+1. Run `supabase/referrals.sql` (after `support-and-deposit.sql`): referral
+   codes on every profile, `referred_by`, and `my_referrals()`. Rewards are
+   not paid automatically — the counts are what you pay against.
+2. `tradin-payments` → Environment → `FINNHUB_API_KEY` (finnhub.io). The
+   Market news page reads `/api/news` there; the key never reaches a browser.
+3. Two-step verification uses Supabase MFA (TOTP) — on by default in Supabase
+   Auth. Customers turn it on under Security.
+4. Live chat opens WhatsApp when the main app is built with
+   `NEXT_PUBLIC_SUPPORT_WHATSAPP=2547XXXXXXXX`; otherwise it opens Support.

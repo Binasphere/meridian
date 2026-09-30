@@ -4,14 +4,14 @@ import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowDownToLine,
-  ArrowLeftRight,
   ArrowUpFromLine,
   BadgeCheck,
-  ChartCandlestick,
-  CircleUserRound,
   History,
+  Gift,
   LifeBuoy,
-  ListOrdered,
+  MessagesSquare,
+  Newspaper,
+  ShieldCheck,
   LogIn,
   LogOut,
   Moon,
@@ -22,13 +22,22 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/format";
 import { formatPhoneMasked, useAuth, useCurrentAccount } from "@/lib/auth";
-import { useOpenTrades, useStore } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { usePrefs, depositPhoneOf } from "@/lib/prefs";
 import { useUi } from "@/lib/ui";
 import { Wordmark } from "@/components/Wordmark";
 import { useAuthGate } from "@/components/auth/SignInGate";
+
+/**
+ * Live chat: WhatsApp with support when `NEXT_PUBLIC_SUPPORT_WHATSAPP` holds a
+ * number (digits, country code first, e.g. 254712345678); the Support page
+ * until then.
+ */
+const LIVE_CHAT_URL = (() => {
+  const digits = (process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "").replace(/\D/g, "");
+  return digits ? `https://wa.me/${digits}` : null;
+})();
 
 /**
  * The menu behind the hamburger.
@@ -52,11 +61,8 @@ export function NavDrawer() {
   const depositPhone = depositPhoneOf(account);
 
   const accountKind = useStore((s) => s.accountKind);
-  const setAccountKind = useStore((s) => s.setAccountKind);
-  const balances = useStore((s) => s.balances);
   const clearSession = useStore((s) => s.signOut);
   const resetDemo = useStore((s) => s.resetDemo);
-  const openTrades = useOpenTrades();
 
   const theme = usePrefs((s) => s.theme);
   const setTheme = usePrefs((s) => s.setTheme);
@@ -71,8 +77,6 @@ export function NavDrawer() {
     if (signedIn) action();
     else showGate();
   };
-
-  const otherKind = accountKind === "DEMO" ? "LIVE" : "DEMO";
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -153,26 +157,11 @@ export function NavDrawer() {
               <Row icon={History} label="Transactions" href="/transactions" onNavigate={close} />
             </Group>
 
-            {/* --- Trading ---------------------------------------------------- */}
+            {/* --- Trading ----------------------------------------------------
+                Markets, positions, wallet and profile are the tab bar's; the
+                account switch is the balance chip's. This holds the rest. */}
             <Group label="Trading">
-              <Row icon={ChartCandlestick} label="Markets" href="/markets" onNavigate={close} />
-              <Row
-                icon={ListOrdered}
-                label="Open positions"
-                value={openTrades.length > 0 ? `${openTrades.length} open` : undefined}
-                href="/positions"
-                onNavigate={close}
-              />
-              <Row
-                icon={ArrowLeftRight}
-                label={`Switch to ${otherKind === "LIVE" ? "Live" : "Demo"}`}
-                value={formatMoney(BigInt(balances[otherKind]), { currency: "KSh", compact: true })}
-                onClick={() => {
-                  close();
-                  if (otherKind === "LIVE" && !signedIn) showGate();
-                  else setAccountKind(otherKind);
-                }}
-              />
+              <Row icon={Newspaper} label="Market news" href="/news" onNavigate={close} />
               {accountKind === "DEMO" ? (
                 <Row
                   icon={RotateCcw}
@@ -180,7 +169,7 @@ export function NavDrawer() {
                   onClick={() => {
                     close();
                     resetDemo();
-                    toast.success("Demo balance reset to KSh 100,000.00");
+                    toast.success("Demo balance reset");
                   }}
                 />
               ) : null}
@@ -188,11 +177,23 @@ export function NavDrawer() {
 
             {/* --- Account ---------------------------------------------------- */}
             <Group label="Account">
-              <Row icon={CircleUserRound} label="Account details" href="/account" onNavigate={close} />
               <Row
                 icon={BadgeCheck}
                 label="Verification"
                 onClick={withAccount(() => setVerificationOpen(true))}
+              />
+              <Row icon={ShieldCheck} label="Security" href="/security" onNavigate={close} />
+              <Row icon={Gift} label="Refer & earn" href="/referrals" onNavigate={close} />
+            </Group>
+
+            {/* --- Help ------------------------------------------------------- */}
+            <Group label="Help">
+              <Row
+                icon={MessagesSquare}
+                label="Live chat"
+                href={LIVE_CHAT_URL ?? "/support"}
+                external={Boolean(LIVE_CHAT_URL)}
+                onNavigate={close}
               />
               <Row icon={LifeBuoy} label="Support" href="/support" onNavigate={close} />
             </Group>
@@ -246,6 +247,7 @@ function Row({
   label,
   value,
   href,
+  external = false,
   onClick,
   onNavigate,
 }: {
@@ -253,6 +255,8 @@ function Row({
   label: string;
   value?: string;
   href?: string;
+  /** Opens outside the app (the chat), in a new tab. */
+  external?: boolean;
   onClick?: () => void;
   onNavigate?: () => void;
 }) {
@@ -271,6 +275,14 @@ function Row({
   );
   const className =
     "flex min-h-11 w-full items-center gap-3 px-3.5 py-1.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-3";
+
+  if (href && external) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" onClick={onNavigate} className={className}>
+        {inner}
+      </a>
+    );
+  }
 
   return href ? (
     <Link href={href} prefetch onClick={onNavigate} className={className}>

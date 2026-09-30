@@ -189,11 +189,10 @@
    Light theme
    ==========================================================================
 
-   The default. Same tokens, redrawn for daylight: a white working surface on a
+   The menu's alternative to dark, which is the default. Same tokens, redrawn for daylight: a white working surface on a
    cool off-white page, ink stepped for contrast on white, and hairlines drawn
    in ink rather than in white. Direction keeps its green and red, one step
-   deeper so a signed number still clears 4.5:1 on white. Dark mode is the
-   drawer's switch away, and restores the original terminal palette exactly. */
+   deeper so a signed number still clears 4.5:1 on white. */
 
 :root {
   --chart-grid: rgba(237, 236, 232, 0.035);

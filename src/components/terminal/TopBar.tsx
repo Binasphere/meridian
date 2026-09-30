@@ -48,14 +48,13 @@ export function TopBar() {
         <button
           onClick={() => (signedIn ? setCash("deposit") : showGate())}
           aria-label="Deposit"
+          title="Deposit"
           className={cn(
-            "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 bg-cash text-white",
-            "w-10 sm:w-auto sm:px-4",
-            "text-[13px] font-semibold transition-colors hover:bg-cash-hover active:scale-[0.97]",
+            "grid h-10 w-10 shrink-0 place-items-center rounded-full bg-cash text-white",
+            "transition-colors hover:bg-cash-hover active:scale-[0.95]",
           )}
         >
-          <ArrowDownToLine className="h-4 w-4" aria-hidden />
-          <span className="hidden sm:inline">Deposit</span>
+          <ArrowDownToLine className="h-[18px] w-[18px]" aria-hidden />
         </button>
       </div>
     </header>

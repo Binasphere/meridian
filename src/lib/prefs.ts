@@ -23,19 +23,21 @@ interface PrefsState {
 export const usePrefs = create<PrefsState>()(
   persist(
     (set) => ({
-      theme: "light",
+      theme: "dark",
       sound: true,
       setTheme: (theme) => set({ theme }),
       setSound: (sound) => set({ sound }),
     }),
     {
       name: "venti-prefs",
-      version: 2,
+      version: 3,
       // v2: deposit numbers moved to the server profile.
+      // v3: dark became the default; everyone starts there once, and can
+      //     switch to light from the menu.
       migrate: (state) => {
         const { depositPhones: _dropped, ...rest } = (state ?? {}) as Record<string, unknown>;
         void _dropped;
-        return rest as unknown as PrefsState;
+        return { ...rest, theme: "dark" } as unknown as PrefsState;
       },
       storage: createJSONStorage(() => localStorage),
     },
