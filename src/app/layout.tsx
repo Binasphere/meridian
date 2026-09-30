@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 /**
@@ -95,8 +96,8 @@ export const metadata: Metadata = {
  * the threshold iOS uses to decide whether to zoom at all.
  */
 export const viewport: Viewport = {
-  themeColor: "#08090d",
-  colorScheme: "dark",
+  themeColor: "#ffffff",
+  colorScheme: "light dark",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -107,11 +108,22 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
+    <html
+      lang="en"
+      data-theme="light"
+      // The boot script below rewrites data-theme before paint.
+      suppressHydrationWarning
+      className={`${plexSans.variable} ${plexMono.variable}`}
+    >
+      <head>
+        {/* Reads the saved theme before first paint, so a dark-mode reload
+            never flashes light (or the reverse). */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-dvh bg-base text-ink antialiased">
         {children}
         <Toaster
-          position="bottom-right"
+          position="top-center"
           toastOptions={{
             unstyled: true,
             classNames: {

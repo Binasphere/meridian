@@ -61,7 +61,7 @@ type ButtonSize = "sm" | "md" | "lg";
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    "bg-ink text-base hover:bg-white active:bg-white/90 shadow-[0_1px_2px_rgba(0,0,0,.4)]",
+    "bg-ink text-surface-1 hover:opacity-90 active:opacity-80",
   secondary:
     "bg-surface-3 text-ink hover:bg-surface-4 border border-line-strong",
   ghost: "text-ink-secondary hover:text-ink hover:bg-surface-3",

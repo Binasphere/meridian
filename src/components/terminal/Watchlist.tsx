@@ -12,6 +12,7 @@ import {
   type InstrumentKind,
 } from "@/lib/market/instruments";
 import { Sparkline } from "./Sparkline";
+import { CoinIcon } from "./CoinIcon";
 import { Empty } from "@/components/ui/primitives";
 
 /**
@@ -23,9 +24,14 @@ import { Empty } from "@/components/ui/primitives";
 export function Watchlist({
   active,
   onSelect,
+  variant = "rail",
+  autoFocus = false,
 }: {
   active: string;
   onSelect: (symbol: string) => void;
+  /** The picker drops the sparklines: it is a place to choose, not to scan. */
+  variant?: "rail" | "picker";
+  autoFocus?: boolean;
 }) {
   const ticks = useAllTicks();
   const [query, setQuery] = useState("");
@@ -87,10 +93,11 @@ export function Watchlist({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search markets"
             aria-label="Search markets"
+            autoFocus={autoFocus}
             className={cn(
-              "h-8 w-full rounded-none border border-line bg-surface-1 pl-8 pr-2.5",
+              "h-9 w-full rounded-none border border-line bg-surface-1 pl-8 pr-2.5",
               "text-[13px] text-ink placeholder:text-ink-faint",
-              "transition-colors focus:border-line-strong focus:outline-none",
+              "transition-colors focus:border-accent focus:outline-none",
             )}
           />
         </div>
@@ -102,7 +109,7 @@ export function Watchlist({
         ) : (
           groups.map(([kind, specs]) => (
             <div key={kind} className="mb-1">
-              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-faint">
+              <div className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-faint">
                 {KIND_LABEL[kind]}
               </div>
 
@@ -118,7 +125,8 @@ export function Watchlist({
                     onClick={() => onSelect(spec.symbol)}
                     aria-current={isActive}
                     className={cn(
-                      "group relative flex w-full items-center gap-2.5 px-3 py-2 text-left",
+                      "group relative flex w-full items-center gap-2.5 px-3 text-left",
+                      variant === "picker" ? "py-2.5" : "py-2",
                       "transition-colors duration-100",
                       isActive ? "bg-surface-3" : "hover:bg-surface-2/70",
                     )}
@@ -133,38 +141,30 @@ export function Watchlist({
                       aria-hidden
                     />
 
+                    <CoinIcon short={spec.short} size={variant === "picker" ? 28 : 24} />
+
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={cn(
-                            "truncate text-[13px] font-medium",
-                            isActive ? "text-ink" : "text-ink-secondary",
-                          )}
-                        >
-                          {spec.short}
-                        </span>
-                        <span
-                          title="Live price"
-                          className="border border-up/25 bg-up/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-up"
-                        >
-                          live
-                        </span>
+                      <div
+                        className={cn(
+                          "truncate text-[13px] font-semibold tracking-tight",
+                          isActive ? "text-ink" : "text-ink-secondary",
+                        )}
+                      >
+                        {spec.short}/USD
                       </div>
-                      {/* The instrument's full name, where its payout rate
-                          used to sit. The row keeps its second line, and what
-                          fills it now tells you which market you are looking
-                          at rather than what it pays. */}
                       <div className="truncate text-[10.5px] text-ink-faint">
-                        {spec.displayName}
+                        {spec.displayName.replace(/\s*\/\s*USD$/, "")} / US Dollar
                       </div>
                     </div>
 
-                    <Sparkline
-                      points={sparks[spec.symbol] ?? []}
-                      tone={tone}
-                      width={48}
-                      height={18}
-                    />
+                    {variant === "rail" ? (
+                      <Sparkline
+                        points={sparks[spec.symbol] ?? []}
+                        tone={tone}
+                        width={40}
+                        height={18}
+                      />
+                    ) : null}
 
                     <div className="w-[74px] shrink-0 text-right">
                       <div className="tnum truncate font-mono text-[12.5px] text-ink">

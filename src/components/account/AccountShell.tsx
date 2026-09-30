@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { useAuth, useAuthHydrated } from "@/lib/auth";
 import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
 import { AuthScreen } from "@/components/auth/AuthScreen";
 import { Wordmark } from "@/components/Wordmark";
+import { SignInGate } from "@/components/auth/SignInGate";
+import { BottomTabs } from "@/components/terminal/BottomTabs";
+import { Overlays } from "@/components/terminal/Overlays";
+import { useApplyTheme } from "@/lib/prefs";
+import { useUi } from "@/lib/ui";
 
 /**
  * Chrome for the account pages.
@@ -46,6 +51,8 @@ export function AccountShell({
   const storeHydrated = useStoreHydrated();
   const balance = useStore(selectBalance);
   const accountKind = useStore((s) => s.accountKind);
+  const setDrawerOpen = useUi((s) => s.setDrawerOpen);
+  useApplyTheme();
 
   // Only once we know there is no session do we swap in sign-in — showing it
   // while storage is still being read would flash it at signed-in users.
@@ -53,16 +60,18 @@ export function AccountShell({
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-base">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line bg-surface-1 px-3 sm:px-4">
-        <Link
-          href="/"
-          aria-label="Back to terminal"
-          className="grid h-9 w-9 shrink-0 place-items-center border border-line bg-surface-2 text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink"
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface-1 px-2 sm:gap-3 sm:px-3">
+        <Overlays />
+        <SignInGate />
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open menu"
+          className="grid h-10 w-10 shrink-0 place-items-center text-ink transition-colors hover:bg-surface-3"
         >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
+          <Menu className="h-5 w-5" aria-hidden />
+        </button>
 
-        <Link href="/" className="hidden shrink-0 sm:block">
+        <Link href="/" className="shrink-0" aria-label="Back to terminal">
           <Wordmark className="h-[18px]" />
         </Link>
 
@@ -100,6 +109,8 @@ export function AccountShell({
           </div>
         </div>
       </main>
+
+      <BottomTabs />
     </div>
   );
 }

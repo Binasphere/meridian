@@ -30,6 +30,8 @@ import {
   startServerWithdrawal,
 } from "@/lib/wallet";
 import { depositFromPhone, usesMpesaRail, withdrawToPhone } from "@/lib/mpesaRail";
+import { useDepositPhone } from "@/lib/prefs";
+import { useUi } from "@/lib/ui";
 
 // Neither form offers amounts. A menu of chips beside a "pay now" button is a
 // suggestion nobody asked for, and the one it makes loudest is always the
@@ -76,6 +78,8 @@ export function CashDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const account = useCurrentAccount();
+  const savedDepositPhone = useDepositPhone(account?.phone);
+  const openDepositNumber = useUi((s) => s.setDepositNumberOpen);
   const requestDeposit = useStore((s) => s.requestDeposit);
   const requestWithdrawal = useStore((s) => s.requestWithdrawal);
   const liveBalance = useStore((s) => BigInt(s.balances.LIVE));
@@ -112,6 +116,15 @@ export function CashDialog({
   // VIP accounts settle against the companion M-Pesa app: instant both ways,
   // no STK push out to PayHero and no queue for a withdrawal.
   const onMpesaRail = serverWalletActive() && usesMpesaRail(account?.liveTier);
+
+  // The number this movement is raised against. Withdrawals always go to the
+  // registered number. Deposits use the saved deposit number where the rail
+  // honours it: the local simulation does, but the PayHero route still pushes
+  // to `profiles.phone` only, so on real money the form shows that number
+  // rather than promising a prompt on a handset it will not reach.
+  const depositNumberHonoured = !serverWalletActive();
+  const payingPhone =
+    isDeposit && depositNumberHonoured ? savedDepositPhone : account?.phone;
 
   // Reset whenever the dialog is reopened, so a previous receipt never greets
   // the next transaction.
@@ -227,7 +240,7 @@ export function CashDialog({
 
     // --- Local simulation (Supabase unconfigured) --------------------------
     if (isDeposit) {
-      const { id, done } = requestDeposit(amountMinor, account.phone);
+      const { id, done } = requestDeposit(amountMinor, payingPhone ?? account.phone);
       setPendingId(id);
       const event = await done;
       setPendingId(null);
@@ -257,11 +270,11 @@ export function CashDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="sheet-overlay fixed inset-0 z-[60] bg-black/70 backdrop-blur-sm" />
+        <Dialog.Overlay className="sheet-overlay fixed inset-0 z-[60] bg-black/50 backdrop-blur-[2px]" />
         <Dialog.Content
           className={cn(
             "dialog-pop fixed left-1/2 top-1/2 z-[60] w-[calc(100vw-2rem)] max-w-[400px]",
-            "-translate-x-1/2 -translate-y-1/2 border border-line bg-surface-2 shadow-2xl",
+            "-translate-x-1/2 -translate-y-1/2 border border-line bg-surface-1 shadow-2xl",
             "focus:outline-none",
             // A centred box taller than the screen loses *both* ends, and the
             // top one silently: the first-deposit banner sits at the top of the
@@ -326,14 +339,24 @@ export function CashDialog({
                   <div className="flex items-center gap-2 border border-line bg-surface-1 px-3 py-2.5">
                     <Smartphone className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden />
                     <span className="tnum font-mono text-[15px] text-ink">
-                      {account ? formatPhoneMasked(account.phone) : "—"}
+                      {payingPhone ? formatPhoneMasked(payingPhone) : "—"}
                     </span>
-                    {/* One label whichever rail settles this. Which rail it is
-                        is an implementation detail of the account, and naming it
-                        on the payment form invites the question. */}
-                    <span className="ml-auto text-[10px] uppercase tracking-wide text-ink-faint">
-                      verified
-                    </span>
+                    {isDeposit && depositNumberHonoured ? (
+                      <button
+                        type="button"
+                        onClick={() => openDepositNumber(true)}
+                        className="ml-auto text-[11.5px] font-semibold text-accent hover:underline"
+                      >
+                        Change
+                      </button>
+                    ) : (
+                      /* One label whichever rail settles this. Which rail it
+                         is is an implementation detail of the account, and
+                         naming it on the payment form invites the question. */
+                      <span className="ml-auto text-[10px] uppercase tracking-wide text-ink-faint">
+                        verified
+                      </span>
+                    )}
                   </div>
                 </div>
 

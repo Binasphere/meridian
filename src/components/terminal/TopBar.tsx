@@ -1,110 +1,79 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowDownToLine, Menu } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { ArrowDownToLine, Check, ChevronDown, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 import type { AccountKind } from "@/lib/trading";
-import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
-import { LiveDot } from "@/components/ui/primitives";
+import { useStore, useStoreHydrated } from "@/lib/store";
+import { useUi } from "@/lib/ui";
 import { Wordmark } from "@/components/Wordmark";
 import { useAuthGate } from "@/components/auth/SignInGate";
-import { AccountPanel } from "./AccountPanel";
-import { CashDialog } from "./CashDialog";
 
 /**
  * The terminal's top bar.
  *
- * Three things and nothing else: which account is active, what the balance is,
- * and the way in and out. Everything else moved behind the account panel.
+ * Menu on the left, brand beside it; on the right, the account you are on with
+ * its balance, and the one money action. Everything else lives in the drawer.
  *
- * Signed out, the same bar stands, but every affordance that presumes an
- * account — the Live switch, Deposit, the account button — summons the
+ * Signed out, the same bar stands, but Deposit and the Live account summon the
  * sign-in gate instead of acting. The demo remains fully usable throughout.
  */
 export function TopBar() {
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [depositOpen, setDepositOpen] = useState(false);
-
-  const accountKind = useStore((s) => s.accountKind);
-  const balance = useStore(selectBalance);
-  const hydrated = useStoreHydrated();
+  const setDrawerOpen = useUi((s) => s.setDrawerOpen);
+  const setCash = useUi((s) => s.setCash);
   const signedIn = useAuth((s) => s.currentPhone) !== null;
   const showGate = useAuthGate((s) => s.show);
 
   return (
-    <>
-      <header className="relative z-30 flex h-14 shrink-0 items-center gap-4 border-b border-line bg-surface-1 px-3 sm:px-4">
-        <Wordmark className="h-[18px] shrink-0" />
+    <header className="relative z-30 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface-1 px-2 sm:gap-3 sm:px-3">
+      <button
+        onClick={() => setDrawerOpen(true)}
+        aria-label="Open menu"
+        className="grid h-10 w-10 shrink-0 place-items-center text-ink transition-colors hover:bg-surface-3"
+      >
+        <Menu className="h-5 w-5" aria-hidden />
+      </button>
 
-        <div className="hidden items-center gap-1.5 md:flex">
-          <LiveDot />
-          <span className="text-[11px] font-medium text-ink-secondary">Live</span>
-        </div>
+      <Wordmark className="h-[18px] shrink-0" />
 
-        <div className="ml-auto flex items-center gap-2 sm:gap-2.5">
-          <AccountSwitcher />
+      <div className="ml-auto flex items-center gap-2">
+        <AccountMenu />
 
-          <div className="hidden text-right sm:block">
-            <div className="text-[9.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-              {accountKind === "DEMO" ? "Demo balance" : "Live balance"}
-            </div>
-            <div className="tnum -mt-0.5 font-mono text-[15px] font-medium leading-tight text-ink">
-              {hydrated ? formatMoney(balance, { currency: "KSh" }) : "—"}
-            </div>
-          </div>
-
-          <DepositButton
-            onClick={() => (signedIn ? setDepositOpen(true) : showGate())}
-          />
-
-          {signedIn ? (
-            <button
-              onClick={() => setPanelOpen(true)}
-              aria-label="Open account panel"
-              className={cn(
-                "grid h-9 w-9 shrink-0 place-items-center border border-line bg-surface-3",
-                "text-ink transition-colors hover:bg-surface-4",
-              )}
-            >
-              {/* A menu glyph rather than the last two digits of the number:
-                  the button opens everything behind the account, and two digits
-                  read as a value to check rather than a door to open. */}
-              <Menu className="h-4 w-4" aria-hidden />
-            </button>
-          ) : (
-            <button
-              onClick={showGate}
-              className={cn(
-                "flex h-9 shrink-0 items-center border border-line bg-surface-3 px-3",
-                "text-[12.5px] font-medium text-ink transition-colors hover:bg-surface-4",
-              )}
-            >
-              Sign in
-            </button>
-          )}
-        </div>
-      </header>
-
-      <AccountPanel open={panelOpen} onOpenChange={setPanelOpen} />
-      <CashDialog
-        mode="deposit"
-        open={depositOpen}
-        onOpenChange={setDepositOpen}
-      />
-    </>
+        {signedIn ? (
+          <button
+            onClick={() => setCash("deposit")}
+            aria-label="Deposit"
+            className={cn(
+              "inline-flex h-10 shrink-0 items-center justify-center gap-1.5 bg-cash text-white",
+              "w-10 sm:w-auto sm:px-4",
+              "text-[13px] font-semibold transition-colors hover:bg-cash-hover active:scale-[0.97]",
+            )}
+          >
+            <ArrowDownToLine className="h-4 w-4" aria-hidden />
+            <span className="hidden sm:inline">Deposit</span>
+          </button>
+        ) : (
+          <button
+            onClick={showGate}
+            className="h-10 shrink-0 bg-ink px-4 text-[13px] font-semibold text-surface-1 transition-opacity hover:opacity-90"
+          >
+            Sign in
+          </button>
+        )}
+      </div>
+    </header>
   );
 }
 
 /**
- * Demo / Live switch.
+ * The balance chip, and the Demo / Live switch behind it.
  *
- * A two-state segmented control rather than a dropdown: which account you are
- * on changes what a mistake costs, so it should be readable at rest, not one
- * click away.
+ * Which account you are on changes what a mistake costs, so the chip names it
+ * at rest — DEMO or LIVE above the balance — and switching is one tap away.
  */
-function AccountSwitcher() {
+function AccountMenu() {
   const accountKind = useStore((s) => s.accountKind);
   const setAccountKind = useStore((s) => s.setAccountKind);
   const balances = useStore((s) => s.balances);
@@ -112,77 +81,78 @@ function AccountSwitcher() {
   const signedIn = useAuth((s) => s.currentPhone) !== null;
   const showGate = useAuthGate((s) => s.show);
 
-  const options: Array<{ kind: AccountKind; label: string }> = [
-    { kind: "DEMO", label: "Demo" },
-    { kind: "LIVE", label: "Live" },
+  const options: Array<{ kind: AccountKind; label: string; hint: string }> = [
+    { kind: "DEMO", label: "Demo account", hint: "Practice funds" },
+    { kind: "LIVE", label: "Live account", hint: "Real money" },
   ];
 
+  const amount = (kind: AccountKind) =>
+    hydrated ? formatMoney(BigInt(balances[kind]), { currency: "KSh" }) : "—";
+
   return (
-    <div
-      role="tablist"
-      aria-label="Account"
-      className="flex items-center gap-0.5 border border-line bg-surface-1 p-0.5"
-    >
-      {options.map(({ kind, label }) => {
-        const active = kind === accountKind;
-        return (
-          <button
-            key={kind}
-            role="tab"
-            aria-selected={active}
-            // The Live account is a signed-in thing; reaching for it while
-            // signed out asks for the account rather than silently refusing.
-            onClick={() =>
-              kind === "LIVE" && !signedIn ? showGate() : setAccountKind(kind)
-            }
-            title={
-              hydrated
-                ? `${label} · ${formatMoney(BigInt(balances[kind]), { currency: "KSh" })}`
-                : label
-            }
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger
+        className={cn(
+          "flex h-10 items-center gap-2 border border-line bg-surface-1 pl-2.5 pr-2 text-left",
+          "transition-colors hover:border-line-strong data-[state=open]:border-accent",
+        )}
+      >
+        <span className="min-w-0">
+          <span
             className={cn(
-              "flex h-8 items-center gap-1.5 px-3 text-[12.5px] font-medium transition-colors duration-150",
-              active
-                ? "bg-surface-4 text-ink shadow-[inset_0_1px_0_rgba(255,255,255,.07)]"
-                : "text-ink-muted hover:text-ink-secondary",
+              "flex items-center gap-1 text-[9.5px] font-semibold uppercase leading-none tracking-[0.1em]",
+              accountKind === "DEMO" ? "text-accent" : "text-up",
             )}
           >
-            {active ? (
-              <span
-                className={cn(
-                  "h-1.5 w-1.5 rounded-full",
-                  kind === "DEMO" ? "bg-accent" : "bg-up",
-                )}
-                aria-hidden
-              />
-            ) : null}
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+            {accountKind === "DEMO" ? "Demo" : "Live"}
+          </span>
+          <span className="tnum mt-1 block font-mono text-[13.5px] font-semibold leading-none text-ink">
+            {amount(accountKind)}
+          </span>
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-ink-muted" aria-hidden />
+      </DropdownMenu.Trigger>
 
-/**
- * Deposit.
- *
- * Green because it is the one affirmative money-in action in the chrome — and
- * it sits in the header, well away from the trading panel, so it cannot be
- * confused with the "up" direction on a contract.
- */
-function DepositButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-9 shrink-0 items-center gap-1.5 px-3 sm:px-3.5",
-        "bg-cash text-[13px] font-semibold text-white hover:bg-cash-hover",
-        "transition-colors duration-150 active:scale-[0.97]",
-      )}
-    >
-      <ArrowDownToLine className="h-3.5 w-3.5" aria-hidden />
-      <span className="hidden sm:inline">Deposit</span>
-    </button>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={6}
+          className="rise-in z-50 w-[248px] border border-line bg-surface-1 p-1 shadow-[0_12px_32px_-8px_rgba(8,12,24,0.28)]"
+        >
+          {options.map(({ kind, label, hint }) => {
+            const active = kind === accountKind;
+            return (
+              <DropdownMenu.Item
+                key={kind}
+                onSelect={() =>
+                  kind === "LIVE" && !signedIn ? showGate() : setAccountKind(kind)
+                }
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 px-3 py-2.5 outline-none",
+                  "data-[highlighted]:bg-surface-2",
+                  active && "bg-surface-2",
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-2 w-2 shrink-0",
+                    kind === "DEMO" ? "bg-accent" : "bg-up",
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium text-ink">{label}</span>
+                  <span className="block text-[11px] text-ink-faint">{hint}</span>
+                </span>
+                <span className="tnum font-mono text-[12px] text-ink-secondary">
+                  {kind === "LIVE" && !signedIn ? "Sign in" : amount(kind)}
+                </span>
+                {active ? <Check className="h-3.5 w-3.5 text-ink" aria-hidden /> : null}
+              </DropdownMenu.Item>
+            );
+          })}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }

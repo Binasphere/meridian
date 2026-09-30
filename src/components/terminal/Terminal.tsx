@@ -6,6 +6,7 @@ import { market } from "@/lib/market/engine";
 import { useAuth, useAuthHydrated } from "@/lib/auth";
 import { useOpenTrades, useStore } from "@/lib/store";
 import { useMounted } from "@/lib/hooks";
+import { usePrefs } from "@/lib/prefs";
 import { Panel } from "@/components/ui/primitives";
 import { SignInGate } from "@/components/auth/SignInGate";
 import { TopBar } from "./TopBar";
@@ -15,6 +16,8 @@ import { Watchlist } from "./Watchlist";
 import { Positions } from "./Positions";
 import { TradeTicket } from "./TradeTicket";
 import { MobileBar } from "./MobileBar";
+import { BottomTabs } from "./BottomTabs";
+import { Overlays } from "./Overlays";
 import { SettlementDriver } from "./SettlementDriver";
 import { TradeCountdown } from "./TradeCountdown";
 
@@ -43,6 +46,7 @@ export function Terminal() {
   const chartStyle = useStore((s) => s.chartStyle);
   const setChartStyle = useStore((s) => s.setChartStyle);
   const openTrades = useOpenTrades();
+  const theme = usePrefs((s) => s.theme);
 
   // Start the market as soon as the terminal mounts, so history is accumulating
   // before the chart asks for it.
@@ -75,17 +79,16 @@ export function Terminal() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-base">
       <TopBar />
+      <Overlays />
       <SignInGate />
       <SettlementDriver />
       <TradeCountdown />
 
-      {/* On a phone the chart takes a fixed slice of the viewport rather than
-          everything the trading bar does not want. It used to run to about 70%
-          of the screen, which pushed the controls into the bottom strip; at 52%
-          the two halves are closer to even and the bar below has room to
-          breathe. On `lg` it goes back to filling, because there the ticket and
-          the lists are beside it rather than under it. */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line max-lg:h-[52dvh] max-lg:flex-none lg:grid-cols-[236px_minmax(0,1fr)_300px]">
+      {/* The chart takes whatever the header, the trading bar and the tab bar
+          leave — on every phone height the controls stay pinned to the bottom
+          and the candles get the rest. On `lg` the ticket and the lists sit
+          beside it instead of under it. */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-line lg:grid-cols-[272px_minmax(0,1fr)_300px]">
         {/* --- Markets ------------------------------------------------------ */}
         <Panel
           flat
@@ -112,6 +115,7 @@ export function Terminal() {
                 style={chartStyle}
                 precision={spec.precision}
                 openTrades={openTrades}
+                theme={theme}
               />
             </div>
           </Panel>
@@ -135,6 +139,7 @@ export function Terminal() {
 
       {/* --- Phones --------------------------------------------------------- */}
       <MobileBar />
+      <BottomTabs />
     </div>
   );
 }

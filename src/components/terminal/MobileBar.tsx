@@ -1,16 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import {
-  ArrowDown,
-  ArrowUp,
-  ChartNoAxesColumn,
-  ListOrdered,
-  Minus,
-  Plus,
-  Timer,
-  Wallet,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, Plus, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatMoney, wholeToMinor } from "@/lib/format";
@@ -21,7 +11,7 @@ import {
   MIN_STAKE_MINOR,
   STAKE_STEP_MINOR,
 } from "@/lib/trading";
-import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
+import { selectBalance, useStore } from "@/lib/store";
 import { playPlace } from "@/lib/sound";
 
 /**
@@ -30,9 +20,8 @@ import { playPlace } from "@/lib/sound";
  * Phones are the majority of this market, so the small-screen layout is a
  * designed thing rather than a reflow of the desktop grid. The chart keeps the
  * screen, and the bar within thumb reach holds only what a contract is made of:
- * how much, and which way. Browsing markets moved onto the chart header, where
- * the instrument name is already the thing you would reach for; positions live
- * on the account pages, and the running contract announces itself.
+ * how much, and which way. Markets, positions, wallet and profile are the tab
+ * bar's job, directly beneath it.
  *
  * There is exactly one chart instance in the app — this bar and the desktop
  * rail arrange the *same* mounted chart rather than each rendering their own,
@@ -48,10 +37,6 @@ export function MobileBar() {
   const setStakeMinor = useStore((s) => s.setStakeMinor);
   const placeTrade = useStore((s) => s.placeTrade);
   const balance = useStore(selectBalance);
-  const accountKind = useStore((s) => s.accountKind);
-  // Held until localStorage has been read, so a signed-in balance never flashes
-  // through its signed-out value on reload.
-  const hydrated = useStoreHydrated();
 
   // The same three refusals the desktop ticket applies, so a stake accepted on
   // one screen size is accepted on the other.
@@ -79,60 +64,34 @@ export function MobileBar() {
   };
 
   return (
-    /* Fills whatever the chart left. Two groups, not two floating blocks: the
-       trading controls sit together at the top and the rail sits on the bottom
-       edge, so the space between them is margin bounded by content rather than
-       a hole at the end of the screen. `min-h-0` so a short viewport shrinks
-       this instead of overflowing the page. */
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-line bg-surface-1 lg:hidden">
-      {/* --- Commit ---------------------------------------------------------
-          Direction first, amount under it: the thumb rests at the bottom of a
-          phone, and the two full-width targets are what the hand reaches for
-          most. The stake is set once and re-used across contracts, so it sits
-          in the calmer position underneath. */}
-      <div className="grid grid-cols-2 gap-2 px-3 pb-2 pt-2.5">
-        <button
-          onClick={() => submit("UP")}
-          disabled={insufficient}
-          className="flex h-[52px] items-center justify-center gap-1.5 rounded-none border border-buy bg-buy text-[15px] font-semibold text-white transition-colors active:bg-buy-hover disabled:opacity-40"
-        >
-          <ArrowUp className="h-4 w-4" aria-hidden />
-          Buy
-        </button>
-        <button
-          onClick={() => submit("DOWN")}
-          disabled={insufficient}
-          className="flex h-[52px] items-center justify-center gap-1.5 rounded-none border border-sell bg-sell text-[15px] font-semibold text-white transition-colors active:bg-sell-hover disabled:opacity-40"
-        >
-          <ArrowDown className="h-4 w-4" aria-hidden />
-          Sell
-        </button>
-      </div>
-
+    /* Stake, then direction: the two commits sit at the bottom of the screen,
+       directly above the tab bar, where the thumb already rests. The balance
+       is in the header chip, so nothing else needs to live down here. */
+    <div className="shrink-0 border-t border-line bg-surface-1 lg:hidden">
       {/* --- Stake ---------------------------------------------------------- */}
-      <div className="px-3 pb-3">
+      <div className="px-3 pt-2.5">
         <div className="mb-1.5 flex items-baseline gap-3">
           <label
             htmlFor="mobile-stake"
-            className="text-[9.5px] font-medium uppercase tracking-[0.08em] text-ink-muted"
+            className="text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-muted"
           >
             Stake
           </label>
 
           {/* Expiry is fixed at ten seconds — stated as a fact, not a control
               you can press and have nothing happen. */}
-          <span className="tnum ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-ink-faint">
+          <span className="tnum ml-auto flex shrink-0 items-center gap-1 font-mono text-[11px] text-ink-muted">
             <Timer className="h-3 w-3" aria-hidden />
-            {FIXED_DURATION_SEC}s
+            {FIXED_DURATION_SEC}s expiry
           </span>
         </div>
 
         <div
           className={cn(
-            "flex items-stretch border bg-surface-2 transition-colors",
+            "flex h-11 items-stretch border bg-surface-1 transition-colors",
             wrong
-              ? "border-down/40"
-              : "border-line focus-within:border-line-strong",
+              ? "border-down/60"
+              : "border-line-strong focus-within:border-accent",
           )}
         >
           <button
@@ -158,7 +117,7 @@ export function MobileBar() {
               onChange={(event) => setStakeMinor(wholeToMinor(event.target.value))}
               // Already ≥16px, so the touch floor in globals.css would only shrink it.
               data-keep-size
-              className="tnum w-full bg-transparent py-2.5 text-center font-mono text-[17px] tracking-tight text-ink outline-none placeholder:text-ink-faint"
+              className="tnum w-full min-w-0 bg-transparent text-center font-mono text-[17px] font-medium tracking-tight text-ink outline-none placeholder:text-ink-faint"
               aria-describedby="mobile-stake-bounds"
               aria-invalid={wrong}
             />
@@ -174,80 +133,38 @@ export function MobileBar() {
           </button>
         </div>
 
-        {/* The bounds where the one-tap amounts used to be. Same reasoning as
-            the desktop ticket: the amount comes from the person typing it, and
-            what a phone needs here is to know the range before it is refused. */}
         <p
           id="mobile-stake-bounds"
-          className="tnum mt-1.5 text-center font-mono text-[10.5px] text-ink-faint"
+          className={cn(
+            "tnum mt-1 text-center font-mono text-[10.5px]",
+            wrong && stakeMinor > balance ? "text-down" : "text-ink-faint",
+          )}
         >
-          Min {formatMoney(MIN_STAKE_MINOR, { currency: "KSh", whole: true })} ·
-          Max {formatMoney(MAX_STAKE_MINOR, { currency: "KSh", whole: true })}
+          {wrong && stakeMinor > balance
+            ? "Stake exceeds your balance"
+            : `Min ${formatMoney(MIN_STAKE_MINOR, { currency: "KSh", whole: true })} · Max ${formatMoney(MAX_STAKE_MINOR, { currency: "KSh", whole: true })}`}
         </p>
       </div>
 
-      {/* --- Balance ---------------------------------------------------------
-          The top bar drops the balance below `sm` for want of room, so on a
-          phone the number you are staking against was nowhere on screen. It
-          belongs here: between the amount and the rail, sized to be read at a
-          glance and not to compete with the commits.
-
-          It also does the layout work. `flex-1` hands this block whatever the
-          chart and the controls did not take, and the content centres inside
-          it — so the leftover height becomes a margin around a real element
-          rather than a hole above the rail, on every viewport size. */}
-      <div className="grid flex-1 place-content-center px-3 py-2 text-center">
-        <div className="text-[9.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-          {accountKind === "DEMO" ? "Practice balance" : "Live balance"}
-        </div>
-        <div className="tnum mt-1 font-mono text-[22px] leading-none tracking-tight text-ink">
-          {hydrated ? formatMoney(balance, { currency: "KSh" }) : "—"}
-        </div>
+      {/* --- Commit --------------------------------------------------------- */}
+      <div className="grid grid-cols-2 gap-2 px-3 pb-2.5 pt-2">
+        <button
+          onClick={() => submit("UP")}
+          disabled={insufficient}
+          className="flex h-[52px] items-center justify-center gap-1.5 bg-buy text-[15px] font-semibold text-white transition-colors active:bg-buy-hover disabled:opacity-40"
+        >
+          <ArrowUp className="h-4 w-4" aria-hidden />
+          Buy
+        </button>
+        <button
+          onClick={() => submit("DOWN")}
+          disabled={insufficient}
+          className="flex h-[52px] items-center justify-center gap-1.5 bg-sell text-[15px] font-semibold text-white transition-colors active:bg-sell-hover disabled:opacity-40"
+        >
+          <ArrowDown className="h-4 w-4" aria-hidden />
+          Sell
+        </button>
       </div>
-
-      {/* --- Rail -----------------------------------------------------------
-          The three places a phone needs to reach that are not on this screen.
-          `mt-auto` puts it on the bottom edge whatever the viewport, which is
-          what turns the leftover height into spacing between two anchored
-          groups instead of a gap trailing off the end of the layout.
-
-          Deliberately quiet: hairline dividers, small caps, muted until
-          pressed. These are destinations you leave the terminal for, and they
-          must not compete with the two buttons that commit money. */}
-      <nav
-        className="mt-auto grid grid-cols-3 gap-px border-t border-line bg-line"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        aria-label="More"
-      >
-        <RailLink href="/positions" icon={ListOrdered} label="History" />
-        <RailLink href="/wallet" icon={Wallet} label="Wallet" />
-        <RailLink href="/performance" icon={ChartNoAxesColumn} label="Stats" />
-      </nav>
     </div>
-  );
-}
-
-function RailLink({
-  href,
-  icon: Icon,
-  label,
-}: {
-  href: string;
-  icon: typeof Wallet;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        "flex flex-col items-center justify-center gap-1 bg-surface-1 py-3",
-        "text-ink-muted transition-colors active:bg-surface-2 active:text-ink",
-      )}
-    >
-      <Icon className="h-[18px] w-[18px]" aria-hidden />
-      <span className="text-[10px] font-medium uppercase tracking-[0.08em]">
-        {label}
-      </span>
-    </Link>
   );
 }

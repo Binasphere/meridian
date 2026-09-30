@@ -102,12 +102,15 @@ export function PriceChart({
   style,
   precision,
   openTrades,
+  theme,
 }: {
   symbol: string;
   resolution: Resolution;
   style: ChartStyle;
   precision: number;
   openTrades: Trade[];
+  /** Colours are read from CSS at build, so a theme change rebuilds the chart. */
+  theme: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -143,11 +146,11 @@ export function PriceChart({
       grid: {
         // Recessive grid: present enough to read a value against, quiet enough
         // that the price line is what the eye lands on.
-        vertLines: { color: "rgba(255,255,255,0.035)" },
-        horzLines: { color: "rgba(255,255,255,0.035)" },
+        vertLines: { color: cssVar("--chart-grid", "rgba(255,255,255,0.035)") },
+        horzLines: { color: cssVar("--chart-grid", "rgba(255,255,255,0.035)") },
       },
       rightPriceScale: {
-        borderColor: "rgba(255,255,255,0.07)",
+        borderColor: cssVar("--chart-border", "rgba(255,255,255,0.07)"),
         // Tight margins. The autoscale fits the visible high–low into whatever
         // is left between them, so every percent given away here is a percent
         // shorter that every candle draws.
@@ -155,7 +158,7 @@ export function PriceChart({
         entireTextOnly: true,
       },
       timeScale: {
-        borderColor: "rgba(255,255,255,0.07)",
+        borderColor: cssVar("--chart-border", "rgba(255,255,255,0.07)"),
         timeVisible: true,
         // Sub-minute intervals need the seconds field; at 1m and above every
         // label would just read ":00".
@@ -254,7 +257,8 @@ export function PriceChart({
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, [style, precision, resolution]);
+    // `theme` is read through the CSS variables above, so a toggle rebuilds.
+  }, [style, precision, resolution, theme]);
 
   // Load history and stream updates.
   useEffect(() => {
@@ -364,7 +368,8 @@ export function PriceChart({
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [symbol, resolution, style]);
+    // `theme` rebuilds the series above, which then needs its data again.
+  }, [symbol, resolution, style, theme]);
 
   // Entry-price lines for live positions on this instrument. Reconciled against
   // the existing set rather than cleared and rebuilt, so a line does not blink
@@ -404,7 +409,7 @@ export function PriceChart({
         }),
       );
     }
-  }, [openTrades, symbol]);
+  }, [openTrades, symbol, theme]);
 
   return (
     <div className="relative h-full w-full">

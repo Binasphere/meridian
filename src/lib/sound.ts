@@ -12,12 +12,16 @@
  * Everything degrades to a silent no-op where Web Audio is unavailable.
  */
 
+import { soundEnabled } from "./prefs";
+
 let ctx: AudioContext | null = null;
 
 type WebkitWindow = Window & { webkitAudioContext?: typeof AudioContext };
 
 function context(): AudioContext | null {
   if (typeof window === "undefined") return null;
+  // The drawer's Sound switch: off means every cue is a no-op.
+  if (!soundEnabled()) return null;
   if (!ctx) {
     const Ctor = window.AudioContext ?? (window as WebkitWindow).webkitAudioContext;
     if (!Ctor) return null;
