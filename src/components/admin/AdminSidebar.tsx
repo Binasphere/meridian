@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   ArrowLeftRight,
   ArrowUpRight,
   Banknote,
@@ -42,6 +43,7 @@ export type AdminView =
   | "withdrawals"
   | "tickets"
   | "chats"
+  | "system"
   | "verifications"
   | "sessions"
   | "domains"
@@ -100,6 +102,13 @@ const NAV: readonly NavItem[] = [
     label: "Verification",
     icon: IdCard,
     description: "National ID and proof of address",
+    needs: "finance",
+  },
+  {
+    id: "system",
+    label: "System",
+    icon: Activity,
+    description: "Service health, logs and live tests",
     needs: "finance",
   },
   {

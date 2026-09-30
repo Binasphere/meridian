@@ -17,6 +17,7 @@ import { WithdrawalsView } from "./WithdrawalsView";
 import { TicketsView } from "./TicketsView";
 import { VerificationsView } from "./VerificationsView";
 import { ChatsView } from "./ChatsView";
+import { SystemView } from "./SystemView";
 import { useTickets } from "./useTickets";
 import { Button, ToastHost } from "./ui";
 import { useAdmins } from "./useAdmins";
@@ -59,6 +60,10 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
     title: "Support",
     description:
       "Customer tickets. Call the customer on their number, note what you did, then resolve.",
+  },
+  system: {
+    title: "System",
+    description: "Whether each outside service is answering, the recent log, and live tests.",
   },
   chats: {
     title: "Live chat",
@@ -388,6 +393,8 @@ function Console({
             <WithdrawalsView state={withdrawalsState} />
           ) : view === "tickets" ? (
             <TicketsView state={ticketsState} />
+          ) : view === "system" ? (
+            <SystemView onUnauthorised={handleUnauthorised} />
           ) : view === "chats" ? (
             <ChatsView onUnauthorised={handleUnauthorised} />
           ) : view === "verifications" ? (
