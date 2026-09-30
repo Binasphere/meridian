@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Loader2, Smartphone, User } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import googleIcon from "@/app/assets/google.svg";
 import { cn } from "@/lib/utils";
 import { MIN_PASSWORD_LENGTH, useAuth } from "@/lib/auth";
 import { Wordmark } from "@/components/Wordmark";
@@ -48,6 +51,16 @@ export function AuthScreen() {
     if (!result.ok) setError(result.reason);
   };
 
+  // Accounts here are keyed on the M-Pesa number — it is the login, and the
+  // number withdrawals are paid to. A Google sign-in carries no number, so it
+  // needs a "link your M-Pesa number" step and the Google provider enabled in
+  // Supabase before it can open an account. Until then it says so.
+  const continueWithGoogle = () => {
+    toast("Google sign-in is coming soon", {
+      description: "For now, continue with your M-Pesa number.",
+    });
+  };
+
   const switchTo = (next: Mode) => {
     setMode(next);
     setError(null);
@@ -56,64 +69,35 @@ export function AuthScreen() {
     setConfirm("");
   };
 
-  return (
-    <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-base px-4 py-10">
-      <div className="grid-noise pointer-events-none absolute inset-0 opacity-30" aria-hidden />
+  const label = "mb-1.5 block text-[12px] font-medium text-ink-secondary";
+  const field =
+    "flex items-stretch border border-line-strong bg-surface-1 transition-colors focus-within:border-cash";
 
-      <div className="relative w-full max-w-[380px]">
-        <div className="mb-7 flex flex-col items-center gap-3">
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-base px-4 py-10">
+      <div className="w-full max-w-[380px]">
+        <div className="mb-6 flex justify-center">
           <Wordmark className="h-6" />
-          <p className="text-center text-[13px] leading-relaxed text-ink-muted">
-            {mode === "register"
-              ? "Create an account with your M-Pesa number."
-              : "Sign in with your M-Pesa number."}
-          </p>
         </div>
 
-        <div className="panel p-5">
-          {/* --- Mode switch ------------------------------------------------ */}
-          <div
-            role="tablist"
-            className="mb-5 grid grid-cols-2 gap-0.5 border border-line bg-surface-1 p-0.5"
-          >
-            {(
-              [
-                ["register", "Create account"],
-                ["signin", "Sign in"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                role="tab"
-                type="button"
-                aria-selected={mode === value}
-                onClick={() => switchTo(value)}
-                className={cn(
-                  "h-9 text-[12.5px] font-medium transition-colors",
-                  mode === value
-                    ? "bg-surface-4 text-ink shadow-[inset_0_1px_0_rgba(255,255,255,.06)]"
-                    : "text-ink-muted hover:text-ink-secondary",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="border border-line bg-surface-1 p-6">
+          <h1 className="text-[22px] font-semibold tracking-tight text-ink">
+            {mode === "register" ? "Create account" : "Log in"}
+          </h1>
+          <p className="mt-1 text-[13px] text-ink-muted">
+            {mode === "register"
+              ? "Sign up with your M-Pesa number."
+              : "Welcome back. Log in with your M-Pesa number."}
+          </p>
 
-          <form onSubmit={submit} className="flex flex-col gap-4">
+          <form onSubmit={submit} className="mt-5 flex flex-col gap-4">
             {/* --- Username (register only) -------------------------------- */}
             {mode === "register" ? (
               <div>
-                <label
-                  htmlFor="username"
-                  className="mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted"
-                >
+                <label htmlFor="username" className={label}>
                   Username
                 </label>
-                <div className="flex items-stretch border border-line bg-surface-1 transition-colors focus-within:border-line-strong">
-                  <span className="flex items-center border-r border-line px-2.5 text-ink-muted">
-                    <User className="h-3.5 w-3.5" aria-hidden />
-                  </span>
+                <div className={field}>
                   <input
                     id="username"
                     type="text"
@@ -122,7 +106,7 @@ export function AuthScreen() {
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="e.g. akinyi_254"
-                    className="w-full bg-transparent px-3 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-faint"
+                    className="h-11 w-full bg-transparent px-3 text-[15px] text-ink outline-none placeholder:text-ink-faint"
                   />
                 </div>
               </div>
@@ -130,15 +114,11 @@ export function AuthScreen() {
 
             {/* --- Phone --------------------------------------------------- */}
             <div>
-              <label
-                htmlFor="phone"
-                className="mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted"
-              >
+              <label htmlFor="phone" className={label}>
                 M-Pesa number
               </label>
-              <div className="flex items-stretch border border-line bg-surface-1 transition-colors focus-within:border-line-strong">
-                <span className="flex items-center gap-1.5 border-r border-line px-2.5 font-mono text-[13px] text-ink-muted">
-                  <Smartphone className="h-3.5 w-3.5" aria-hidden />
+              <div className={field}>
+                <span className="flex items-center pl-3 pr-1 font-mono text-[14px] text-ink-muted">
                   +254
                 </span>
                 <input
@@ -150,20 +130,17 @@ export function AuthScreen() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="712 345 678"
-                  className="tnum w-full bg-transparent px-3 py-2.5 font-mono text-[15px] text-ink outline-none placeholder:text-ink-faint"
+                  className="tnum h-11 w-full bg-transparent px-2 font-mono text-[15px] text-ink outline-none placeholder:text-ink-faint"
                 />
               </div>
             </div>
 
             {/* --- Password ------------------------------------------------ */}
             <div>
-              <label
-                htmlFor="password"
-                className="mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted"
-              >
+              <label htmlFor="password" className={label}>
                 Password
               </label>
-              <div className="flex items-stretch border border-line bg-surface-1 transition-colors focus-within:border-line-strong">
+              <div className={field}>
                 <input
                   id="password"
                   type={reveal ? "text" : "password"}
@@ -177,19 +154,15 @@ export function AuthScreen() {
                       ? `At least ${MIN_PASSWORD_LENGTH} characters`
                       : "Your password"
                   }
-                  className="w-full bg-transparent px-3 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-faint"
+                  className="h-11 w-full bg-transparent px-3 text-[15px] text-ink outline-none placeholder:text-ink-faint"
                 />
                 <button
                   type="button"
                   onClick={() => setReveal((v) => !v)}
                   aria-label={reveal ? "Hide password" : "Show password"}
-                  className="grid w-10 place-items-center text-ink-muted transition-colors hover:text-ink"
+                  className="grid w-11 place-items-center text-ink-muted transition-colors hover:text-ink"
                 >
-                  {reveal ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  {reveal ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
@@ -197,28 +170,24 @@ export function AuthScreen() {
             {/* --- Confirm ------------------------------------------------- */}
             {mode === "register" ? (
               <div>
-                <label
-                  htmlFor="confirm"
-                  className="mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.09em] text-ink-muted"
-                >
+                <label htmlFor="confirm" className={label}>
                   Confirm password
                 </label>
-                <input
-                  id="confirm"
-                  type={reveal ? "text" : "password"}
-                  autoComplete="new-password"
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  className="w-full border border-line bg-surface-1 px-3 py-2.5 text-[15px] text-ink outline-none transition-colors focus:border-line-strong"
-                />
+                <div className={field}>
+                  <input
+                    id="confirm"
+                    type={reveal ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    className="h-11 w-full bg-transparent px-3 text-[15px] text-ink outline-none"
+                  />
+                </div>
               </div>
             ) : null}
 
             {error ? (
-              <div
-                role="alert"
-                className="border border-down/30 bg-down/10 px-3 py-2 text-[12.5px] text-down"
-              >
+              <div role="alert" className="text-[12.5px] text-down">
                 {error}
               </div>
             ) : null}
@@ -246,15 +215,42 @@ export function AuthScreen() {
               ) : mode === "register" ? (
                 "Create account"
               ) : (
-                "Sign in"
+                "Log in"
               )}
             </button>
           </form>
+
+          {/* --- Or ------------------------------------------------------- */}
+          <div className="my-5 flex items-center gap-3" aria-hidden>
+            <span className="h-px flex-1 bg-line" />
+            <span className="text-[11px] text-ink-faint">or</span>
+            <span className="h-px flex-1 bg-line" />
+          </div>
+
+          <button
+            type="button"
+            onClick={continueWithGoogle}
+            className="flex h-11 w-full items-center justify-center gap-2.5 border border-line-strong bg-surface-1 text-[14px] font-semibold text-ink transition-colors hover:bg-surface-3"
+          >
+            <Image src={googleIcon} alt="" width={18} height={18} aria-hidden />
+            Continue with Google
+          </button>
+
+          <p className="mt-5 text-center text-[13px] text-ink-muted">
+            {mode === "register" ? "Already have an account? " : "New here? "}
+            <button
+              type="button"
+              onClick={() => switchTo(mode === "register" ? "signin" : "register")}
+              className="font-semibold text-ink hover:underline"
+            >
+              {mode === "register" ? "Log in" : "Create an account"}
+            </button>
+          </p>
         </div>
 
         <p className="mt-5 text-center text-[11px] leading-relaxed text-ink-faint">
-          Secured with industry-standard encryption. By continuing you agree to
-          the Terms of Service and Privacy Policy.
+          By continuing you agree to the Terms of Service and Privacy Policy.
+          Trading carries a high risk of loss.
         </p>
       </div>
     </div>

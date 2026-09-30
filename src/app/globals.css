@@ -21,19 +21,21 @@
 
 @theme {
   /* --- Neutral ramp: the chrome ------------------------------------------ */
-  --color-base: #08090d;
-  --color-surface-1: #0e1116;
-  --color-surface-2: #141922;
-  --color-surface-3: #1b2230;
-  --color-surface-4: #232c3d;
+  /* Warm graphite rather than blue-black: the neutrals carry a trace of
+     yellow, so the page reads as paper in a dark room instead of a screen. */
+  --color-base: #171716;
+  --color-surface-1: #1e1e1d;
+  --color-surface-2: #1c1c1b;
+  --color-surface-3: #272725;
+  --color-surface-4: #2e2e2c;
 
-  --color-ink: #f2f5f9;
-  --color-ink-secondary: #9ba6b7;
-  --color-ink-muted: #6b7688;
-  --color-ink-faint: #4a5364;
+  --color-ink: #edece8;
+  --color-ink-secondary: #a5a49e;
+  --color-ink-muted: #78776f;
+  --color-ink-faint: #5d5c56;
 
-  --color-line: #ffffff12;
-  --color-line-strong: #ffffff1f;
+  --color-line: #2e2e2c;
+  --color-line-strong: #474743;
 
   /* --- Directional: the market -------------------------------------------
      One green and one red, used everywhere direction is shown: the BUY and
@@ -194,8 +196,8 @@
    drawer's switch away, and restores the original terminal palette exactly. */
 
 :root {
-  --chart-grid: rgba(255, 255, 255, 0.035);
-  --chart-border: rgba(255, 255, 255, 0.07);
+  --chart-grid: rgba(237, 236, 232, 0.035);
+  --chart-border: #2e2e2c;
 }
 
 :root[data-theme="light"] {

@@ -75,7 +75,7 @@ export function useApplyTheme() {
     root.dataset.theme = theme;
     root.style.colorScheme = theme;
     const meta = document.querySelector('meta[name="theme-color"]');
-    meta?.setAttribute("content", theme === "light" ? "#ffffff" : "#08090d");
+    meta?.setAttribute("content", theme === "light" ? "#ffffff" : "#171716");
   }, [theme]);
   return theme;
 }

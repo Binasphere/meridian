@@ -51,7 +51,7 @@ export function SignInGate() {
       <button
         onClick={hide}
         aria-label="Back to terminal"
-        className="absolute right-3 top-3 grid h-9 w-9 place-items-center border border-line bg-surface-2 text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink"
+        className="absolute right-3 top-3 grid h-10 w-10 place-items-center text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink"
       >
         <X className="h-4 w-4" />
       </button>

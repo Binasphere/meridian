@@ -18,6 +18,7 @@ import { TradeTicket } from "./TradeTicket";
 import { MobileBar } from "./MobileBar";
 import { BottomTabs } from "./BottomTabs";
 import { Overlays } from "./Overlays";
+import { Skyline } from "./Skyline";
 import { SettlementDriver } from "./SettlementDriver";
 import { TradeCountdown } from "./TradeCountdown";
 
@@ -108,7 +109,9 @@ export function Terminal() {
               chartStyle={chartStyle}
               onChartStyleChange={setChartStyle}
             />
-            <div className="min-h-0 flex-1">
+            <div className="relative min-h-0 flex-1">
+              {/* Behind the canvas, whose background is transparent. */}
+              <Skyline className="pointer-events-none absolute inset-x-0 bottom-0 h-[58%] w-full text-ink opacity-[0.06]" />
               <PriceChart
                 symbol={symbol}
                 resolution={resolution}
@@ -148,7 +151,6 @@ export function Terminal() {
 function Boot() {
   return (
     <div className="relative grid min-h-dvh place-items-center bg-base">
-      <div className="grid-noise absolute inset-0 opacity-25" aria-hidden />
     </div>
   );
 }
