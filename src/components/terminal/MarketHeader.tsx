@@ -53,7 +53,7 @@ export function MarketHeader({
   return (
     <div className="shrink-0 border-b border-line">
       {/* --- Market + price ------------------------------------------------ */}
-      <div className="relative flex h-14 items-center gap-3 px-3 sm:px-4">
+      <div className="relative flex h-12 items-center gap-3 px-3 sm:h-14 sm:px-4">
         <button
           onClick={() => setOpen(!open)}
           aria-label="Change market"
@@ -104,7 +104,7 @@ export function MarketHeader({
       </div>
 
       {/* --- Interval + style ------------------------------------------------ */}
-      <div className="flex h-10 items-center gap-1 border-t border-line px-2 sm:px-3">
+      <div className="flex h-9 items-center gap-1 border-t border-line px-2 sm:h-10 sm:px-3">
         <div role="tablist" aria-label="Candle interval" className="flex items-center gap-1">
           {RESOLUTION_OPTIONS.map((option) => {
             const active = option.value === resolution;
@@ -209,7 +209,7 @@ function MarketPicker({
       role="dialog"
       aria-label="Markets"
       className={cn(
-        "rise-in absolute left-3 top-[52px] z-40 flex flex-col sm:left-4",
+        "rise-in absolute left-3 top-[46px] z-40 flex flex-col sm:left-4 sm:top-[52px]",
         "h-[min(460px,62dvh)] w-[min(360px,calc(100vw-24px))]",
         "border border-line bg-surface-1 shadow-[0_12px_32px_-8px_rgba(8,12,24,0.28)]",
       )}

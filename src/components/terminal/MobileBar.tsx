@@ -11,7 +11,8 @@ import {
   MIN_STAKE_MINOR,
   STAKE_STEP_MINOR,
 } from "@/lib/trading";
-import { selectBalance, useStore } from "@/lib/store";
+import { selectBalance, useOpenTrades, useStore } from "@/lib/store";
+import { StakeChips } from "./StakeChips";
 import { playPlace } from "@/lib/sound";
 
 /**
@@ -36,6 +37,8 @@ export function MobileBar() {
   const stakeMinor = useStore((s) => BigInt(s.stakeMinor));
   const setStakeMinor = useStore((s) => s.setStakeMinor);
   const placeTrade = useStore((s) => s.placeTrade);
+  // One contract at a time: the commits rest while one is running.
+  const running = useOpenTrades().length > 0;
   const balance = useStore(selectBalance);
 
   // The same three refusals the desktop ticket applies, so a stake accepted on
@@ -133,14 +136,16 @@ export function MobileBar() {
           </button>
         </div>
 
+        <StakeChips value={stakeMinor} onPick={setStakeMinor} className="mt-2" />
+
         <p
           id="mobile-stake-bounds"
           className={cn(
             "tnum mt-1 text-center font-mono text-[10.5px]",
-            wrong && stakeMinor > balance ? "text-down" : "text-ink-faint",
+            wrong ? "text-down" : "sr-only",
           )}
         >
-          {wrong && stakeMinor > balance
+          {stakeMinor > balance
             ? "Stake exceeds your balance"
             : `Min ${formatMoney(MIN_STAKE_MINOR, { currency: "KSh", whole: true })} · Max ${formatMoney(MAX_STAKE_MINOR, { currency: "KSh", whole: true })}`}
         </p>
@@ -150,7 +155,7 @@ export function MobileBar() {
       <div className="grid grid-cols-2 gap-2 px-3 pb-2.5 pt-2">
         <button
           onClick={() => submit("UP")}
-          disabled={insufficient}
+          disabled={insufficient || running}
           className="flex h-[52px] items-center justify-center gap-1.5 bg-buy text-[15px] font-semibold text-white transition-colors active:bg-buy-hover disabled:opacity-40"
         >
           <ArrowUp className="h-4 w-4" aria-hidden />
@@ -158,7 +163,7 @@ export function MobileBar() {
         </button>
         <button
           onClick={() => submit("DOWN")}
-          disabled={insufficient}
+          disabled={insufficient || running}
           className="flex h-[52px] items-center justify-center gap-1.5 bg-sell text-[15px] font-semibold text-white transition-colors active:bg-sell-hover disabled:opacity-40"
         >
           <ArrowDown className="h-4 w-4" aria-hidden />

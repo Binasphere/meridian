@@ -11,7 +11,8 @@ import {
   MIN_STAKE_MINOR,
   STAKE_STEP_MINOR,
 } from "@/lib/trading";
-import { selectBalance, useStore } from "@/lib/store";
+import { selectBalance, useOpenTrades, useStore } from "@/lib/store";
+import { StakeChips } from "./StakeChips";
 import { playPlace } from "@/lib/sound";
 import { Button } from "@/components/ui/primitives";
 import { ActivityFeed } from "./ActivityFeed";
@@ -37,6 +38,8 @@ export function TradeTicket() {
   const stakeMinor = useStore((s) => BigInt(s.stakeMinor));
   const setStakeMinor = useStore((s) => s.setStakeMinor);
   const placeTrade = useStore((s) => s.placeTrade);
+  // One contract at a time: the commits rest while one is running.
+  const running = useOpenTrades().length > 0;
   const balance = useStore(selectBalance);
   const accountKind = useStore((s) => s.accountKind);
 
@@ -143,6 +146,8 @@ export function TradeTicket() {
             of one-tap amounts: a quick-stake chip is the interface suggesting a
             number, and on a product that takes money the amount should come
             from the person typing it and nowhere else. */}
+        <StakeChips value={stakeMinor} onPick={setStakeMinor} className="mt-2" />
+
         <p
           id="stake-bounds"
           className="tnum mt-2 font-mono text-[10.5px] text-ink-faint"
@@ -187,12 +192,12 @@ export function TradeTicket() {
       <div className="grid grid-cols-2 gap-2.5">
         <DirectionButton
           direction="UP"
-          disabled={blocked}
+          disabled={blocked || running}
           onClick={() => submit("UP")}
         />
         <DirectionButton
           direction="DOWN"
-          disabled={blocked}
+          disabled={blocked || running}
           onClick={() => submit("DOWN")}
         />
       </div>

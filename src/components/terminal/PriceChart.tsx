@@ -155,7 +155,9 @@ export function PriceChart({
         // Tight margins. The autoscale fits the visible high–low into whatever
         // is left between them, so every percent given away here is a percent
         // shorter that every candle draws.
-        scaleMargins: { top: 0.06, bottom: 0.06 },
+        // More room below than above: lifts the candles clear of the time
+        // axis and the zoom buttons in the bottom corner.
+        scaleMargins: { top: 0.04, bottom: 0.16 },
         entireTextOnly: true,
       },
       timeScale: {
