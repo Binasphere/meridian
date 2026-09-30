@@ -20,14 +20,14 @@ import { isWinning, type Trade } from "@/lib/trading";
  * price and the direction in one place for the length of the contract, then
  * shows the outcome and gets out of the way.
  *
- * It deliberately does *not* block the terminal: the panel sits at the bottom
- * of the screen and nothing behind it is disabled. A modal here would stop
- * someone opening a second contract for ten seconds, and a countdown that takes
- * the interface hostage is a worse offence than one that is easy to ignore.
+ * While it runs, the card sits at the top of the screen, under the header, and
+ * blocks nothing — a second contract can be placed straight away. When it
+ * settles, the result opens as a modal in the centre: the one moment the
+ * customer is certainly looking, given the whole screen. It closes itself.
  */
 
-/** How long the settled result stays up before the panel dismisses itself. */
-const RESULT_LINGER_MS = 3_200;
+/** How long the result modal stays up before it closes itself. */
+const RESULT_LINGER_MS = 4_500;
 
 export function TradeCountdown() {
   const focusTradeId = useStore((s) => s.focusTradeId);
@@ -49,8 +49,106 @@ export function TradeCountdown() {
 
   return (
     <AnimatePresence>
-      {trade ? <Panel key={trade.id} trade={trade} onDismiss={dismiss} /> : null}
+      {trade && !settled ? <Panel key={`run-${trade.id}`} trade={trade} onDismiss={dismiss} /> : null}
+      {trade && settled ? <ResultModal key={`end-${trade.id}`} trade={trade} onClose={dismiss} /> : null}
     </AnimatePresence>
+  );
+}
+
+/** The settled contract, centre stage. */
+function ResultModal({ trade, onClose }: { trade: Trade; onClose: () => void }) {
+  const won = trade.status === "WON";
+  const lost = trade.status === "LOST";
+  const pnl = trade.pnlMinor === null ? 0n : BigInt(trade.pnlMinor);
+  const title = won ? "You won" : lost ? "You lost" : trade.status === "TIE" ? "Tie" : "Voided";
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18 }}
+      onClick={onClose}
+      className="fixed inset-0 z-[70] grid place-items-center bg-black/50 px-4 backdrop-blur-[2px]"
+    >
+      <motion.div
+        role="alertdialog"
+        aria-live="assertive"
+        aria-label={title}
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        onClick={(event) => event.stopPropagation()}
+        className={cn(
+          "w-full max-w-[340px] border bg-surface-1 p-6 text-center shadow-2xl",
+          won ? "border-up/50" : lost ? "border-down/50" : "border-line-strong",
+        )}
+      >
+        <div className="mx-auto grid h-16 w-16 place-items-center">
+          {won ? (
+            <motion.span
+              initial={{ scale: 0.4, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 380, damping: 16 }}
+            >
+              <Image src={coinImage} alt="" width={60} height={60} className="h-[60px] w-[60px] object-contain" priority />
+            </motion.span>
+          ) : (
+            <span
+              className={cn(
+                "grid h-14 w-14 place-items-center rounded-full border-2",
+                lost ? "border-down text-down" : "border-line-strong text-ink-muted",
+              )}
+            >
+              {trade.direction === "UP" ? <ArrowUp className="h-6 w-6" /> : <ArrowDown className="h-6 w-6" />}
+            </span>
+          )}
+        </div>
+
+        <h2 className={cn("mt-3 text-[20px] font-semibold", won ? "text-up" : lost ? "text-down" : "text-ink")}>
+          {title}
+        </h2>
+        <div
+          className={cn(
+            "tnum mt-1 font-mono text-[30px] font-semibold leading-tight tracking-tight",
+            pnl > 0n ? "text-up" : pnl < 0n ? "text-down" : "text-ink",
+          )}
+        >
+          {formatMoney(pnl, { currency: "KSh", withSign: true })}
+        </div>
+
+        <dl className="tnum mt-4 divide-y divide-line border-y border-line font-mono text-[12.5px]">
+          <Fact label="Market" value={`${trade.direction === "UP" ? "Buy" : "Sell"} · ${trade.displayName}`} />
+          <Fact label="Stake" value={formatMoney(BigInt(trade.stakeMinor), { currency: "KSh" })} />
+          <Fact label="Entry" value={trade.openPrice.toFixed(trade.precision)} />
+          <Fact label="Close" value={trade.closePrice === null ? "—" : trade.closePrice.toFixed(trade.precision)} />
+        </dl>
+
+        <button
+          onClick={onClose}
+          autoFocus
+          className="mt-5 h-11 w-full bg-ink text-[14px] font-semibold text-surface-1 transition-opacity hover:opacity-90"
+        >
+          Continue
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2">
+      <dt className="font-sans text-ink-muted">{label}</dt>
+      <dd className="truncate text-ink">{value}</dd>
+    </div>
   );
 }
 
@@ -85,16 +183,14 @@ function Panel({ trade, onDismiss }: { trade: Trade; onDismiss: () => void }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
+      initial={{ opacity: 0, y: -16 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 16 }}
+      exit={{ opacity: 0, y: -16 }}
       transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "pointer-events-auto fixed inset-x-0 bottom-0 z-40 mx-auto mb-3 w-[calc(100%-1.5rem)] max-w-[420px]",
-        // Clear of the mobile bar's rail, which owns the very bottom edge
-        // everywhere the bar is shown — that is up to `lg`, not just `sm`. A
-        // large phone was covering the rail with this card.
-        "sm:mb-4 max-lg:bottom-[68px]",
+        // Just under the 56px header, over the chart's top edge — clear of the
+        // stake and the Buy/Sell buttons below.
+        "pointer-events-auto fixed inset-x-0 top-[64px] z-40 mx-auto w-[calc(100%-1.5rem)] max-w-[420px]",
       )}
       role="status"
       aria-live="polite"
