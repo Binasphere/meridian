@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { currentDomainLabel } from "./sites";
+import { currentBrandLabel, currentDomainLabel } from "./sites";
 
 /**
  * The domain the customer is on, once the browser can tell us.
@@ -21,5 +21,14 @@ export function useDomainLabel(): string | null {
     setLabel(currentDomainLabel());
   }, []);
 
+  return label;
+}
+
+/** The short brand ("venti"), on the same one-frame delay as the domain. */
+export function useBrandLabel(): string | null {
+  const [label, setLabel] = useState<string | null>(null);
+  useEffect(() => {
+    setLabel(currentBrandLabel());
+  }, []);
   return label;
 }

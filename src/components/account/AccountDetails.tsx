@@ -55,7 +55,6 @@ export function AccountDetails() {
           <div className="flex items-baseline justify-between gap-3 px-4 py-2.5">
             <dt className="text-[12.5px] text-ink-muted">Verification</dt>
             <dd className="flex items-baseline gap-3">
-              <span className="text-[13px] text-up">Tier 1</span>
               <button
                 onClick={() => openVerification(true)}
                 className="text-[12px] font-semibold text-accent hover:underline"
@@ -66,10 +65,6 @@ export function AccountDetails() {
           </div>
         </dl>
       </div>
-      <p className="mt-3 text-[12px] leading-relaxed text-ink-muted">
-        Withdrawals are always paid to your registered number. To change it,
-        raise a ticket on the Support page.
-      </p>
     </div>
   );
 }

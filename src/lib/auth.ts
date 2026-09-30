@@ -6,7 +6,12 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { hasSubtleCrypto, pbkdf2Sha256 } from "./pbkdf2";
 import { BACKEND_ORIGIN } from "./backend";
 import { supabase } from "./supabase/client";
-import { identityEmail, normalisePhone, validateRegistration } from "./phone";
+import {
+  identityEmail,
+  MIN_PASSWORD_LENGTH,
+  normalisePhone,
+  validateRegistration,
+} from "./phone";
 import { useStore } from "./store";
 import { refreshWallet } from "./wallet";
 import type { LiveTier } from "./trading";
@@ -213,6 +218,11 @@ interface AuthState {
   linkPhone: (phone: string, username: string) => Promise<AuthResult>;
   /** Saves (or, with null, clears) the deposit number. */
   setDepositPhone: (phone: string | null) => Promise<AuthResult>;
+  /**
+   * Signs in with the reset code support issued (a temporary password) and
+   * replaces it with a new password in the same step.
+   */
+  resetPassword: (phone: string, code: string, password: string) => Promise<AuthResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -396,6 +406,26 @@ export const useAuth = create<AuthState>()(
         const profile = await readProfile("");
         set({ linkPending: false });
         applyProfile(profile.phone || null, profile.phone ? profile : null);
+        return { ok: true };
+      },
+
+      resetPassword: async (phoneInput, code, password) => {
+        if (password.length < MIN_PASSWORD_LENGTH) {
+          return {
+            ok: false,
+            reason: `Use at least ${MIN_PASSWORD_LENGTH} characters`,
+          };
+        }
+        const db = supabase();
+        if (!db) return { ok: false, reason: "Password reset is unavailable" };
+
+        const signedIn = await get().signIn(phoneInput, code.trim());
+        if (!signedIn.ok) return { ok: false, reason: "Incorrect number or reset code" };
+
+        const { error } = await db.auth.updateUser({ password });
+        if (error) {
+          return { ok: false, reason: "Could not save the new password. Try again." };
+        }
         return { ok: true };
       },
 

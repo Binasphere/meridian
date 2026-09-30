@@ -103,7 +103,7 @@ export function NavDrawer() {
             {account ? (
               <div className="flex items-center gap-3 border-b border-line px-4 py-4">
                 <span
-                  className="grid h-10 w-10 shrink-0 place-items-center bg-ink text-[13px] font-semibold text-surface-1"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink text-[13px] font-semibold text-surface-1"
                   aria-hidden
                 >
                   {(account.username?.slice(0, 2) ?? account.phone.slice(-2)).toUpperCase()}
@@ -119,19 +119,15 @@ export function NavDrawer() {
               </div>
             ) : (
               <div className="border-b border-line p-4">
-                <p className="text-[12.5px] leading-relaxed text-ink-secondary">
-                  You are trading on the practice account. Sign in to deposit and
-                  trade live.
-                </p>
                 <button
                   onClick={() => {
                     close();
                     showGate();
                   }}
-                  className="mt-3 flex h-10 w-full items-center justify-center gap-2 bg-ink text-[13px] font-semibold text-surface-1 transition-opacity hover:opacity-90"
+                  className="flex h-10 w-full items-center justify-center gap-2 bg-ink text-[13px] font-semibold text-surface-1 transition-opacity hover:opacity-90"
                 >
                   <LogIn className="h-4 w-4" aria-hidden />
-                  Sign in or create account
+                  Sign in
                 </button>
               </div>
             )}
@@ -154,7 +150,7 @@ export function NavDrawer() {
                 value={depositPhone ? formatPhoneMasked(depositPhone) : undefined}
                 onClick={withAccount(() => setDepositNumberOpen(true))}
               />
-              <Row icon={History} label="Transaction history" href="/wallet" onNavigate={close} />
+              <Row icon={History} label="Transactions" href="/transactions" onNavigate={close} />
             </Group>
 
             {/* --- Trading ---------------------------------------------------- */}

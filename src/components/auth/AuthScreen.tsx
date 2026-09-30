@@ -150,7 +150,7 @@ export function AuthScreen() {
                 </label>
                 {mode === "signin" ? (
                   <Link
-                    href="/support?topic=PASSWORD"
+                    href="/forgot-password"
                     className="text-[12px] font-semibold text-ink hover:underline"
                   >
                     Forgot password?

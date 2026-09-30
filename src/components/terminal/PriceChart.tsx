@@ -13,6 +13,7 @@ import {
   type Time,
   type UTCTimestamp,
 } from "lightweight-charts";
+import { Minus, Plus } from "lucide-react";
 import { market, type Candle, type Resolution } from "@/lib/market/engine";
 import type { Trade } from "@/lib/trading";
 import type { ChartStyle } from "@/lib/store";
@@ -182,7 +183,9 @@ export function PriceChart({
          * step so a pinch-zoom-out cannot undo this either.
          */
         barSpacing: 32,
-        minBarSpacing: 18,
+        // Low enough that the zoom buttons (and a pinch) can widen the view;
+        // every reload starts back at 32.
+        minBarSpacing: 6,
         tickMarkFormatter: (time: Time, type: TickMarkType) =>
           tickMarkLabel(time, type),
       },
@@ -411,9 +414,35 @@ export function PriceChart({
     }
   }, [openTrades, symbol, theme]);
 
+  /** Wider or narrower bars, keeping the live edge in view. */
+  const zoom = (factor: number) => {
+    const timeScale = chartRef.current?.timeScale();
+    if (!timeScale) return;
+    const current = timeScale.options().barSpacing;
+    const next = Math.min(80, Math.max(6, current * factor));
+    timeScale.applyOptions({ barSpacing: next });
+    timeScale.scrollToRealTime();
+  };
+
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="absolute inset-0" />
+      <div className="absolute bottom-9 left-2 z-10 flex flex-col border border-line bg-surface-1/90 backdrop-blur-sm">
+        <button
+          onClick={() => zoom(1.35)}
+          aria-label="Zoom in"
+          className="grid h-8 w-8 place-items-center text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+        </button>
+        <button
+          onClick={() => zoom(1 / 1.35)}
+          aria-label="Zoom out"
+          className="grid h-8 w-8 place-items-center border-t border-line text-ink-secondary transition-colors hover:bg-surface-3 hover:text-ink"
+        >
+          <Minus className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
     </div>
   );
 }

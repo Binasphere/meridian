@@ -135,3 +135,16 @@ export function currentDomainLabel(): string | null {
   // literal host they are on is more useful than a fabricated product name.
   return host || null;
 }
+
+/**
+ * The short brand for the header: the site's id on a known domain ("venti"),
+ * else the host's first label without its TLD ("example" from example.com).
+ */
+export function currentBrandLabel(): string | null {
+  if (typeof window === "undefined") return null;
+  const here = canonical(window.location.origin);
+  const known = SITES.find((site) => canonical(site.origin) === here);
+  if (known) return known.id;
+  const host = window.location.hostname.replace(/^www\./i, "");
+  return host.split(".")[0] || null;
+}

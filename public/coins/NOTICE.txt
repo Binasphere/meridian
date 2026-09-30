@@ -1,0 +1,2 @@
+Coin logos from @web3icons/core 4.0.57 (MIT License, https://github.com/0xa3k5/web3icons).
+Trademarks belong to their respective projects.

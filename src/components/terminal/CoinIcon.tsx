@@ -1,44 +1,20 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Instrument marks.
+ * Instrument marks: each coin's own logo, clipped round, with the quote
+ * currency's flag tucked under its bottom-right edge — base first, quote
+ * second, the way a pair is read.
  *
- * Drawn locally rather than fetched: a logo CDN is one more thing to fail on a
- * slow connection, and a market list with holes in it reads as broken. Each coin
- * is its brand colour with its customary glyph, and every pair carries the
- * quote currency's flag tucked under its bottom-right edge — the way a pair is
- * read, base first and quote second.
- *
+ * The logos ship with the app (`public/coins`, from web3icons, MIT) rather
+ * than from a CDN, so a slow connection never leaves the list with holes.
  * Round, where the rest of the product is square: these are the coins' own
- * marks and flags, which are content, not chrome.
+ * marks, which are content, not chrome.
  */
-const COINS: Record<string, { bg: string; fg?: string; glyph: string }> = {
-  BTC: { bg: "#F7931A", glyph: "₿" },
-  ETH: { bg: "#627EEA", glyph: "Ξ" },
-  BNB: { bg: "#F3BA2F", fg: "#1E2026", glyph: "B" },
-  SOL: { bg: "#9945FF", glyph: "S" },
-  XRP: { bg: "#23292F", glyph: "X" },
-  ADA: { bg: "#0033AD", glyph: "₳" },
-  AVAX: { bg: "#E84142", glyph: "A" },
-  DOT: { bg: "#E6007A", glyph: "●" },
-  NEAR: { bg: "#111111", glyph: "N" },
-  ATOM: { bg: "#2E3148", glyph: "⚛" },
-  SUI: { bg: "#4DA2FF", glyph: "S" },
-  TRX: { bg: "#FF060A", glyph: "T" },
-  XLM: { bg: "#14161B", glyph: "✦" },
-  LTC: { bg: "#345D9D", glyph: "Ł" },
-  BCH: { bg: "#0AC18E", glyph: "₿" },
-  FIL: { bg: "#0090FF", glyph: "F" },
-  LINK: { bg: "#2A5ADA", glyph: "⬡" },
-  UNI: { bg: "#FF007A", glyph: "U" },
-  AAVE: { bg: "#B6509E", glyph: "A" },
-  INJ: { bg: "#0082FA", glyph: "I" },
-  ARB: { bg: "#28A0F0", glyph: "A" },
-  OP: { bg: "#FF0420", glyph: "OP" },
-  DOGE: { bg: "#C2A633", glyph: "Ð" },
-  SHIB: { bg: "#FFA409", glyph: "S" },
-  PEPE: { bg: "#3D8130", glyph: "P" },
-};
+const LOGOS = new Set([
+  "BTC", "ETH", "BNB", "SOL", "XRP", "ADA", "AVAX", "DOT", "NEAR", "ATOM",
+  "SUI", "TRX", "XLM", "LTC", "BCH", "FIL", "LINK", "UNI", "AAVE", "INJ",
+  "ARB", "OP", "DOGE", "SHIB", "PEPE",
+]);
 
 export function CoinIcon({
   short,
@@ -52,7 +28,6 @@ export function CoinIcon({
   flag?: boolean;
   className?: string;
 }) {
-  const coin = COINS[short] ?? { bg: "#5d6677", glyph: short.slice(0, 1) };
   const flagSize = Math.round(size * 0.52);
 
   return (
@@ -61,16 +36,24 @@ export function CoinIcon({
       style={{ width: size, height: size }}
       aria-hidden
     >
-      <span
-        className="grid h-full w-full place-items-center rounded-full font-semibold leading-none"
-        style={{
-          background: coin.bg,
-          color: coin.fg ?? "#ffffff",
-          fontSize: Math.round(size * (coin.glyph.length > 1 ? 0.36 : 0.5)),
-        }}
-      >
-        {coin.glyph}
-      </span>
+      {LOGOS.has(short) ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/coins/${short.toLowerCase()}.svg`}
+          alt=""
+          width={size}
+          height={size}
+          loading="lazy"
+          className="h-full w-full rounded-full ring-1 ring-line"
+        />
+      ) : (
+        <span
+          className="grid h-full w-full place-items-center rounded-full bg-ink-muted font-semibold text-white"
+          style={{ fontSize: Math.round(size * 0.45) }}
+        >
+          {short.slice(0, 1)}
+        </span>
+      )}
       {flag ? (
         <UsFlag
           size={flagSize}
@@ -98,6 +81,27 @@ export function UsFlag({ size = 14, className }: { size?: number; className?: st
         <rect key={i} y={(i * 20) / 13} width="20" height={20 / 13} fill="#B22234" />
       ))}
       <rect width="10" height={(20 / 13) * 7} fill="#3C3B6E" />
+    </svg>
+  );
+}
+
+/** A round Kenyan flag — the account currency's mark beside every balance. */
+export function KenyaFlag({ size = 20, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      width={size}
+      height={size}
+      className={cn("shrink-0 overflow-hidden rounded-full", className)}
+      aria-hidden
+    >
+      <rect width="20" height="20" fill="#ffffff" />
+      <rect width="20" height="6" fill="#000000" />
+      <rect y="7" width="20" height="6" fill="#bb0000" />
+      <rect y="14" width="20" height="6" fill="#006600" />
+      {/* The Maasai shield, reduced to what survives at 20px. */}
+      <ellipse cx="10" cy="10" rx="2.6" ry="5.2" fill="#bb0000" stroke="#000000" strokeWidth="0.8" />
+      <ellipse cx="10" cy="10" rx="0.9" ry="2.4" fill="#000000" />
     </svg>
   );
 }

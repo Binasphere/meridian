@@ -8,10 +8,7 @@ export const metadata: Metadata = { title: "Wallet", robots: NO_INDEX };
 
 export default function Page() {
   return (
-    <AccountShell
-      title="Wallet"
-      description="Your balances, moving money in and out, and the full statement."
-    >
+    <AccountShell title="Wallet">
       <WalletPage />
     </AccountShell>
   );

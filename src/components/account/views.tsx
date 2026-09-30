@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   ArrowDownToLine,
+  ChevronRight,
   ArrowUpFromLine,
   Download,
   History,
@@ -18,6 +20,7 @@ import { Empty } from "@/components/ui/primitives";
 import { Positions } from "@/components/terminal/Positions";
 import { CashDialog, CashRow } from "@/components/terminal/CashDialog";
 import { Column, Columns, Section } from "./AccountShell";
+import { KenyaFlag } from "@/components/terminal/CoinIcon";
 
 /** Opens the deposit/withdraw dialog from anywhere on these pages. */
 function useCashDialog() {
@@ -45,103 +48,63 @@ function useCashDialog() {
  */
 export function WalletPage() {
   const cash = useCashDialog();
+  const live = useStore((s) => BigInt(s.balances.LIVE));
 
   return (
-    <Columns count={3}>
-      <Column>
-        <Section title="Balances" description="Only Live holds real funds.">
-          <BalancesBlock onCash={cash.open} />
-        </Section>
-      </Column>
+    <div className="max-w-[440px] border border-line bg-surface-1 p-5">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-muted">
+        <KenyaFlag size={18} />
+        Live balance
+      </div>
+      <div className="tnum mt-3 font-mono text-[32px] font-semibold leading-none tracking-tight text-ink">
+        {formatMoney(live, { currency: "KSh" })}
+      </div>
 
-      <Column>
-        <Section
-          title="Deposits & withdrawals"
-          description="Money moves to and from your registered number."
-          fill
+      <div className="mt-5 grid grid-cols-2 gap-2">
+        <button
+          onClick={() => cash.open("deposit")}
+          className="flex h-11 items-center justify-center gap-1.5 bg-cash text-[14px] font-semibold text-white transition-colors hover:bg-cash-hover"
         >
-          <MovementsBlock onCash={cash.open} />
-        </Section>
-      </Column>
+          <ArrowDownToLine className="h-4 w-4" aria-hidden />
+          Deposit
+        </button>
+        <button
+          onClick={() => cash.open("withdraw")}
+          className="flex h-11 items-center justify-center gap-1.5 border border-line-strong text-[14px] font-semibold text-ink transition-colors hover:bg-surface-3"
+        >
+          <ArrowUpFromLine className="h-4 w-4" aria-hidden />
+          Withdraw
+        </button>
+      </div>
 
-      {/* At lg there are two columns, so the statement takes a full-width row
-          beneath them. At xl it becomes the third column. */}
-      <Column className="lg:col-span-2 xl:col-span-1">
-        <StatementSection />
-      </Column>
+      <Link
+        href="/transactions"
+        className="mt-4 flex items-center justify-between border-t border-line pt-3 text-[13px] font-medium text-ink-secondary hover:text-ink"
+      >
+        Transactions
+        <ChevronRight className="h-4 w-4" aria-hidden />
+      </Link>
 
       {cash.element}
-    </Columns>
+    </div>
   );
 }
 
-function BalancesBlock({
-  onCash,
-}: {
-  onCash: (mode: "deposit" | "withdraw") => void;
-}) {
-  const balances = useStore((s) => s.balances);
-  const accountKind = useStore((s) => s.accountKind);
-  const setAccountKind = useStore((s) => s.setAccountKind);
-
+/** Every deposit, withdrawal and contract, newest first. */
+export function TransactionsPage() {
+  const cash = useCashDialog();
   return (
-    <div className="grid divide-y divide-line sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-      {(["DEMO", "LIVE"] as const).map((kind) => (
-        <div key={kind} className="p-4">
-          <div className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                kind === "DEMO" ? "bg-accent" : "bg-up",
-              )}
-              aria-hidden
-            />
-            <span className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-ink-muted">
-              {kind === "DEMO" ? "Demo" : "Live"}
-            </span>
-            {kind === accountKind ? (
-              <span className="ml-auto text-[9.5px] uppercase tracking-wide text-ink-faint">
-                active
-              </span>
-            ) : (
-              <button
-                onClick={() => setAccountKind(kind)}
-                className="ml-auto text-[11px] text-accent hover:underline"
-              >
-                Switch
-              </button>
-            )}
-          </div>
-
-          <div className="tnum mt-2 font-mono text-[26px] leading-none text-ink">
-            {formatMoney(BigInt(balances[kind]), { currency: "KSh" })}
-          </div>
-
-          {kind === "LIVE" ? (
-            <div className="mt-3.5 flex flex-wrap gap-2">
-              <button
-                onClick={() => onCash("deposit")}
-                className="flex h-9 items-center gap-1.5 bg-cash px-3.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-cash-hover"
-              >
-                <ArrowDownToLine className="h-3.5 w-3.5" aria-hidden />
-                Deposit
-              </button>
-              <button
-                onClick={() => onCash("withdraw")}
-                className="flex h-9 items-center gap-1.5 border border-line-strong bg-surface-3 px-3.5 text-[12.5px] font-medium text-ink transition-colors hover:bg-surface-4"
-              >
-                <ArrowUpFromLine className="h-3.5 w-3.5" aria-hidden />
-                Withdraw
-              </button>
-            </div>
-          ) : (
-            <p className="mt-3 text-[11.5px] leading-relaxed text-ink-muted">
-              Practice funds. Reset any time from Settings.
-            </p>
-          )}
-        </div>
-      ))}
-    </div>
+    <Columns count={2}>
+      <Column>
+        <Section title="Deposits & withdrawals" fill>
+          <MovementsBlock onCash={cash.open} />
+        </Section>
+      </Column>
+      <Column>
+        <StatementSection />
+      </Column>
+      {cash.element}
+    </Columns>
   );
 }
 

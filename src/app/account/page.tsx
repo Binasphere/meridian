@@ -11,7 +11,6 @@ export default function Page() {
   return (
     <AccountShell
       title="Account"
-      description="Your account details."
     >
       <AccountDetails />
     </AccountShell>

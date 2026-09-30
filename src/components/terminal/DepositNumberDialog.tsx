@@ -5,7 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Smartphone, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatPhoneMasked, useAuth, useCurrentAccount } from "@/lib/auth";
+import { useAuth, useCurrentAccount } from "@/lib/auth";
 import { formatPhone, normalisePhone } from "@/lib/phone";
 import { depositPhoneOf } from "@/lib/prefs";
 import { Spinner } from "@/components/ui/Spinner";
@@ -97,9 +97,7 @@ export function DepositNumberDialog() {
             }}
           >
             <Dialog.Description className="text-[12.5px] leading-relaxed text-ink-secondary">
-              M-Pesa deposit prompts are sent to this number. It can be any
-              Safaricom or Airtel line — the same number can fund more than one
-              account.
+              Deposit prompts go to this number.
             </Dialog.Description>
 
             <div>
@@ -133,10 +131,7 @@ export function DepositNumberDialog() {
                   {error ?? "Enter a Safaricom or Airtel number, e.g. 0712 345 678."}
                 </p>
               ) : (
-                <p className="mt-1.5 text-[11.5px] text-ink-faint">
-                  Withdrawals are always paid to your registered number
-                  {account ? ` ${formatPhoneMasked(account.phone)}` : ""}.
-                </p>
+                null
               )}
             </div>
 

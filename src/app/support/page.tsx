@@ -13,7 +13,6 @@ export default function Page() {
   return (
     <AccountShell
       title="Support"
-      description="Tell us what happened and we will get back to you."
       publicPage
     >
       <SupportPage />

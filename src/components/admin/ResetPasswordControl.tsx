@@ -30,7 +30,7 @@ export function ResetPasswordControl({ userId, name }: { userId: string; name: s
     setConfirming(false);
 
     if (!response?.ok || !body.password) {
-      notify({ tone: "error", title: "Could not reset the password", body: body.error });
+      notify({ tone: "error", title: "Could not issue a reset code", body: body.error });
       return;
     }
     setPassword(body.password);
@@ -39,14 +39,14 @@ export function ResetPasswordControl({ userId, name }: { userId: string; name: s
   if (password) {
     return (
       <div className="flex items-center gap-2 border border-adm-accent-line bg-adm-accent-tint px-2 py-1 text-[11.5px] text-adm-accent-deep">
-        Temporary password
+        Reset code
         <span className="tnum select-all font-mono font-semibold">{password}</span>
         <button
           onClick={() => {
             void navigator.clipboard?.writeText(password);
-            notify({ tone: "success", title: "Copied", body: `Read it to ${name}.` });
+            notify({ tone: "success", title: "Copied", body: `Read it to ${name}; they enter it at /reset-password.` });
           }}
-          aria-label="Copy password"
+          aria-label="Copy reset code"
           className="text-adm-accent-deep/70 hover:text-adm-accent-deep"
         >
           <Copy size={12} />
@@ -71,7 +71,7 @@ export function ResetPasswordControl({ userId, name }: { userId: string; name: s
       )}
     >
       <KeyRound size={12} className={confirming ? "" : "text-adm-ink-4"} />
-      {busy ? "Resetting…" : confirming ? "Confirm reset" : "Reset password"}
+      {busy ? "Resetting…" : confirming ? "Confirm reset" : "Issue reset code"}
     </button>
   );
 }

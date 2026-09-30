@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Banknote,
   Globe,
+  IdCard,
   LayoutGrid,
   LifeBuoy,
   LogOut,
@@ -39,6 +40,7 @@ export type AdminView =
   | "users"
   | "withdrawals"
   | "tickets"
+  | "verifications"
   | "sessions"
   | "domains"
   | "admins";
@@ -82,6 +84,13 @@ const NAV: readonly NavItem[] = [
     label: "Support",
     icon: LifeBuoy,
     description: "Tickets from customers, and password resets",
+    needs: "finance",
+  },
+  {
+    id: "verifications",
+    label: "Verification",
+    icon: IdCard,
+    description: "National ID and proof of address",
     needs: "finance",
   },
   {

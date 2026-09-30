@@ -10,7 +10,6 @@ export default function Page() {
   return (
     <AccountShell
       title="Positions"
-      description="Contracts running now, and every one that has settled."
     >
       <PositionsPage />
     </AccountShell>

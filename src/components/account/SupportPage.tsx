@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, ChevronRight, Inbox } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Check, CheckCircle2, ChevronDown, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatRelative } from "@/lib/format";
@@ -17,33 +18,8 @@ import { Empty } from "@/components/ui/primitives";
 import { Spinner } from "@/components/ui/Spinner";
 import { Column, Columns, Section } from "./AccountShell";
 
-const FAQS = [
-  {
-    q: "How is a contract decided?",
-    a: "At expiry the price at that exact instant is compared with your entry price. Buy wins if it closed above, Sell if it closed below. A close exactly at your entry returns your stake.",
-  },
-  {
-    q: "How long do deposits and withdrawals take?",
-    a: "The M-Pesa prompt arrives on your deposit number within seconds and the balance updates once you enter your PIN. Withdrawals are reviewed and paid to your registered number, usually within a few hours.",
-  },
-  {
-    q: "Can I deposit from a different number?",
-    a: "Yes. Open the menu → Deposit number and save any Safaricom or Airtel line. Withdrawals always go to your registered number.",
-  },
-  {
-    q: "I forgot my password.",
-    a: "Raise a ticket with the topic “Forgot password”. We call your registered number to confirm it is you, then issue a temporary password.",
-  },
-];
-
-const PLACEHOLDER: Record<TicketCategory, string> = {
-  DEPOSIT: "e.g. Deposit of KSh 1,000 not showing",
-  WITHDRAWAL: "e.g. Withdrawal still pending",
-  TRADING: "e.g. Question about a contract result",
-  ACCOUNT: "e.g. Verify my account",
-  PASSWORD: "I can't sign in",
-  OTHER: "What can we help with?",
-};
+const labelOf = (value: TicketCategory) =>
+  TICKET_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 
 export function SupportPage() {
   const account = useCurrentAccount();
@@ -61,7 +37,7 @@ export function SupportPage() {
   return (
     <Columns count={2}>
       <Column>
-        <Section title="Raise a ticket" description="We reply by phone or SMS, usually within a few hours.">
+        <Section title="New ticket">
           <TicketForm
             phoneLabel={account?.phone ? formatPhoneMasked(account.phone) : null}
             onSent={load}
@@ -69,26 +45,22 @@ export function SupportPage() {
         </Section>
       </Column>
 
-      <Column>
-        {signedIn ? (
+      {signedIn ? (
+        <Column>
           <Section title="Your tickets" fill>
             {tickets === null ? (
               <div className="grid place-items-center py-10">
                 <Spinner size={28} label="Loading tickets" />
               </div>
             ) : tickets.length === 0 ? (
-              <Empty
-                icon={<Inbox className="h-5 w-5" />}
-                title="No tickets yet"
-                hint="Anything you raise shows up here with its status."
-              />
+              <Empty icon={<Inbox className="h-5 w-5" />} title="No tickets yet" />
             ) : (
               <ul className="divide-y divide-line">
                 {tickets.map((ticket) => (
                   <li key={ticket.id} className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-ink">
-                        {ticket.subject}
+                        {labelOf(ticket.category)}
                       </span>
                       <span
                         className={cn(
@@ -101,12 +73,14 @@ export function SupportPage() {
                         {ticket.status === "OPEN" ? "Open" : "Resolved"}
                       </span>
                     </div>
-                    <div className="mt-0.5 text-[11.5px] text-ink-faint">
-                      {TICKET_CATEGORIES.find((c) => c.value === ticket.category)?.label} ·{" "}
+                    <p className="mt-0.5 line-clamp-2 text-[12.5px] text-ink-secondary">
+                      {ticket.message}
+                    </p>
+                    <div className="mt-1 text-[11px] text-ink-faint">
                       {formatRelative(new Date(ticket.createdAt).getTime())}
                     </div>
                     {ticket.adminNote ? (
-                      <p className="mt-2 border-l-2 border-line-strong pl-3 text-[12.5px] leading-relaxed text-ink-secondary">
+                      <p className="mt-2 border-l-2 border-cash pl-3 text-[12.5px] text-ink">
                         {ticket.adminNote}
                       </p>
                     ) : null}
@@ -115,29 +89,8 @@ export function SupportPage() {
               </ul>
             )}
           </Section>
-        ) : null}
-
-        <Section title="Common questions">
-          <div className="divide-y divide-line">
-            {FAQS.map((faq) => (
-              <details key={faq.q} className="group px-4 py-3.5">
-                <summary className="cursor-pointer list-none text-[13.5px] font-medium text-ink marker:hidden">
-                  <span className="flex items-start gap-2">
-                    <ChevronRight
-                      className="mt-0.5 h-4 w-4 shrink-0 text-ink-faint transition-transform group-open:rotate-90"
-                      aria-hidden
-                    />
-                    {faq.q}
-                  </span>
-                </summary>
-                <p className="mt-2 pl-6 text-[12.5px] leading-relaxed text-ink-secondary">
-                  {faq.a}
-                </p>
-              </details>
-            ))}
-          </div>
-        </Section>
-      </Column>
+        </Column>
+      ) : null}
     </Columns>
   );
 }
@@ -151,19 +104,17 @@ function TicketForm({
   onSent: () => void;
 }) {
   const [category, setCategory] = useState<TicketCategory>("DEPOSIT");
-  const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  // `/support?topic=PASSWORD` — where "Forgot password?" lands.
+  // `/support?topic=…` preselects the topic.
   useEffect(() => {
     const topic = new URLSearchParams(window.location.search).get("topic");
     if (topic && TICKET_CATEGORIES.some((c) => c.value === topic)) {
       setCategory(topic as TicketCategory);
-      if (topic === "PASSWORD") setSubject("I can't sign in");
     }
   }, []);
 
@@ -173,19 +124,16 @@ function TicketForm({
     setBusy(true);
     const result = await raiseTicket({
       category,
-      subject,
+      // The topic is the subject; the description carries the rest.
+      subject: labelOf(category),
       message,
       phone: phoneLabel ? undefined : phone,
     });
     setBusy(false);
-    if (!result.ok) {
-      setError(result.reason);
-      return;
-    }
+    if (!result.ok) return setError(result.reason);
     setSent(true);
-    setSubject("");
     setMessage("");
-    toast.success("Ticket sent", { description: "We'll be in touch shortly." });
+    toast.success("Ticket sent");
     onSent();
   };
 
@@ -193,15 +141,12 @@ function TicketForm({
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
         <CheckCircle2 className="h-8 w-8 text-up" aria-hidden />
-        <div className="text-[15px] font-semibold text-ink">We have your ticket</div>
-        <p className="max-w-[320px] text-[12.5px] leading-relaxed text-ink-muted">
-          Our team will contact you on {phoneLabel ?? "the number you gave"}.
-        </p>
+        <div className="text-[15px] font-semibold text-ink">Ticket sent</div>
         <button
           onClick={() => setSent(false)}
-          className="mt-2 h-10 border border-line-strong px-4 text-[13px] font-medium text-ink transition-colors hover:bg-surface-3"
+          className="h-10 border border-line-strong px-4 text-[13px] font-medium text-ink transition-colors hover:bg-surface-3"
         >
-          Raise another
+          New ticket
         </button>
       </div>
     );
@@ -215,35 +160,13 @@ function TicketForm({
     <form onSubmit={submit} className="flex flex-col gap-4 p-4">
       <div>
         <span className={label}>Topic</span>
-        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Topic">
-          {TICKET_CATEGORIES.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={category === option.value}
-              onClick={() => setCategory(option.value)}
-              className={cn(
-                "h-8 border px-3 text-[12.5px] font-medium transition-colors",
-                category === option.value
-                  ? "border-ink bg-ink text-surface-1"
-                  : "border-line-strong text-ink-secondary hover:text-ink",
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+        <TopicSelect value={category} onChange={setCategory} />
       </div>
 
-      {phoneLabel ? (
-        <p className="text-[12px] text-ink-muted">
-          We will reply to <span className="tnum font-mono text-ink">{phoneLabel}</span>.
-        </p>
-      ) : (
+      {phoneLabel ? null : (
         <div>
           <label htmlFor="ticket-phone" className={label}>
-            M-Pesa number on your account
+            M-Pesa number
           </label>
           <input
             id="ticket-phone"
@@ -259,30 +182,15 @@ function TicketForm({
       )}
 
       <div>
-        <label htmlFor="ticket-subject" className={label}>
-          Subject
-        </label>
-        <input
-          id="ticket-subject"
-          maxLength={120}
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          placeholder={PLACEHOLDER[category]}
-          className={cn(input, "h-11")}
-        />
-      </div>
-
-      <div>
         <label htmlFor="ticket-message" className={label}>
-          Details
+          Description
         </label>
         <textarea
           id="ticket-message"
-          rows={5}
+          rows={6}
           maxLength={2000}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Amounts, times and M-Pesa references help us sort it faster."
           className={cn(input, "resize-y py-2.5 leading-relaxed")}
         />
       </div>
@@ -295,11 +203,52 @@ function TicketForm({
 
       <button
         type="submit"
-        disabled={busy || subject.trim().length < 3 || message.trim().length < 10 || (!phoneLabel && !phone)}
+        disabled={busy || message.trim().length < 10 || (!phoneLabel && !phone)}
         className="flex h-11 items-center justify-center bg-cash text-[14px] font-semibold text-white transition-colors hover:bg-cash-hover disabled:pointer-events-none disabled:opacity-40"
       >
-        {busy ? <Spinner size={18} onColor /> : "Send ticket"}
+        {busy ? <Spinner size={18} onColor /> : "Send"}
       </button>
     </form>
+  );
+}
+
+/** A dropdown drawn like the rest of the product, not the browser's select. */
+function TopicSelect({
+  value,
+  onChange,
+}: {
+  value: TicketCategory;
+  onChange: (value: TicketCategory) => void;
+}) {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger
+        className={cn(
+          "flex h-11 w-full items-center justify-between border border-line-strong bg-surface-1 px-3",
+          "text-left text-[15px] text-ink transition-colors data-[state=open]:border-cash",
+        )}
+      >
+        {labelOf(value)}
+        <ChevronDown className="h-4 w-4 text-ink-muted" aria-hidden />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="start"
+          sideOffset={4}
+          className="rise-in z-50 w-[var(--radix-dropdown-menu-trigger-width)] border border-line bg-surface-1 py-1 shadow-[0_12px_32px_-8px_rgba(8,12,24,0.28)]"
+        >
+          {TICKET_CATEGORIES.map((option) => (
+            <DropdownMenu.Item
+              key={option.value}
+              onSelect={() => onChange(option.value)}
+              className="flex cursor-pointer items-center justify-between px-3 py-2.5 text-[14px] text-ink outline-none data-[highlighted]:bg-surface-2"
+            >
+              {option.label}
+              {option.value === value ? <Check className="h-4 w-4 text-cash" aria-hidden /> : null}
+            </DropdownMenu.Item>
+          ))}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }

@@ -286,4 +286,12 @@ Two things worth knowing before you use it in anger:
    Configuration → Redirect URLs. First Google sign-in asks for the M-Pesa
    number once.
 4. **Forgot password** is a support ticket; an admin confirms by phone and
-   issues a temporary password from Support or Users in the console.
+   issues a reset code from Support or Users in the console; the customer enters it at /reset-password with a new password.
+
+## 2026-10-01 — Verification uploads
+
+Run `supabase/verification.sql` (after `support-and-deposit.sql`): a private
+`verification` storage bucket (10 MB, images/PDF, customers upload into their
+own folder only), the `verifications` table and the `submit_verification`
+RPC. Redeploy `tradin-payments` for the admin review routes. Review lives in
+the console under Verification; document links are signed for ten minutes.

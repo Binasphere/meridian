@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { useDomainLabel } from "@/lib/useDomainLabel";
+import { useBrandLabel } from "@/lib/useDomainLabel";
 
 /**
  * The wordmark: a mark that is the same everywhere, and a name that is not.
@@ -27,7 +27,7 @@ export function Wordmark({
   className?: string;
   showText?: boolean;
 }) {
-  const domain = useDomainLabel();
+  const domain = useBrandLabel();
   return (
     <span className={cn("flex items-center gap-2 text-ink", className)}>
       <svg

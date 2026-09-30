@@ -15,6 +15,7 @@ import { SignInGate } from "./SignInGate";
 import { UsersView } from "./UsersView";
 import { WithdrawalsView } from "./WithdrawalsView";
 import { TicketsView } from "./TicketsView";
+import { VerificationsView } from "./VerificationsView";
 import { useTickets } from "./useTickets";
 import { Button, ToastHost } from "./ui";
 import { useAdmins } from "./useAdmins";
@@ -57,6 +58,10 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
     title: "Support",
     description:
       "Customer tickets. Call the customer on their number, note what you did, then resolve.",
+  },
+  verifications: {
+    title: "Verification",
+    description: "Check both documents match the account, then approve or reject.",
   },
   sessions: {
     title: "Sessions",
@@ -378,6 +383,8 @@ function Console({
             <WithdrawalsView state={withdrawalsState} />
           ) : view === "tickets" ? (
             <TicketsView state={ticketsState} />
+          ) : view === "verifications" ? (
+            <VerificationsView onUnauthorised={handleUnauthorised} />
           ) : view === "sessions" ? (
             <SessionsView state={sessionsState} />
           ) : view === "domains" ? (
