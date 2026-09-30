@@ -28,7 +28,7 @@ const RESOLUTION_OPTIONS: ReadonlyArray<{ value: Resolution; label: string }> = 
  *
  * The pair name is the way to a different market on every screen size: it
  * opens a list anchored beneath it, searchable, the way a trading app's symbol
- * picker behaves. The bottom tab bar's Markets tab opens the same list.
+ * picker behaves. The full list is also a page of its own, at /markets.
  */
 export function MarketHeader({
   spec,
@@ -190,8 +190,6 @@ function MarketPicker({
       if (ref.current.contains(target)) return;
       // The pair button toggles on its own; closing here too would reopen it.
       if (target.closest('[aria-label="Change market"]')) return;
-      // The bottom tab that opened it does the same.
-      if (target.closest("[data-markets-toggle]")) return;
       onClose();
     };
     const onKey = (event: KeyboardEvent) => {

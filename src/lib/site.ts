@@ -24,7 +24,7 @@ export const SITE_ORIGIN = (
 /** `SITE_ORIGIN` as a `URL`, which is the shape Next's `metadataBase` wants. */
 export const SITE_URL = new URL(SITE_ORIGIN);
 
-/** `https://ventitradingfx.com/help` from `/help`. */
+/** `https://ventitradingfx.com/support` from `/support`. */
 export function absoluteUrl(path: string): string {
   return `${SITE_ORIGIN}${path.startsWith("/") ? path : `/${path}`}`;
 }
@@ -67,7 +67,7 @@ export const NO_INDEX = { index: false, follow: false } as const;
  * two groups, both of which also carry their own `robots: { index: false }` so
  * that a stray link cannot get them crawled anyway:
  *
- *   - Personal surfaces (`/account`, `/wallet`, `/positions`, `/performance`).
+ *   - Personal surfaces (`/account`, `/wallet`, `/positions`).
  *     They render one person's balances and contracts. Nothing there is useful
  *     to a stranger arriving from a search result, and the titles alone would
  *     leak what the page is for.
@@ -82,7 +82,8 @@ export const PUBLIC_ROUTES: { path: string; lastModified: Date }[] = [
   // The terminal itself. No sign-in wall — an anonymous visitor lands on a
   // funded demo account — so it is both the landing page and the product.
   { path: "/", lastModified: new Date("2026-08-06") },
-  // How contracts settle and how money moves. The one page here that answers a
-  // question somebody types into a search box.
-  { path: "/help", lastModified: new Date("2026-08-06") },
+  // Every market, with its price — and the support page, which answers the
+  // questions somebody types into a search box.
+  { path: "/markets", lastModified: new Date("2026-09-30") },
+  { path: "/support", lastModified: new Date("2026-09-30") },
 ];

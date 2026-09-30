@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import googleIcon from "@/app/assets/google.svg";
 import { cn } from "@/lib/utils";
 import { MIN_PASSWORD_LENGTH, useAuth } from "@/lib/auth";
 import { Wordmark } from "@/components/Wordmark";
+import { Spinner } from "@/components/ui/Spinner";
 
 type Mode = "signin" | "register";
 
@@ -51,14 +53,19 @@ export function AuthScreen() {
     if (!result.ok) setError(result.reason);
   };
 
-  // Accounts here are keyed on the M-Pesa number — it is the login, and the
-  // number withdrawals are paid to. A Google sign-in carries no number, so it
-  // needs a "link your M-Pesa number" step and the Google provider enabled in
-  // Supabase before it can open an account. Until then it says so.
-  const continueWithGoogle = () => {
-    toast("Google sign-in is coming soon", {
-      description: "For now, continue with your M-Pesa number.",
-    });
+  // Google hands back an account with no number; the link screen asks for
+  // it once on return (see LinkNumberScreen). Needs the Google provider
+  // switched on in Supabase → Authentication → Providers.
+  const signInWithGoogle = useAuth((s) => s.signInWithGoogle);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const continueWithGoogle = async () => {
+    setGoogleBusy(true);
+    const result = await signInWithGoogle();
+    if (!result.ok) {
+      setGoogleBusy(false);
+      toast.error(result.reason);
+    }
+    // On success the browser is already leaving for Google.
   };
 
   const switchTo = (next: Mode) => {
@@ -137,9 +144,19 @@ export function AuthScreen() {
 
             {/* --- Password ------------------------------------------------ */}
             <div>
-              <label htmlFor="password" className={label}>
-                Password
-              </label>
+              <div className="mb-1.5 flex items-baseline justify-between">
+                <label htmlFor="password" className="block text-[12px] font-medium text-ink-secondary">
+                  Password
+                </label>
+                {mode === "signin" ? (
+                  <Link
+                    href="/support?topic=PASSWORD"
+                    className="text-[12px] font-semibold text-ink hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                ) : null}
+              </div>
               <div className={field}>
                 <input
                   id="password"
@@ -209,7 +226,7 @@ export function AuthScreen() {
             >
               {busy ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  <Spinner size={18} onColor />
                   Securing…
                 </>
               ) : mode === "register" ? (
@@ -229,10 +246,15 @@ export function AuthScreen() {
 
           <button
             type="button"
-            onClick={continueWithGoogle}
+            onClick={() => void continueWithGoogle()}
+            disabled={googleBusy}
             className="flex h-11 w-full items-center justify-center gap-2.5 border border-line-strong bg-surface-1 text-[14px] font-semibold text-ink transition-colors hover:bg-surface-3"
           >
-            <Image src={googleIcon} alt="" width={18} height={18} aria-hidden />
+            {googleBusy ? (
+              <Spinner size={18} />
+            ) : (
+              <Image src={googleIcon} alt="" width={18} height={18} aria-hidden />
+            )}
             Continue with Google
           </button>
 

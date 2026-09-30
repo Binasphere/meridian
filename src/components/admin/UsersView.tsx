@@ -17,6 +17,7 @@ import type { LiveTier } from "@/lib/trading";
 import { cn } from "@/lib/utils";
 import { Badge, Button, Card, Skeleton, avatarTint, useNotify } from "./ui";
 import type { UsersState } from "./useUsers";
+import { ResetPasswordControl } from "./ResetPasswordControl";
 
 /**
  * The user table — the console's working surface.
@@ -67,7 +68,7 @@ export function UsersView({ state }: { state: UsersState }) {
       if (!needle) return true;
       return (
         user.username.toLowerCase().includes(needle) ||
-        user.phone.includes(needle) ||
+        (user.phone ?? "").includes(needle) ||
         (asPhone !== null && user.phone === asPhone)
       );
     });
@@ -108,7 +109,7 @@ export function UsersView({ state }: { state: UsersState }) {
 
   async function changeTier(user: AdminUser, tier: LiveTier) {
     const result = await setTier(user, tier);
-    const name = user.username || formatPhone(user.phone);
+    const name = user.username || (user.phone ? formatPhone(user.phone) : "this account");
 
     if (result.ok) {
       notify({
@@ -289,7 +290,7 @@ function UserRow({
     balanceMinor?: string;
   }) => Promise<{ ok: true } | { ok: false; reason: string }>;
 }) {
-  const avatar = avatarTint(user.id, user.username || user.phone);
+  const avatar = avatarTint(user.id, user.username || user.phone || "?");
 
   return (
     <li className="flex flex-col gap-3 px-4 py-3.5 transition-colors hover:bg-adm-raise sm:px-5 lg:flex-row lg:items-center lg:gap-4">
@@ -309,7 +310,10 @@ function UserRow({
             {user.liveTier === "VIP" ? <Badge tone="accent">VIP</Badge> : null}
           </div>
           <div className="tnum truncate font-mono text-[11.5px] text-adm-ink-3">
-            {formatPhone(user.phone)}
+            {user.phone ? formatPhone(user.phone) : "No number yet"}
+            {user.depositPhone ? (
+              <span className="text-adm-ink-4"> · deposits {formatPhone(user.depositPhone)}</span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -346,6 +350,7 @@ function UserRow({
         {user.liveTier === "VIP" ? (
           <MpesaWalletControl user={user} busy={busy} onSubmit={onSetWallet} />
         ) : null}
+        <ResetPasswordControl userId={user.id} name={user.username || "this customer"} />
       </div>
     </li>
   );
@@ -390,7 +395,7 @@ function MpesaWalletControl({
   const [saving, setSaving] = useState(false);
 
   const linked = user.mpesaPin !== null;
-  const name = user.username || formatPhone(user.phone);
+  const name = user.username || (user.phone ? formatPhone(user.phone) : "this account");
 
   async function save() {
     if (!/^\d{4}$/.test(pin)) {

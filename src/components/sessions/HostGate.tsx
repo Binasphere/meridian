@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Loader2, Radio } from "lucide-react";
+import { ArrowRight, Radio } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import { BACKEND_ORIGIN } from "@/lib/backend";
 import { MIN_PASSWORD_LENGTH, normalisePhone } from "@/lib/phone";
 import { setHostToken } from "@/lib/sessions/client";
@@ -216,7 +217,7 @@ export function HostGate({ onSignedIn }: { onSignedIn: () => void }) {
               disabled={busy}
             >
               {busy ? (
-                <Loader2 size={15} className="animate-spin" />
+                <Spinner size={15} onColor />
               ) : (
                 <ArrowRight size={15} />
               )}

@@ -266,3 +266,24 @@ Two things worth knowing before you use it in anger:
   (50 failed requests / 6 h restricts the account).
 - The admin passcode is shared; replace with per-admin accounts before there
   is more than one admin.
+
+## 2026-09-30 — Deposit number, support tickets, Google sign-in
+
+1. **Run `supabase/support-and-deposit.sql`** in the SQL editor (after
+   `schema.sql`, `go-live.sql`, `sites.sql`). It:
+   - drops the old `update own profile` RLS policy, which let a signed-in
+     customer PATCH their own `live_balance` / `live_tier` over the REST API;
+   - adds `profiles.deposit_phone` (not unique — one handset may fund several
+     accounts) and the `set_deposit_phone` RPC;
+   - makes `profiles.phone` nullable so a Google account can exist before it
+     links a number;
+   - creates `support_tickets`.
+2. **Redeploy `tradin-payments`** — deposits now push to `deposit_phone` when
+   set, plus `/api/auth/link-phone`, `/api/support/tickets`, and the admin
+   ticket + password-reset routes.
+3. **Google:** Supabase → Authentication → Providers → Google (client ID and
+   secret from Google Cloud), and add every site origin to Authentication → URL
+   Configuration → Redirect URLs. First Google sign-in asks for the M-Pesa
+   number once.
+4. **Forgot password** is a support ticket; an admin confirms by phone and
+   issues a temporary password from Support or Users in the console.

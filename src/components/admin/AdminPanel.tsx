@@ -14,6 +14,8 @@ import { SessionsView } from "./SessionsView";
 import { SignInGate } from "./SignInGate";
 import { UsersView } from "./UsersView";
 import { WithdrawalsView } from "./WithdrawalsView";
+import { TicketsView } from "./TicketsView";
+import { useTickets } from "./useTickets";
 import { Button, ToastHost } from "./ui";
 import { useAdmins } from "./useAdmins";
 import { useOverview } from "./useOverview";
@@ -50,6 +52,11 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
     title: "Withdrawals",
     description:
       "Requests with funds already held. Pay via M-Pesa, confirm with the reference — or reject to refund.",
+  },
+  tickets: {
+    title: "Support",
+    description:
+      "Customer tickets. Call the customer on their number, note what you did, then resolve.",
   },
   sessions: {
     title: "Sessions",
@@ -224,6 +231,7 @@ function Console({
 
   const state = useUsers(handleUnauthorised, canSeeMoney, site);
   const withdrawalsState = useWithdrawals(handleUnauthorised, canSeeMoney, site);
+  const ticketsState = useTickets(handleUnauthorised, canSeeMoney, site);
   const sessionsState = useSessions(
     handleUnauthorised,
     roleCan(role, "sessions"),
@@ -325,7 +333,10 @@ function Console({
           {/* Only where it changes what you see. Domains is the comparison
               itself and Admins is platform-wide, so a filter on either would
               be a control that does nothing. */}
-          {view === "users" || view === "withdrawals" || view === "sessions" ? (
+          {view === "users" ||
+          view === "withdrawals" ||
+          view === "tickets" ||
+          view === "sessions" ? (
             <SiteFilter
               value={site}
               sites={sitesState.sites}
@@ -337,6 +348,7 @@ function Console({
             onClick={() => {
               void state.reload();
               void withdrawalsState.reload();
+              void ticketsState.reload();
               void sessionsState.reload();
               void adminsState.reload();
               void sitesState.reload();
@@ -364,6 +376,8 @@ function Console({
             <UsersView state={state} />
           ) : view === "withdrawals" ? (
             <WithdrawalsView state={withdrawalsState} />
+          ) : view === "tickets" ? (
+            <TicketsView state={ticketsState} />
           ) : view === "sessions" ? (
             <SessionsView state={sessionsState} />
           ) : view === "domains" ? (

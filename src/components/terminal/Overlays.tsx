@@ -5,6 +5,7 @@ import { useUi } from "@/lib/ui";
 import { CashDialog } from "./CashDialog";
 import { DepositNumberDialog } from "./DepositNumberDialog";
 import { NavDrawer } from "./NavDrawer";
+import { VerificationDialog } from "./VerificationDialog";
 
 /**
  * Everything that opens over a page: the menu, the money dialogs and the
@@ -19,6 +20,7 @@ export function Overlays() {
   return (
     <>
       <NavDrawer />
+      <VerificationDialog />
       <DepositNumberDialog />
       {cash ? (
         <CashDialog

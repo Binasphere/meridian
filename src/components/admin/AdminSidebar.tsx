@@ -6,6 +6,7 @@ import {
   Banknote,
   Globe,
   LayoutGrid,
+  LifeBuoy,
   LogOut,
   Radio,
   ShieldCheck,
@@ -37,6 +38,7 @@ export type AdminView =
   | "overview"
   | "users"
   | "withdrawals"
+  | "tickets"
   | "sessions"
   | "domains"
   | "admins";
@@ -73,6 +75,13 @@ const NAV: readonly NavItem[] = [
     label: "Withdrawals",
     icon: Banknote,
     description: "Review requests and record payouts",
+    needs: "finance",
+  },
+  {
+    id: "tickets",
+    label: "Support",
+    icon: LifeBuoy,
+    description: "Tickets from customers, and password resets",
     needs: "finance",
   },
   {

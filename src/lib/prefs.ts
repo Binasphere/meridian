@@ -16,15 +16,8 @@ export type Theme = "light" | "dark";
 interface PrefsState {
   theme: Theme;
   sound: boolean;
-  /**
-   * The M-Pesa number each account deposits from, keyed by the account's
-   * registered number. Absent means "the registered number". Withdrawals never
-   * read this — they are paid to the registered number only.
-   */
-  depositPhones: Record<string, string>;
   setTheme: (theme: Theme) => void;
   setSound: (on: boolean) => void;
-  setDepositPhone: (account: string, phone: string | null) => void;
 }
 
 export const usePrefs = create<PrefsState>()(
@@ -32,20 +25,18 @@ export const usePrefs = create<PrefsState>()(
     (set) => ({
       theme: "light",
       sound: true,
-      depositPhones: {},
       setTheme: (theme) => set({ theme }),
       setSound: (sound) => set({ sound }),
-      setDepositPhone: (account, phone) =>
-        set((s) => {
-          const next = { ...s.depositPhones };
-          if (phone && phone !== account) next[account] = phone;
-          else delete next[account];
-          return { depositPhones: next };
-        }),
     }),
     {
       name: "venti-prefs",
-      version: 1,
+      version: 2,
+      // v2: deposit numbers moved to the server profile.
+      migrate: (state) => {
+        const { depositPhones: _dropped, ...rest } = (state ?? {}) as Record<string, unknown>;
+        void _dropped;
+        return rest as unknown as PrefsState;
+      },
       storage: createJSONStorage(() => localStorage),
     },
   ),
@@ -56,12 +47,14 @@ export function soundEnabled(): boolean {
   return usePrefs.getState().sound;
 }
 
-/** The number a deposit is raised against, for an account. */
-export function useDepositPhone(accountPhone: string | undefined): string | undefined {
-  const saved = usePrefs((s) =>
-    accountPhone ? s.depositPhones[accountPhone] : undefined,
-  );
-  return saved ?? accountPhone;
+/**
+ * The number a deposit is raised against: the account's saved deposit number
+ * (kept on the server profile), else its registered number.
+ */
+export function depositPhoneOf(
+  account: { phone: string; depositPhone?: string } | null | undefined,
+): string | undefined {
+  return account?.depositPhone || account?.phone || undefined;
 }
 
 /**

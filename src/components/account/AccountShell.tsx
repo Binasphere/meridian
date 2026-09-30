@@ -1,18 +1,16 @@
 "use client";
 
-import Link from "next/link";
-import { Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/format";
 import { useAuth, useAuthHydrated } from "@/lib/auth";
-import { selectBalance, useStore, useStoreHydrated } from "@/lib/store";
+import { useStoreHydrated } from "@/lib/store";
 import { AuthScreen } from "@/components/auth/AuthScreen";
-import { Wordmark } from "@/components/Wordmark";
+import { LinkNumberScreen } from "@/components/auth/LinkNumberScreen";
 import { SignInGate } from "@/components/auth/SignInGate";
 import { BottomTabs } from "@/components/terminal/BottomTabs";
 import { Overlays } from "@/components/terminal/Overlays";
+import { TopBar } from "@/components/terminal/TopBar";
 import { useApplyTheme } from "@/lib/prefs";
-import { useUi } from "@/lib/ui";
+import { Spinner } from "@/components/ui/Spinner";
 
 /**
  * Chrome for the account pages.
@@ -41,49 +39,34 @@ export function AccountShell({
   title,
   description,
   children,
+  publicPage = false,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
+  /** Readable signed out — Markets and Support. Everything else gates. */
+  publicPage?: boolean;
 }) {
   const authHydrated = useAuthHydrated();
   const currentPhone = useAuth((s) => s.currentPhone);
+  const linkPending = useAuth((s) => s.linkPending);
   const storeHydrated = useStoreHydrated();
-  const balance = useStore(selectBalance);
-  const accountKind = useStore((s) => s.accountKind);
-  const setDrawerOpen = useUi((s) => s.setDrawerOpen);
   useApplyTheme();
+
+  // A Google account with no number yet finishes that first, on every page.
+  if (authHydrated && linkPending) return <LinkNumberScreen />;
 
   // Only once we know there is no session do we swap in sign-in — showing it
   // while storage is still being read would flash it at signed-in users.
-  if (authHydrated && !currentPhone) return <AuthScreen />;
+  if (!publicPage && authHydrated && !currentPhone) return <AuthScreen />;
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-base">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface-1 px-2 sm:gap-3 sm:px-3">
-        <Overlays />
-        <SignInGate />
-        <button
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open menu"
-          className="grid h-10 w-10 shrink-0 place-items-center text-ink transition-colors hover:bg-surface-3"
-        >
-          <Menu className="h-5 w-5" aria-hidden />
-        </button>
-
-        <Link href="/" className="shrink-0" aria-label="Back to terminal">
-          <Wordmark className="h-[18px]" />
-        </Link>
-
-        <div className="ml-auto text-right">
-          <div className="text-[9.5px] font-medium uppercase tracking-[0.09em] text-ink-muted">
-            {accountKind === "DEMO" ? "Demo balance" : "Live balance"}
-          </div>
-          <div className="tnum -mt-0.5 font-mono text-[15px] font-medium leading-tight text-ink">
-            {storeHydrated ? formatMoney(balance, { currency: "KSh" }) : "—"}
-          </div>
-        </div>
-      </header>
+      {/* The same bar as the terminal: menu, brand, the balance chip and
+          Deposit — so the account you are on reads identically everywhere. */}
+      <TopBar />
+      <Overlays />
+      <SignInGate />
 
       {/* Scrolls on phones, pinned on desktop. */}
       <main className="min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
@@ -100,11 +83,13 @@ export function AccountShell({
           </div>
 
           <div className="min-h-0 lg:flex-1">
-            {storeHydrated ? (
+            {storeHydrated && authHydrated ? (
               children
             ) : (
               // Occupies roughly the space the content will, so nothing jumps.
-              <div className="h-[60vh] border border-line bg-surface-1" />
+              <div className="grid h-[60vh] place-items-center border border-line bg-surface-1">
+                <Spinner size={36} label="Loading" />
+              </div>
             )}
           </div>
         </div>

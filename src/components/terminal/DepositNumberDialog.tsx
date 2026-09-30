@@ -5,9 +5,10 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Smartphone, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { formatPhoneMasked, useCurrentAccount } from "@/lib/auth";
+import { formatPhoneMasked, useAuth, useCurrentAccount } from "@/lib/auth";
 import { formatPhone, normalisePhone } from "@/lib/phone";
-import { usePrefs, useDepositPhone } from "@/lib/prefs";
+import { depositPhoneOf } from "@/lib/prefs";
+import { Spinner } from "@/components/ui/Spinner";
 import { useUi } from "@/lib/ui";
 
 /**
@@ -21,16 +22,19 @@ export function DepositNumberDialog() {
   const open = useUi((s) => s.depositNumberOpen);
   const setOpen = useUi((s) => s.setDepositNumberOpen);
   const account = useCurrentAccount();
-  const current = useDepositPhone(account?.phone);
-  const setDepositPhone = usePrefs((s) => s.setDepositPhone);
+  const current = depositPhoneOf(account);
+  const setDepositPhone = useAuth((s) => s.setDepositPhone);
 
   const [value, setValue] = useState("");
   const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setValue(current ? `0${current.slice(3)}` : "");
       setTouched(false);
+      setError(null);
     }
   }, [open, current]);
 
@@ -38,13 +42,25 @@ export function DepositNumberDialog() {
   const invalid = touched && value.trim() !== "" && !normalised;
   const unchanged = normalised !== null && normalised === current;
 
+  const commit = async (phone: string | null) => {
+    setBusy(true);
+    setError(null);
+    const result = await setDepositPhone(phone);
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.reason);
+      return;
+    }
+    setOpen(false);
+    toast.success(
+      phone ? "Deposit number updated" : "Deposits will use your registered number",
+      phone ? { description: formatPhone(phone) } : undefined,
+    );
+  };
+
   const save = () => {
     if (!account || !normalised) return;
-    setDepositPhone(account.phone, normalised);
-    setOpen(false);
-    toast.success("Deposit number updated", {
-      description: formatPhone(normalised),
-    });
+    void commit(normalised);
   };
 
   const isCustom = !!account && current !== account.phone;
@@ -81,7 +97,9 @@ export function DepositNumberDialog() {
             }}
           >
             <Dialog.Description className="text-[12.5px] leading-relaxed text-ink-secondary">
-              M-Pesa deposit prompts are sent to this number.
+              M-Pesa deposit prompts are sent to this number. It can be any
+              Safaricom or Airtel line — the same number can fund more than one
+              account.
             </Dialog.Description>
 
             <div>
@@ -110,9 +128,9 @@ export function DepositNumberDialog() {
                   className="tnum h-11 w-full bg-transparent font-mono text-[15px] text-ink outline-none placeholder:text-ink-faint"
                 />
               </div>
-              {invalid ? (
+              {invalid || error ? (
                 <p role="alert" className="mt-1.5 text-[11.5px] text-down">
-                  Enter a Safaricom or Airtel number, e.g. 0712 345 678.
+                  {error ?? "Enter a Safaricom or Airtel number, e.g. 0712 345 678."}
                 </p>
               ) : (
                 <p className="mt-1.5 text-[11.5px] text-ink-faint">
@@ -126,12 +144,8 @@ export function DepositNumberDialog() {
               {isCustom ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!account) return;
-                    setDepositPhone(account.phone, null);
-                    setOpen(false);
-                    toast.success("Deposits will use your registered number");
-                  }}
+                  disabled={busy}
+                  onClick={() => void commit(null)}
                   className="h-11 flex-1 border border-line-strong bg-surface-1 text-[13px] font-medium text-ink transition-colors hover:bg-surface-3"
                 >
                   Use registered
@@ -139,10 +153,10 @@ export function DepositNumberDialog() {
               ) : null}
               <button
                 type="submit"
-                disabled={!normalised || unchanged}
-                className="h-11 flex-1 bg-ink text-[13px] font-semibold text-surface-1 transition-opacity hover:opacity-90 disabled:opacity-40"
+                disabled={!normalised || unchanged || busy}
+                className="flex h-11 flex-1 items-center justify-center bg-ink text-[13px] font-semibold text-surface-1 transition-opacity hover:opacity-90 disabled:opacity-40"
               >
-                Save number
+                {busy ? <Spinner size={16} className="[--loader-1:var(--color-surface-1)]" /> : "Save number"}
               </button>
             </div>
           </form>

@@ -8,6 +8,13 @@ const nextConfig: NextConfig = {
     // at build time, so a build never ships an unchecked type.
     ignoreBuildErrors: false,
   },
+  // Old links, bookmarks and search results keep working.
+  async redirects() {
+    return [
+      { source: "/help", destination: "/support", permanent: true },
+      { source: "/performance", destination: "/positions", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

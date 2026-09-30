@@ -14,7 +14,10 @@ import type { LiveTier } from "@/lib/trading";
  */
 export interface AdminUser {
   id: string;
-  phone: string;
+  /** Null for a Google account that has not linked its number yet. */
+  phone: string | null;
+  /** Where deposit prompts go, when not `phone`. Never a payout destination. */
+  depositPhone: string | null;
   username: string;
   liveTier: LiveTier;
   demoBalanceMinor: string;
@@ -180,4 +183,20 @@ export interface AdminWithdrawal {
   failureReason: string | null;
   createdAt: string;
   settledAt: string | null;
+}
+
+/** A support ticket, as the console sees it. */
+export interface AdminTicket {
+  id: string;
+  userId: string | null;
+  username: string | null;
+  site: string | null;
+  phone: string;
+  category: "DEPOSIT" | "WITHDRAWAL" | "TRADING" | "ACCOUNT" | "PASSWORD" | "OTHER";
+  subject: string;
+  message: string;
+  status: "OPEN" | "RESOLVED";
+  adminNote: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
 }

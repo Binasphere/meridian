@@ -12,10 +12,9 @@ import {
  *
  * The caller is the signed-in customer; their access token arrives as a Bearer
  * header and is verified against Supabase before anything happens. The push
- * always goes to the *registered* number from `profiles.phone` — the request
- * body carries an amount and nothing else, for the same reason the dialog
- * shows the number read-only: a payment endpoint that accepts an arbitrary
- * phone number is how money ends up prompted on a stranger's handset.
+ * goes to the customer's saved `deposit_phone`, else the registered
+ * `profiles.phone` — both read from their own profile row. The request body
+ * carries an amount and nothing else. Withdrawals never read `deposit_phone`.
  *
  * The flow it starts is settled by `../payhero/callback`, never by this route:
  * a deposit is credited when M-Pesa says it happened, not when we asked.
@@ -95,22 +94,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // --- To which number: always the registered one --------------------------
+  // --- To which number: the saved deposit number, else the registered one --
+  // Read from the customer's own profile, never from the request body.
   const { data: profile } = await db
     .from("profiles")
-    .select("phone")
+    .select("phone, deposit_phone")
     .eq("id", auth.user.id)
     .maybeSingle();
 
   if (!profile?.phone) {
     return NextResponse.json({ error: "No registered number" }, { status: 400 });
   }
+  const phone: string = profile.deposit_phone || profile.phone;
 
   // --- Book the pending event, then raise the push -------------------------
   const { data: eventId, error: startError } = await db.rpc("deposit_start", {
     p_user: auth.user.id,
     p_amount: Number(amountMinor),
-    p_phone: profile.phone,
+    p_phone: phone,
   });
 
   if (startError || typeof eventId !== "string") {
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
 
   const push = await stkPush({
     amountKes: Number(amountMinor / 100n),
-    phone: profile.phone,
+    phone,
     reference: eventId,
     callbackUrl,
   });

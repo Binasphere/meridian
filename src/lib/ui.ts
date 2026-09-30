@@ -15,6 +15,8 @@ interface UiState {
   marketsOpen: boolean;
   cash: "deposit" | "withdraw" | null;
   depositNumberOpen: boolean;
+  verificationOpen: boolean;
+  setVerificationOpen: (open: boolean) => void;
   setDrawerOpen: (open: boolean) => void;
   setMarketsOpen: (open: boolean) => void;
   setCash: (mode: "deposit" | "withdraw" | null) => void;
@@ -26,6 +28,8 @@ export const useUi = create<UiState>()((set) => ({
   marketsOpen: false,
   cash: null,
   depositNumberOpen: false,
+  verificationOpen: false,
+  setVerificationOpen: (verificationOpen) => set({ verificationOpen }),
   setDrawerOpen: (drawerOpen) => set({ drawerOpen }),
   setMarketsOpen: (marketsOpen) => set({ marketsOpen }),
   setCash: (cash) => set({ cash }),

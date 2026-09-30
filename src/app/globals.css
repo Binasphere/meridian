@@ -478,6 +478,72 @@
     animation: dialog-pop-in 160ms var(--ease-out-quint);
   }
 
+  /* The waiting spinner: two arcs turning against each other. Ink for the
+     outer arc and the brand green for the inner, so it reads on both themes;
+     `.loader-on-color` swaps to white for use inside a filled button. Sized by
+     `--size` (1px = 48px across), set per use from `<Spinner size>`. */
+  .loader {
+    --loader-1: var(--color-ink);
+    --loader-2: var(--color-cash);
+    --size: 1px;
+    position: relative;
+    width: calc(48 * var(--size));
+    height: calc(48 * var(--size));
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    border-top: calc(4 * var(--size)) solid var(--loader-1);
+    border-right: calc(4 * var(--size)) solid transparent;
+    box-sizing: border-box;
+    animation: loader-rotation 1s linear infinite;
+  }
+  .loader::after {
+    content: "";
+    box-sizing: border-box;
+    position: absolute;
+    /* Offsets are from the padding box, which the top border pushes down;
+       pull the inner arc back up so the two circles share a centre. */
+    left: 0;
+    top: calc(-4 * var(--size));
+    width: calc(48 * var(--size));
+    height: calc(48 * var(--size));
+    border-radius: 50%;
+    border-left: calc(4 * var(--size)) solid var(--loader-2);
+    border-bottom: calc(4 * var(--size)) solid transparent;
+    animation: loader-rotation 0.5s linear infinite reverse;
+  }
+  [data-theme="light"] .loader {
+    --loader-2: #16a34a;
+  }
+  .loader.loader-on-color {
+    --loader-1: #ffffff;
+    --loader-2: #ffffff99;
+  }
+  @keyframes loader-rotation {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* The skyline behind the chart. Clear of the time axis (26px) and the price
+     axis (~64px); stretched to fit, as the artwork is drawn for. */
+  .chart-skyline {
+    --sky-opacity: 0.05;
+    position: absolute;
+    left: 0;
+    bottom: 26px;
+    width: calc(100% - 64px);
+    height: 50%;
+    object-fit: fill;
+    opacity: var(--sky-opacity);
+    pointer-events: none;
+  }
+  [data-theme="light"] .chart-skyline { --sky-opacity: 0.04; }
+  /* An area chart washes the lower half, so the skyline comes up to meet it. */
+  .chart-as-line .chart-skyline { --sky-opacity: 0.12; }
+  [data-theme="light"] .chart-as-line .chart-skyline { --sky-opacity: 0.1; }
+  [data-theme="light"] .sky-on-dark,
+  :root:not([data-theme="light"]) .sky-on-light { display: none; }
+
   .grid-noise {
     background-image:
       linear-gradient(var(--color-line) 1px, transparent 1px),

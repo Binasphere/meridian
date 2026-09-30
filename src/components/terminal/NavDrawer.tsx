@@ -1,19 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ArrowDownToLine,
   ArrowLeftRight,
   ArrowUpFromLine,
   BadgeCheck,
-  BookOpen,
   ChartCandlestick,
-  ChartNoAxesCombined,
-  ChevronRight,
-  CircleHelp,
+  CircleUserRound,
   History,
+  LifeBuoy,
   ListOrdered,
   LogIn,
   LogOut,
@@ -28,7 +25,7 @@ import { cn } from "@/lib/utils";
 import { formatMoney } from "@/lib/format";
 import { formatPhoneMasked, useAuth, useCurrentAccount } from "@/lib/auth";
 import { useOpenTrades, useStore } from "@/lib/store";
-import { usePrefs, useDepositPhone } from "@/lib/prefs";
+import { usePrefs, depositPhoneOf } from "@/lib/prefs";
 import { useUi } from "@/lib/ui";
 import { Wordmark } from "@/components/Wordmark";
 import { useAuthGate } from "@/components/auth/SignInGate";
@@ -45,17 +42,14 @@ export function NavDrawer() {
   const open = useUi((s) => s.drawerOpen);
   const setOpen = useUi((s) => s.setDrawerOpen);
   const setCash = useUi((s) => s.setCash);
-  const setMarketsOpen = useUi((s) => s.setMarketsOpen);
+  const setVerificationOpen = useUi((s) => s.setVerificationOpen);
   const setDepositNumberOpen = useUi((s) => s.setDepositNumberOpen);
-
-  const router = useRouter();
-  const pathname = usePathname();
 
   const account = useCurrentAccount();
   const signedIn = useAuth((s) => s.currentPhone) !== null;
   const signOutAuth = useAuth((s) => s.signOut);
   const showGate = useAuthGate((s) => s.show);
-  const depositPhone = useDepositPhone(account?.phone);
+  const depositPhone = depositPhoneOf(account);
 
   const accountKind = useStore((s) => s.accountKind);
   const setAccountKind = useStore((s) => s.setAccountKind);
@@ -86,7 +80,7 @@ export function NavDrawer() {
         <Dialog.Overlay className="sheet-overlay fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px]" />
         <Dialog.Content
           className={cn(
-            "drawer-slide fixed inset-y-0 left-0 z-50 flex w-[86vw] max-w-[320px] flex-col",
+            "drawer-slide fixed inset-y-0 left-0 z-50 flex w-1/2 min-w-[244px] max-w-[340px] flex-col",
             "border-r border-line bg-surface-1 shadow-2xl focus:outline-none",
           )}
         >
@@ -165,15 +159,7 @@ export function NavDrawer() {
 
             {/* --- Trading ---------------------------------------------------- */}
             <Group label="Trading">
-              <Row
-                icon={ChartCandlestick}
-                label="Markets"
-                onClick={() => {
-                  close();
-                  if (pathname !== "/") router.push("/");
-                  setMarketsOpen(true);
-                }}
-              />
+              <Row icon={ChartCandlestick} label="Markets" href="/markets" onNavigate={close} />
               <Row
                 icon={ListOrdered}
                 label="Open positions"
@@ -181,7 +167,6 @@ export function NavDrawer() {
                 href="/positions"
                 onNavigate={close}
               />
-              <Row icon={ChartNoAxesCombined} label="Performance" href="/performance" onNavigate={close} />
               <Row
                 icon={ArrowLeftRight}
                 label={`Switch to ${otherKind === "LIVE" ? "Live" : "Demo"}`}
@@ -207,9 +192,13 @@ export function NavDrawer() {
 
             {/* --- Account ---------------------------------------------------- */}
             <Group label="Account">
-              <Row icon={BadgeCheck} label="Profile & verification" href="/account" onNavigate={close} />
-              <Row icon={BookOpen} label="How contracts work" href="/help" onNavigate={close} />
-              <Row icon={CircleHelp} label="Help & support" href="/help" onNavigate={close} />
+              <Row icon={CircleUserRound} label="Account details" href="/account" onNavigate={close} />
+              <Row
+                icon={BadgeCheck}
+                label="Verification"
+                onClick={withAccount(() => setVerificationOpen(true))}
+              />
+              <Row icon={LifeBuoy} label="Support" href="/support" onNavigate={close} />
             </Group>
           </div>
 
@@ -248,7 +237,7 @@ export function NavDrawer() {
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="border-b border-line py-2">
-      <div className="px-4 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+      <div className="px-3.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
         {label}
       </div>
       {children}
@@ -274,15 +263,18 @@ function Row({
   const inner = (
     <>
       <Icon className="h-[17px] w-[17px] shrink-0 text-ink-muted" aria-hidden />
-      <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink">{label}</span>
-      {value ? (
-        <span className="tnum shrink-0 font-mono text-[11px] text-ink-faint">{value}</span>
-      ) : null}
-      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-faint" aria-hidden />
+      {/* At half the screen there is no room beside the label, so a value
+          sits under it instead. */}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13.5px] text-ink">{label}</span>
+        {value ? (
+          <span className="tnum block truncate font-mono text-[10.5px] text-ink-faint">{value}</span>
+        ) : null}
+      </span>
     </>
   );
   const className =
-    "flex h-11 w-full items-center gap-3 px-4 text-left transition-colors hover:bg-surface-2 active:bg-surface-3";
+    "flex min-h-11 w-full items-center gap-3 px-3.5 py-1.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-3";
 
   return href ? (
     <Link href={href} prefetch onClick={onNavigate} className={className}>
@@ -311,7 +303,7 @@ function Toggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex h-12 w-full items-center gap-3 px-4 text-left transition-colors hover:bg-surface-2"
+      className="flex h-12 w-full items-center gap-3 px-3.5 text-left transition-colors hover:bg-surface-2"
     >
       <Icon className="h-[17px] w-[17px] shrink-0 text-ink-muted" aria-hidden />
       <span className="flex-1 text-[13.5px] text-ink">{label}</span>

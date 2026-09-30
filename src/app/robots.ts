@@ -27,7 +27,6 @@ export default function robots(): MetadataRoute.Robots {
         "/account",
         "/wallet",
         "/positions",
-        "/performance",
       ],
     },
     sitemap: absoluteUrl("/sitemap.xml"),

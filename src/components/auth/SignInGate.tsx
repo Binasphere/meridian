@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { create } from "zustand";
 import { X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -42,6 +43,13 @@ export function SignInGate() {
   useEffect(() => {
     if (currentPhone) hide();
   }, [currentPhone, hide]);
+
+  // A link out of the form ("Forgot password?") leaves for another page; the
+  // gate must not follow the visitor there.
+  const pathname = usePathname();
+  useEffect(() => {
+    hide();
+  }, [pathname, hide]);
 
   if (!open || currentPhone) return null;
 

@@ -7,7 +7,6 @@ import {
   ArrowUpFromLine,
   Check,
   Gift,
-  Loader2,
   Smartphone,
   X,
 } from "lucide-react";
@@ -30,8 +29,9 @@ import {
   startServerWithdrawal,
 } from "@/lib/wallet";
 import { depositFromPhone, usesMpesaRail, withdrawToPhone } from "@/lib/mpesaRail";
-import { useDepositPhone } from "@/lib/prefs";
+import { depositPhoneOf } from "@/lib/prefs";
 import { useUi } from "@/lib/ui";
+import { Spinner } from "@/components/ui/Spinner";
 
 // Neither form offers amounts. A menu of chips beside a "pay now" button is a
 // suggestion nobody asked for, and the one it makes loudest is always the
@@ -78,7 +78,7 @@ export function CashDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const account = useCurrentAccount();
-  const savedDepositPhone = useDepositPhone(account?.phone);
+  const savedDepositPhone = depositPhoneOf(account);
   const openDepositNumber = useUi((s) => s.setDepositNumberOpen);
   const requestDeposit = useStore((s) => s.requestDeposit);
   const requestWithdrawal = useStore((s) => s.requestWithdrawal);
@@ -118,11 +118,10 @@ export function CashDialog({
   const onMpesaRail = serverWalletActive() && usesMpesaRail(account?.liveTier);
 
   // The number this movement is raised against. Withdrawals always go to the
-  // registered number. Deposits use the saved deposit number where the rail
-  // honours it: the local simulation does, but the PayHero route still pushes
-  // to `profiles.phone` only, so on real money the form shows that number
-  // rather than promising a prompt on a handset it will not reach.
-  const depositNumberHonoured = !serverWalletActive();
+  // registered number. Deposits go to the saved deposit number — the server
+  // reads it from the profile — except on the VIP demo rail, which settles
+  // against the linked handset instead.
+  const depositNumberHonoured = !onMpesaRail;
   const payingPhone =
     isDeposit && depositNumberHonoured ? savedDepositPhone : account?.phone;
 
@@ -444,7 +443,7 @@ export function CashDialog({
                 <StkProgress stage={liveStage} amountMinor={amountMinor} />
               ) : (
                 <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">
-                  <Loader2 className="h-7 w-7 animate-spin text-ink-muted" aria-hidden />
+                  <Spinner size={40} label="Submitting request" />
                   <p className="text-[14px] font-medium text-ink">Submitting request</p>
                   <p className="max-w-[260px] text-[12px] leading-relaxed text-ink-muted">
                     {`Requesting ${formatMoney(amountMinor, { currency: "KSh" })} to ${account ? formatPhoneMasked(account.phone) : "your number"}.`}
@@ -519,7 +518,8 @@ function StkProgress({
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <div className="text-center">
+      <div className="flex flex-col items-center text-center">
+        <Spinner size={40} label="Waiting for M-Pesa" className="mb-4" />
         <div className="tnum font-mono text-[22px] leading-none text-ink">
           {formatMoney(amountMinor, { currency: "KSh" })}
         </div>
@@ -546,7 +546,7 @@ function StkProgress({
                 {complete ? (
                   <Check className="h-3 w-3" aria-hidden />
                 ) : active ? (
-                  <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+                  <Spinner size={12} />
                 ) : (
                   <span className="text-[10px] font-mono">{index + 1}</span>
                 )}

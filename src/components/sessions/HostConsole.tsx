@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import {
   BookOpen,
   History,
-  Loader2,
   LogOut,
   Radio,
   RefreshCw,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import { formatMoney, wholeToMinor } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Spinner } from "@/components/ui/Spinner";
 import { setHostToken } from "@/lib/sessions/client";
 import {
   elapsedMs,
@@ -520,7 +520,7 @@ function LivePanel({
                   className="bg-adm-neg hover:bg-[#96201a]"
                 >
                   {state.busy ? (
-                    <Loader2 size={14} className="animate-spin" />
+                    <Spinner size={14} onColor />
                   ) : (
                     <Square size={13} />
                   )}
@@ -643,7 +643,7 @@ function StartPanel({
           disabled={state.busy || suspended || spend.length === 0}
         >
           {state.busy ? (
-            <Loader2 size={15} className="animate-spin" />
+            <Spinner size={15} onColor />
           ) : (
             <Radio size={15} />
           )}

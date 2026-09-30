@@ -9,6 +9,8 @@ import { useMounted } from "@/lib/hooks";
 import { usePrefs } from "@/lib/prefs";
 import { Panel } from "@/components/ui/primitives";
 import { SignInGate } from "@/components/auth/SignInGate";
+import { LinkNumberScreen } from "@/components/auth/LinkNumberScreen";
+import { Spinner } from "@/components/ui/Spinner";
 import { TopBar } from "./TopBar";
 import { MarketHeader } from "./MarketHeader";
 import { PriceChart } from "./PriceChart";
@@ -18,7 +20,6 @@ import { TradeTicket } from "./TradeTicket";
 import { MobileBar } from "./MobileBar";
 import { BottomTabs } from "./BottomTabs";
 import { Overlays } from "./Overlays";
-import { Skyline } from "./Skyline";
 import { SettlementDriver } from "./SettlementDriver";
 import { TradeCountdown } from "./TradeCountdown";
 
@@ -37,6 +38,7 @@ export function Terminal() {
   const mounted = useMounted();
   const authHydrated = useAuthHydrated();
   const currentPhone = useAuth((s) => s.currentPhone);
+  const linkPending = useAuth((s) => s.linkPending);
 
   const symbol = useStore((s) => s.symbol);
   const setSymbol = useStore((s) => s.setSymbol);
@@ -75,6 +77,9 @@ export function Terminal() {
   // gate themselves.
   if (!mounted || !authHydrated) return <Boot />;
 
+  // Back from Google with no number on the account yet: finish that first.
+  if (linkPending) return <LinkNumberScreen />;
+
   const spec = instrumentOrDefault(symbol);
 
   return (
@@ -109,9 +114,14 @@ export function Terminal() {
               chartStyle={chartStyle}
               onChartStyleChange={setChartStyle}
             />
-            <div className="relative min-h-0 flex-1">
-              {/* Behind the canvas, whose background is transparent. */}
-              <Skyline className="pointer-events-none absolute inset-x-0 bottom-0 h-[58%] w-full text-ink opacity-[0.06]" />
+            <div className={`relative min-h-0 flex-1 ${chartStyle === "area" ? "chart-as-line" : ""}`}>
+              {/* The skyline, behind the transparent canvas: clear of the time
+                  axis below and the price axis on the right, ink on light and
+                  paper on dark. The same artwork and placement as orbis. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img/skyline-ink.svg" alt="" aria-hidden className="chart-skyline sky-on-light" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img/skyline.svg" alt="" aria-hidden className="chart-skyline sky-on-dark" />
               <PriceChart
                 symbol={symbol}
                 resolution={resolution}
@@ -150,7 +160,8 @@ export function Terminal() {
 /** Held for the frame before localStorage is readable. */
 function Boot() {
   return (
-    <div className="relative grid min-h-dvh place-items-center bg-base">
+    <div className="grid min-h-dvh place-items-center bg-base">
+      <Spinner size={44} label="Loading" />
     </div>
   );
 }

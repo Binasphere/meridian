@@ -49,7 +49,7 @@ const plexMono = IBM_Plex_Mono({
  *
  * So the default is now "indexable", and the pages that must stay out carry
  * their own `robots: { index: false, follow: false }`: `/account`, `/wallet`,
- * `/positions` and `/performance` because they render one person's money, and
+ * and `/positions` because they render one person's money, and
  * `/admin` and `/sessions` because they are staff surfaces. `lib/site.ts` holds
  * the list and the reasoning; `robots.ts` repeats it for crawl budget.
  *

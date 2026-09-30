@@ -160,6 +160,15 @@ export interface StoredAccount {
    * offer it.
    */
   liveTier: LiveTier;
+  /**
+   * Where M-Pesa deposit prompts go when it is not `phone`. Not unique — one
+   * handset may fund several accounts — and never where a withdrawal is paid.
+   */
+  depositPhone?: string;
+  /** How the account signs in: its number and password, or Google. */
+  method?: "phone" | "google";
+  /** The Google address, for accounts that sign in with Google. */
+  email?: string;
 }
 
 /**
@@ -185,6 +194,11 @@ interface AuthState {
   profile: StoredAccount | null;
   /** False until the session has been established (or ruled out). */
   hydrated: boolean;
+  /**
+   * Signed in with Google, but the account has no M-Pesa number yet. The app
+   * treats this as signed out everywhere except the link-your-number screen.
+   */
+  linkPending: boolean;
 
   register: (
     phone: string,
@@ -193,6 +207,12 @@ interface AuthState {
   ) => Promise<AuthResult>;
   signIn: (phone: string, password: string) => Promise<AuthResult>;
   signOut: () => void;
+  /** Leaves for Google's consent screen; the session lands on return. */
+  signInWithGoogle: () => Promise<AuthResult>;
+  /** Gives a Google account its number, once. */
+  linkPhone: (phone: string, username: string) => Promise<AuthResult>;
+  /** Saves (or, with null, clears) the deposit number. */
+  setDepositPhone: (phone: string | null) => Promise<AuthResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -206,6 +226,7 @@ export const useAuth = create<AuthState>()(
       currentPhone: null,
       profile: null,
       hydrated: false,
+      linkPending: false,
 
       // --- Register --------------------------------------------------------
       register: async (phoneInput, usernameInput, password) => {
@@ -322,7 +343,88 @@ export const useAuth = create<AuthState>()(
         // Clear locally first so the UI never sits on a stale session waiting
         // for a network call it does not need to wait for.
         applyProfile(null, null);
+        set({ linkPending: false });
         void supabase()?.auth.signOut();
+      },
+
+      // --- Google ----------------------------------------------------------
+      signInWithGoogle: async () => {
+        const db = supabase();
+        if (!db) return { ok: false, reason: "Google sign-in is unavailable" };
+        const { error } = await db.auth.signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: window.location.href.split("#")[0] },
+        });
+        if (error) {
+          return {
+            ok: false,
+            reason: /not enabled|unsupported provider/i.test(error.message)
+              ? "Google sign-in is not switched on yet"
+              : error.message,
+          };
+        }
+        // The browser is on its way to Google; nothing else happens here.
+        return { ok: true };
+      },
+
+      linkPhone: async (phoneInput, usernameInput) => {
+        const db = supabase();
+        if (!db) return { ok: false, reason: "Unavailable" };
+        const validated = validateRegistration(phoneInput, usernameInput, "link-placeholder-1");
+        if (!validated.ok) return { ok: false, reason: validated.reason };
+
+        const { data } = await db.auth.getSession();
+        const token = data.session?.access_token;
+        if (!token) return { ok: false, reason: "Your session has expired. Sign in again." };
+
+        const response = await fetch(`${BACKEND_ORIGIN}/api/auth/link-phone`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            phone: validated.value.phone,
+            username: validated.value.username,
+          }),
+        });
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) {
+          return { ok: false, reason: body.error ?? "Could not link the number" };
+        }
+
+        const profile = await readProfile("");
+        set({ linkPending: false });
+        applyProfile(profile.phone || null, profile.phone ? profile : null);
+        return { ok: true };
+      },
+
+      setDepositPhone: async (phoneInput) => {
+        const current = get().profile;
+        if (!current) return { ok: false, reason: "Sign in first" };
+
+        let phone: string | null = null;
+        if (phoneInput) {
+          phone = normalisePhone(phoneInput);
+          if (!phone) return { ok: false, reason: "Enter a valid M-Pesa number" };
+        }
+        if (phone === current.phone) phone = null;
+
+        const db = supabase();
+        if (db) {
+          const { error } = await db.rpc("set_deposit_phone", { p_phone: phone });
+          if (error) {
+            return {
+              ok: false,
+              reason: /BAD_PHONE/.test(error.message)
+                ? "Enter a valid M-Pesa number"
+                : "Could not save the number",
+            };
+          }
+        }
+
+        set({ profile: { ...current, depositPhone: phone ?? undefined } });
+        return { ok: true };
       },
     }),
     {
@@ -362,25 +464,34 @@ async function readProfile(phone: string): Promise<StoredAccount> {
 
   const { data } = await db
     .from("profiles")
-    .select("phone, username, created_at, live_tier")
+    .select("phone, deposit_phone, username, created_at, live_tier")
     .maybeSingle();
+
+  const { data: auth } = await db.auth.getUser();
+  const google = auth.user?.app_metadata?.provider === "google";
+  const method = google ? ("google" as const) : ("phone" as const);
+  const email = google ? (auth.user?.email ?? undefined) : undefined;
 
   if (data) {
     return {
       phone: data.phone ?? phone,
+      depositPhone: data.deposit_phone ?? undefined,
       username: data.username ?? undefined,
       createdAt: new Date(data.created_at).getTime(),
       liveTier: data.live_tier === "VIP" ? "VIP" : "STANDARD",
+      method,
+      email,
     };
   }
 
-  const { data: auth } = await db.auth.getUser();
   const meta = auth.user?.user_metadata as
     | { phone?: string; username?: string }
     | undefined;
 
   return {
     phone: meta?.phone ?? phone,
+    method,
+    email,
     username: meta?.username,
     createdAt: auth.user?.created_at
       ? new Date(auth.user.created_at).getTime()
@@ -438,12 +549,24 @@ function bootstrap(): void {
 
   void (async () => {
     const { data } = await db.auth.getSession();
-    const email = data.session?.user.email ?? null;
-    // The identity email is the normalised number with the domain appended.
-    const phone = email ? (email.split("@")[0] ?? null) : null;
 
-    applyProfile(phone, phone ? await readProfile(phone) : null);
-    useAuth.setState({ hydrated: true });
+    if (!data.session) {
+      applyProfile(null, null);
+      useAuth.setState({ hydrated: true, linkPending: false });
+      return;
+    }
+
+    // The profile row is the authority on the number. A phone account's row
+    // always has one; a Google account's has none until it is linked, and
+    // until then the app treats it as signed out behind the link screen.
+    const profile = await readProfile("");
+    if (profile.phone) {
+      applyProfile(profile.phone, profile);
+      useAuth.setState({ hydrated: true, linkPending: false });
+    } else {
+      applyProfile(null, null);
+      useAuth.setState({ hydrated: true, linkPending: true });
+    }
   })();
 
   // A token refresh failure or a sign-out in another tab has to land here too,
@@ -451,6 +574,7 @@ function bootstrap(): void {
   db.auth.onAuthStateChange((event, session) => {
     if (event === "SIGNED_OUT" || !session) {
       applyProfile(null, null);
+      useAuth.setState({ linkPending: false });
     }
   });
 
