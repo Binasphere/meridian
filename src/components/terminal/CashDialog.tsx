@@ -342,7 +342,9 @@ export function CashDialog({
             ) : stage === "form" ? (
               <div className="flex flex-col gap-4 p-4">
                 {/* --- First-deposit bonus (promo only) ---------------------- */}
-                {isDeposit && !hasDeposited ? (
+                {/* VIP keeps the card on every deposit; elsewhere it goes once
+                    the first deposit has landed. */}
+                {isDeposit && (onMpesaRail || !hasDeposited) ? (
                   <div className="flex items-start gap-2.5 border border-cash/40 bg-cash/10 p-3">
                     <Gift className="mt-0.5 h-4 w-4 shrink-0 text-cash" aria-hidden />
                     <div className="min-w-0">
