@@ -131,12 +131,9 @@ export function CashDialog({
   const onMpesaRail = serverWalletActive() && usesMpesaRail(account?.liveTier);
 
   // The number this movement is raised against. Withdrawals always go to the
-  // registered number. Deposits go to the saved deposit number — the server
-  // reads it from the profile — except on the VIP demo rail, which settles
-  // against the linked handset instead.
-  const depositNumberHonoured = !onMpesaRail;
-  const payingPhone =
-    isDeposit && depositNumberHonoured ? savedDepositPhone : account?.phone;
+  // registered number; deposits show the saved deposit number on every rail.
+  // That number is not tied to this account — several may share one.
+  const payingPhone = isDeposit ? savedDepositPhone : account?.phone;
 
   // Reset whenever the dialog is reopened, so a previous receipt never greets
   // the next transaction.
@@ -373,7 +370,7 @@ export function CashDialog({
                     <span className="tnum font-mono text-[15px] text-ink">
                       {payingPhone ? formatPhoneMasked(payingPhone) : "—"}
                     </span>
-                    {isDeposit && depositNumberHonoured ? (
+                    {isDeposit ? (
                       <button
                         type="button"
                         onClick={() => openDepositNumber(true)}

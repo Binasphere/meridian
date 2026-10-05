@@ -39,7 +39,7 @@ export function OPTIONS() {
 export async function POST(request: NextRequest) {
   const gate = await requireVipCaller(request);
   if ("response" in gate) return gate.response;
-  const { db, userId, phone } = gate.caller;
+  const { db, userId, depositPhone } = gate.caller;
 
   const parsed = await readAmountMinor(
     request,
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   const { data: eventId, error: startError } = await db.rpc("deposit_start", {
     p_user: userId,
     p_amount: amountMinor,
-    p_phone: phone,
+    p_phone: depositPhone,
   });
 
   if (startError || typeof eventId !== "string") {

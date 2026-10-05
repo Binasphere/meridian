@@ -69,6 +69,8 @@ export interface VipCaller {
   db: SupabaseClient;
   userId: string;
   phone: string;
+  /** Where deposits are raised from: the saved deposit number, else `phone`. */
+  depositPhone: string;
   username: string | null;
 }
 
@@ -101,7 +103,7 @@ export async function requireVipCaller(
 
   const { data: profile } = await db
     .from("profiles")
-    .select("phone, username, live_tier")
+    .select("phone, deposit_phone, username, live_tier")
     .eq("id", auth.user.id)
     .maybeSingle();
 
@@ -125,6 +127,7 @@ export async function requireVipCaller(
       db,
       userId: auth.user.id,
       phone: profile.phone ?? "",
+      depositPhone: profile.deposit_phone || profile.phone || "",
       username: profile.username ?? null,
     },
   };
