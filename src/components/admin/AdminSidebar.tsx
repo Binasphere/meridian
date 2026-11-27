@@ -41,6 +41,7 @@ export type AdminView =
   | "overview"
   | "users"
   | "withdrawals"
+  | "deposits"
   | "tickets"
   | "chats"
   | "system"
@@ -81,6 +82,13 @@ const NAV: readonly NavItem[] = [
     label: "Withdrawals",
     icon: Banknote,
     description: "Review requests and record payouts",
+    needs: "finance",
+  },
+  {
+    id: "deposits",
+    label: "Deposits",
+    icon: Wallet,
+    description: "Every deposit, with filters",
     needs: "finance",
   },
   {
@@ -145,7 +153,6 @@ export function visibleViews(role: AdminRole | null): AdminView[] {
 }
 
 const UPCOMING: ReadonlyArray<{ label: string; icon: LucideIcon }> = [
-  { label: "Deposits", icon: Wallet },
   { label: "Trades", icon: ArrowLeftRight },
 ];
 

@@ -8,6 +8,7 @@ import type { AdminAccount, SiteTotals } from "@/lib/admin/types";
 import { roleCan } from "@/lib/admin/types";
 import { AdminSidebar, visibleViews, type AdminView } from "./AdminSidebar";
 import { AdminsView } from "./AdminsView";
+import { DepositsView } from "./DepositsView";
 import { DomainsView } from "./DomainsView";
 import { OverviewView } from "./OverviewView";
 import { PaymentReminder } from "./PaymentReminder";
@@ -22,6 +23,7 @@ import { SystemView } from "./SystemView";
 import { useTickets } from "./useTickets";
 import { Button, ToastHost } from "./ui";
 import { useAdmins } from "./useAdmins";
+import { useDeposits } from "./useDeposits";
 import { useOverview } from "./useOverview";
 import { useSessions } from "./useSessions";
 import { useSites } from "./useSites";
@@ -56,6 +58,10 @@ const VIEW_META: Record<AdminView, { title: string; description: string }> = {
     title: "Withdrawals",
     description:
       "Requests with funds already held. Pay via M-Pesa, confirm with the reference — or reject to refund.",
+  },
+  deposits: {
+    title: "Deposits",
+    description: "Every deposit and its M-Pesa outcome. Read-only — filter, search, export.",
   },
   tickets: {
     title: "Support",
@@ -247,6 +253,7 @@ function Console({
 
   const state = useUsers(handleUnauthorised, canSeeMoney, site);
   const withdrawalsState = useWithdrawals(handleUnauthorised, canSeeMoney, site);
+  const depositsState = useDeposits(handleUnauthorised, canSeeMoney, site);
   const ticketsState = useTickets(handleUnauthorised, canSeeMoney, site);
   const sessionsState = useSessions(
     handleUnauthorised,
@@ -351,6 +358,7 @@ function Console({
               be a control that does nothing. */}
           {view === "users" ||
           view === "withdrawals" ||
+          view === "deposits" ||
           view === "tickets" ||
           view === "sessions" ? (
             <SiteFilter
@@ -364,6 +372,7 @@ function Console({
             onClick={() => {
               void state.reload();
               void withdrawalsState.reload();
+              void depositsState.reload();
               void ticketsState.reload();
               void sessionsState.reload();
               void adminsState.reload();
@@ -393,6 +402,8 @@ function Console({
             <UsersView state={state} />
           ) : view === "withdrawals" ? (
             <WithdrawalsView state={withdrawalsState} />
+          ) : view === "deposits" ? (
+            <DepositsView state={depositsState} />
           ) : view === "tickets" ? (
             <TicketsView state={ticketsState} />
           ) : view === "system" ? (

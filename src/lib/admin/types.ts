@@ -185,6 +185,35 @@ export interface AdminWithdrawal {
   settledAt: string | null;
 }
 
+/** A deposit, as the Deposits page lists it. Read-only. */
+export interface AdminDeposit {
+  id: string;
+  userId: string;
+  site: string | null;
+  phone: string;
+  username: string;
+  amountMinor: string;
+  bonusMinor: string;
+  status: "PENDING" | "COMPLETED" | "FAILED";
+  reference: string | null;
+  failureReason: string | null;
+  checkoutId: string | null;
+  isDemo: boolean;
+  createdAt: string;
+  settledAt: string | null;
+}
+
+/** Totals over the deposits a filter returned. */
+export interface AdminDepositTotals {
+  count: number;
+  completedCount: number;
+  completedMinor: string;
+  bonusMinor: string;
+  pendingCount: number;
+  pendingMinor: string;
+  failedCount: number;
+}
+
 /** A support ticket, as the console sees it. */
 export interface AdminTicket {
   id: string;
