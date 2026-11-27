@@ -81,7 +81,13 @@ insert into public.sites (id, origin, name, is_primary) values
   ('venti',  'https://ventitradingfx.com', 'Venti',     true),
   ('candix', 'https://candixfx.com',       'Candix FX', false),
   ('barsfx', 'https://barsfx.com',         'Bars FX',   false),
-  ('zbarfx', 'https://zbarfx.com',         'Zbar FX',   false)
+  ('zbarfx', 'https://zbarfx.com',         'Zbar FX',   false),
+  ('petatrader', 'https://petatrader.com', 'Peta Trader', false),
+  ('metaderiv', 'https://metaderiv.com', 'Meta Deriv', false),
+  ('derivmax', 'https://derivmax.com', 'Deriv Max', false),
+  ('polloptions', 'https://polloptions.com', 'Poll Options', false),
+  ('donorsarena', 'https://donorsarena.com', 'Donors Arena', false),
+  ('nexdonfund', 'https://nexdonfund.com', 'Nexdon Fund', false)
 on conflict (id) do update
   set origin = excluded.origin,
       name   = excluded.name;

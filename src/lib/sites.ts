@@ -48,6 +48,42 @@ export const SITES: readonly Site[] = [
     name: "Zbar FX",
     primary: false,
   },
+  {
+    id: "petatrader",
+    origin: "https://petatrader.com",
+    name: "Peta Trader",
+    primary: false,
+  },
+  {
+    id: "metaderiv",
+    origin: "https://metaderiv.com",
+    name: "Meta Deriv",
+    primary: false,
+  },
+  {
+    id: "derivmax",
+    origin: "https://derivmax.com",
+    name: "Deriv Max",
+    primary: false,
+  },
+  {
+    id: "polloptions",
+    origin: "https://polloptions.com",
+    name: "Poll Options",
+    primary: false,
+  },
+  {
+    id: "donorsarena",
+    origin: "https://donorsarena.com",
+    name: "Donors Arena",
+    primary: false,
+  },
+  {
+    id: "nexdonfund",
+    origin: "https://nexdonfund.com",
+    name: "Nexdon Fund",
+    primary: false,
+  },
 ];
 
 // The non-null assertion is load-bearing rather than lazy: `SITES` is a literal

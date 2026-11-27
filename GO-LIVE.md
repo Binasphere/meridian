@@ -126,7 +126,8 @@ Two things to know before you rely on it:
 share infrastructure and nothing else a customer can see.
 
 The domains live at `ventitradingfx.com` (primary), `candixfx.com`,
-`barsfx.com` and `zbarfx.com`.
+`barsfx.com`, `zbarfx.com`, `petatrader.com`, `metaderiv.com`,
+`derivmax.com`, `polloptions.com`, `donorsarena.com` and `nexdonfund.com`.
 
 **How a request is attributed.** The service reads the browser's `Origin`
 header and matches it against `public.sites`. An unrecognised origin resolves to
@@ -145,6 +146,12 @@ separate balances. The Supabase Auth identity carries the site to match:
 | `candix` | candixfx.com | `candix.254712345678@meridian.invalid` |
 | `barsfx` | barsfx.com | `barsfx.254712345678@meridian.invalid` |
 | `zbarfx` | zbarfx.com | `zbarfx.254712345678@meridian.invalid` |
+| `petatrader` | petatrader.com | `petatrader.254712345678@meridian.invalid` |
+| `metaderiv` | metaderiv.com | `metaderiv.254712345678@meridian.invalid` |
+| `derivmax` | derivmax.com | `derivmax.254712345678@meridian.invalid` |
+| `polloptions` | polloptions.com | `polloptions.254712345678@meridian.invalid` |
+| `donorsarena` | donorsarena.com | `donorsarena.254712345678@meridian.invalid` |
+| `nexdonfund` | nexdonfund.com | `nexdonfund.254712345678@meridian.invalid` |
 
 The primary site keeps the untagged form permanently, because every account
 created before the split already has it and tagging it now would lock all of
