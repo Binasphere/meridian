@@ -36,20 +36,18 @@ export function PaymentReminder() {
   return (
     <div
       role="status"
-      className="mb-5 flex flex-wrap items-center gap-4 border border-[#f0b37a] bg-[#fff4e8] px-5 py-4"
+      className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 bg-[#F26522] px-3.5 py-2 text-[12.5px] text-white"
     >
-      <Clock size={20} className="shrink-0 text-[#c2580a]" />
-      <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-semibold text-[#8a3c05]">
+      <Clock size={14} className="shrink-0" />
+      <p className="min-w-0 flex-1">
+        <span className="font-semibold">
           {overdue ? "Payment overdue" : "Payment reminder"}
-        </p>
-        <p className="mt-0.5 text-[13px] text-[#9a4a12]">
-          Please pay the outstanding {AMOUNT_DUE} by {dueDate}.
-        </p>
-      </div>
-      <p className="font-mono text-[18px] font-semibold tabular-nums text-[#c2580a]">
-        {overdue ? "Due now" : formatLeft(left)}
+        </span>
+        {" · "}Pay the outstanding {AMOUNT_DUE} by {dueDate}
       </p>
+      <span className="font-mono font-semibold tabular-nums">
+        {overdue ? "Due now" : formatLeft(left)}
+      </span>
     </div>
   );
 }
