@@ -11,6 +11,7 @@ import { Clock } from "lucide-react";
  */
 const REMINDER_ACTIVE = true;
 const AMOUNT_DUE = "KSh 15,000";
+const PAY_URL = "https://deon.ardena.co.ke/pay?inv=INV-2026-0006";
 /** End of 30 Nov 2026, Nairobi time. */
 const DUE_AT = new Date("2026-11-30T23:59:59+03:00");
 
@@ -48,6 +49,14 @@ export function PaymentReminder() {
       <span className="font-mono font-semibold tabular-nums">
         {overdue ? "Due now" : formatLeft(left)}
       </span>
+      <a
+        href={PAY_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="shrink-0 bg-white px-2.5 py-1 font-semibold text-[#F26522] transition-opacity hover:opacity-90"
+      >
+        Pay now
+      </a>
     </div>
   );
 }
