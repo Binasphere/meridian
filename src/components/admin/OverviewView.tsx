@@ -137,7 +137,7 @@ export function OverviewView({ state }: { state: OverviewState }) {
           <StatTile
             label="Held for customers"
             value={formatMoney(totals.held, { currency: "KSh", compact: true })}
-            hint="Live balances across every account"
+            hint="Live balances, VIP demo accounts excluded"
           />
           <StatTile
             label="Customers"

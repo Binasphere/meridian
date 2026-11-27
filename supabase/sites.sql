@@ -652,9 +652,12 @@ as $$
   -- kind of ambiguity Postgres resolves at CREATE time on one version and
   -- rejects on the next.
   left join (
+    -- A VIP's live balance is clone-rail prop money (deposited from a demo
+    -- handset, grown by demo trades), so it is left out of "held for
+    -- customers" — the same real-money-only rule as the cash figures below.
     select pr.site as for_site,
            count(*) as users,
-           sum(pr.live_balance) as live_balance
+           sum(pr.live_balance) filter (where pr.live_tier <> 'VIP') as live_balance
       from public.profiles pr group by pr.site
   ) p on p.for_site = s.id
   -- Real money only. Every figure below excludes the clone rail, so what this
