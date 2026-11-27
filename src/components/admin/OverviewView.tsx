@@ -200,84 +200,62 @@ export function OverviewView({ state }: { state: OverviewState }) {
       </Card>
 
       {/* --- Per-domain breakdown ---------------------------------------- */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader
-            title="Domain breakdown"
-            subtitle="Lifetime, real money only."
-          />
-          <div className="space-y-5 px-5 py-4">
-            {sites ? (
-              <>
-                <Breakdown
-                  title="Collected"
-                  data={sites.map((site) => ({
-                    id: site.id,
-                    label: site.name,
-                    value: Number(BigInt(site.depositMinor ?? "0") / 100n),
-                    display: formatMoney(site.depositMinor ?? "0", {
-                      currency: "KSh",
-                      whole: true,
-                    }),
-                  }))}
-                />
-                <Breakdown
-                  title="Paid out"
-                  data={sites.map((site) => ({
-                    id: site.id,
-                    label: site.name,
-                    value: Number(BigInt(site.withdrawalMinor ?? "0") / 100n),
-                    display: formatMoney(site.withdrawalMinor ?? "0", {
-                      currency: "KSh",
-                      whole: true,
-                    }),
-                  }))}
-                />
-                <Breakdown
-                  title="Customers"
-                  data={sites.map((site) => ({
-                    id: site.id,
-                    label: site.name,
-                    value: site.users,
-                    display: site.users.toLocaleString(),
-                  }))}
-                />
-              </>
-            ) : (
-              <Skeleton className="h-40 w-full" />
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Sign-ups by domain"
-            subtitle={`New accounts per day, last ${days} days.`}
-          />
-          <div className="px-5 py-4">
-            {chart ? (
-              <>
-                <LineChart
-                  series={chart.signups}
-                  labels={chart.dayList.map(shortDay)}
-                  format={(value) => String(Math.round(value))}
-                  height={190}
-                  emptyMessage="No sign-ups in this period."
-                />
-                <TableView
-                  columns={["Day", ...chart.signups.map((line) => line.label)]}
-                  rows={chart.dayList.map((day, index) => [
-                    day,
-                    ...chart.signups.map((line) => line.values[index] ?? 0),
-                  ])}
-                />
-              </>
-            ) : (
-              <Skeleton className="h-[190px] w-full" />
-            )}
-          </div>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader
+          title="Domain breakdown"
+          subtitle="Lifetime, real money only."
+        />
+        <div className="grid gap-x-8 gap-y-5 px-5 py-4 md:grid-cols-2">
+          {sites ? (
+            <>
+              <Breakdown
+                title="Collected"
+                data={sites.map((site) => ({
+                  id: site.id,
+                  label: site.name,
+                  value: Number(BigInt(site.depositMinor ?? "0") / 100n),
+                  display: formatMoney(site.depositMinor ?? "0", {
+                    currency: "KSh",
+                    whole: true,
+                  }),
+                }))}
+              />
+              <Breakdown
+                title="Paid out"
+                data={sites.map((site) => ({
+                  id: site.id,
+                  label: site.name,
+                  value: Number(BigInt(site.withdrawalMinor ?? "0") / 100n),
+                  display: formatMoney(site.withdrawalMinor ?? "0", {
+                    currency: "KSh",
+                    whole: true,
+                  }),
+                }))}
+              />
+              <Breakdown
+                title="Customers"
+                data={sites.map((site) => ({
+                  id: site.id,
+                  label: site.name,
+                  value: site.users,
+                  display: site.users.toLocaleString(),
+                }))}
+              />
+              <Breakdown
+                title="Deposits"
+                data={sites.map((site) => ({
+                  id: site.id,
+                  label: site.name,
+                  value: site.depositCount,
+                  display: site.depositCount.toLocaleString(),
+                }))}
+              />
+            </>
+          ) : (
+            <Skeleton className="h-40 w-full" />
+          )}
+        </div>
+      </Card>
 
       {/* --- The domains themselves -------------------------------------- */}
       {sites ? <SitesSummary sites={sites} /> : null}
