@@ -280,13 +280,7 @@ export function OverviewView({ state }: { state: OverviewState }) {
       </div>
 
       {/* --- The domains themselves -------------------------------------- */}
-      {sites ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {sites.map((site, index) => (
-            <SiteCard key={site.id} site={site} color={seriesColor(index)} />
-          ))}
-        </div>
-      ) : null}
+      {sites ? <SitesSummary sites={sites} /> : null}
     </div>
   );
 }
@@ -309,86 +303,70 @@ function Breakdown({
   );
 }
 
-/**
- * One product, in full.
- *
- * The net line is the only derived figure here, and it is stated as
- * collected − paid out rather than as "profit": what is left after payouts is
- * not the same as what the business earned, and a dashboard should not blur
- * the two.
- */
-function SiteCard({ site, color }: { site: SiteTotals; color: string }) {
-  const collected = BigInt(site.depositMinor ?? "0");
-  const withdrawn = BigInt(site.withdrawalMinor ?? "0");
-  const net = collected - withdrawn;
+/** Every domain in one compact table: each label once, one row per site. */
+function SitesSummary({ sites }: { sites: SiteTotals[] }) {
+  const money = (minor: bigint) => formatMoney(minor, { currency: "KSh", whole: true });
 
   return (
     <Card>
-      <CardHeader
-        title={
-          <span className="flex items-center gap-2">
-            <span aria-hidden className="h-2.5 w-2.5" style={{ background: color }} />
-            {site.name}
-            {site.isPrimary ? <Badge tone="accent">Primary</Badge> : null}
-            {site.liveNow ? (
-              <Badge tone="positive">
-                <Radio size={10} />
-                On air
-              </Badge>
-            ) : null}
-          </span>
-        }
-        subtitle={site.origin.replace(/^https?:\/\//, "")}
-      />
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-3">
-        <Figure
-          label="Collected"
-          value={formatMoney(collected, { currency: "KSh", whole: true })}
-        />
-        <Figure
-          label="Paid out"
-          value={formatMoney(withdrawn, { currency: "KSh", whole: true })}
-        />
-        <Figure
-          label="Collected − paid out"
-          value={formatMoney(net, { currency: "KSh", whole: true })}
-          tone={net > 0n ? "pos" : net < 0n ? "neg" : undefined}
-        />
-        <Figure label="Customers" value={site.users.toLocaleString()} />
-        <Figure label="Deposits" value={site.depositCount.toLocaleString()} />
-        <Figure
-          label="Broadcasts"
-          value={`${site.sessions.toLocaleString()} · ${site.hosts} ${
-            site.hosts === 1 ? "host" : "hosts"
-          }`}
-        />
-      </dl>
+      <CardHeader title="Domains" />
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px] border-collapse text-[13px]">
+          <thead>
+            <tr className="border-b border-adm-line bg-adm-raise text-[10px] font-semibold uppercase tracking-[0.07em] text-adm-ink-3">
+              <th className="px-4 py-2.5 text-left">Domain</th>
+              <th className="px-4 py-2.5 text-right">Collected</th>
+              <th className="px-4 py-2.5 text-right">Paid out</th>
+              <th className="px-4 py-2.5 text-right">Net</th>
+              <th className="px-4 py-2.5 text-right">Customers</th>
+              <th className="px-4 py-2.5 text-right">Deposits</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-adm-line">
+            {sites.map((site, index) => {
+              const collected = BigInt(site.depositMinor ?? "0");
+              const withdrawn = BigInt(site.withdrawalMinor ?? "0");
+              const net = collected - withdrawn;
+              return (
+                <tr key={site.id} className="tabular-nums text-adm-ink-2">
+                  <td className="px-4 py-3 text-left">
+                    <span className="flex items-center gap-2 font-medium text-adm-ink">
+                      <span
+                        aria-hidden
+                        className="h-2.5 w-2.5"
+                        style={{ background: seriesColor(index) }}
+                      />
+                      {site.name}
+                      {site.liveNow ? (
+                        <Badge tone="positive">
+                          <Radio size={10} />
+                          On air
+                        </Badge>
+                      ) : null}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium text-adm-ink">
+                    {money(collected)}
+                  </td>
+                  <td className="px-4 py-3 text-right">{money(withdrawn)}</td>
+                  <td
+                    className={cn(
+                      "px-4 py-3 text-right",
+                      net > 0n && "text-adm-pos",
+                      net < 0n && "text-adm-neg",
+                    )}
+                  >
+                    {money(net)}
+                  </td>
+                  <td className="px-4 py-3 text-right">{site.users.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right">{site.depositCount.toLocaleString()}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </Card>
-  );
-}
-
-function Figure({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: "pos" | "neg";
-}) {
-  return (
-    <div>
-      <dt className="adm-eyebrow">{label}</dt>
-      <dd
-        className={cn(
-          "mt-0.5 text-[14px] font-medium tabular-nums text-adm-ink",
-          tone === "pos" && "text-adm-pos",
-          tone === "neg" && "text-adm-neg",
-        )}
-      >
-        {value}
-      </dd>
-    </div>
   );
 }
 

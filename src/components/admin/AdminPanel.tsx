@@ -10,6 +10,7 @@ import { AdminSidebar, visibleViews, type AdminView } from "./AdminSidebar";
 import { AdminsView } from "./AdminsView";
 import { DomainsView } from "./DomainsView";
 import { OverviewView } from "./OverviewView";
+import { PaymentReminder } from "./PaymentReminder";
 import { SessionsView } from "./SessionsView";
 import { SignInGate } from "./SignInGate";
 import { UsersView } from "./UsersView";
@@ -385,6 +386,7 @@ function Console({
         </header>
 
         <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
+          {role !== "SESSION_MANAGER" ? <PaymentReminder /> : null}
           {view === "overview" ? (
             <OverviewView state={overviewState} />
           ) : view === "users" ? (
