@@ -19,7 +19,7 @@
  */
 
 /** The project this build points at when nothing overrides it. */
-const FALLBACK_URL = "https://ztieoirzquejbwikcjzy.supabase.co";
+const FALLBACK_URL = "https://ihjfuowbjsqdxhfnlzdr.supabase.co";
 
 /**
  * The anon / publishable key. Role `anon`, bounded entirely by RLS.
@@ -28,7 +28,7 @@ const FALLBACK_URL = "https://ztieoirzquejbwikcjzy.supabase.co";
  * to fix the policy that let it do something it should not.
  */
 const FALLBACK_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0aWVvaXJ6cXVlamJ3aWtjanp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5MTUzMTUsImV4cCI6MjEwMDQ5MTMxNX0.CBk7in8OoVeOj3X8CQo9BlkBEwcpnMAdlQnNvafSiNs";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImloamZ1b3dianNxZHhoZm5semRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU3NjgwNzQsImV4cCI6MjExMTM0NDA3NH0.tOmzYjWxHUALWUKHCZnPHEmx7_rl_c6EB44o_JtUVu8";
 
 export const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_URL;
